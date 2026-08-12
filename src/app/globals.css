@@ -1,26 +1,190 @@
 @import "tailwindcss";
 
+/* ===========================================================================
+   FrioHub — sistema de design
+   Marca de serviço de climatização: confiável, limpa, brasileira.
+=========================================================================== */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg:         #ffffff;
+  --bg-subtle:  #f3f7f9;
+  --surface:    #ffffff;
+  --surface-2:  #eef3f5;
+  --ink:        #0c1e2a;
+  --ink-soft:   #51636c;
+  --ink-faint:  #8797a0;
+  --line:       #e2eaee;
+  --line-soft:  #eef3f5;
+  --cool:       #0d6e8f;   /* marca / ação */
+  --cool-deep:  #0a5670;
+  --cool-wash:  #e6f1f4;
+  --brand-ink:  #082532;   /* fundos escuros de seção */
+  --warm:       #b9691f;   /* usado com parcimônia (ex.: Patrocinado) */
+  --warm-wash:  #f6ecdf;
+  --good:       #1f7a5c;
+  --shadow-sm:  0 1px 2px rgba(12,30,42,.05);
+  --shadow-md:  0 4px 16px rgba(12,30,42,.07);
+  --shadow-lg:  0 18px 48px rgba(12,30,42,.14);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg:         #0a1720;
+    --bg-subtle:  #0c1e28;
+    --surface:    #0f2531;
+    --surface-2:  #163039;
+    --ink:        #e7eff2;
+    --ink-soft:   #a2b3bb;
+    --ink-faint:  #6f858f;
+    --line:       #1e3742;
+    --line-soft:  #16303a;
+    --cool:       #2ca6c4;
+    --cool-deep:  #57c3da;
+    --cool-wash:  #103440;
+    --brand-ink:  #081f2a;
+    --warm:       #dfa05c;
+    --warm-wash:  #291d12;
+    --good:       #49bd93;
+    --shadow-sm:  0 1px 2px rgba(0,0,0,.3);
+    --shadow-md:  0 4px 16px rgba(0,0,0,.35);
+    --shadow-lg:  0 18px 48px rgba(0,0,0,.5);
+  }
+}
+:root[data-theme="light"] {
+  --bg:#ffffff; --bg-subtle:#f3f7f9; --surface:#ffffff; --surface-2:#eef3f5;
+  --ink:#0c1e2a; --ink-soft:#51636c; --ink-faint:#8797a0; --line:#e2eaee; --line-soft:#eef3f5;
+  --cool:#0d6e8f; --cool-deep:#0a5670; --cool-wash:#e6f1f4; --brand-ink:#082532;
+  --warm:#b9691f; --warm-wash:#f6ecdf; --good:#1f7a5c;
+}
+:root[data-theme="dark"] {
+  --bg:#0a1720; --bg-subtle:#0c1e28; --surface:#0f2531; --surface-2:#163039;
+  --ink:#e7eff2; --ink-soft:#a2b3bb; --ink-faint:#6f858f; --line:#1e3742; --line-soft:#16303a;
+  --cool:#2ca6c4; --cool-deep:#57c3da; --cool-wash:#103440; --brand-ink:#081f2a;
+  --warm:#dfa05c; --warm-wash:#291d12; --good:#49bd93;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-cool: var(--cool);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  * { animation: none !important; transition: none !important; }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+h1, h2, h3 { letter-spacing: -0.022em; text-wrap: balance; margin: 0; }
+a { color: inherit; text-decoration: none; }
+::selection { background: var(--cool); color: #fff; }
+
+:where(a, button, input, select, textarea):focus-visible {
+  outline: 2px solid var(--cool);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
+
+/* ---------- layout ---------- */
+.container { width: 100%; max-width: 1120px; margin: 0 auto; padding-inline: 24px; }
+.container-tight { width: 100%; max-width: 760px; margin: 0 auto; padding-inline: 24px; }
+
+/* ---------- botões ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 46px; padding: 0 20px; border-radius: 10px;
+  font-size: 15px; font-weight: 600; cursor: pointer;
+  border: 1px solid transparent; white-space: nowrap;
+  transition: transform .12s ease, background .15s ease, border-color .15s ease, box-shadow .15s ease;
+}
+.btn:active { transform: translateY(1px); }
+.btn-primary { background: var(--cool); color: #fff; box-shadow: var(--shadow-sm); }
+.btn-primary:hover { background: var(--cool-deep); }
+.btn-ghost { background: var(--surface); color: var(--ink); border-color: var(--line); }
+.btn-ghost:hover { border-color: var(--ink-faint); }
+.btn-lg { height: 54px; padding: 0 26px; font-size: 16px; border-radius: 12px; }
+.btn-block { width: 100%; }
+.btn-onbrand { background: #fff; color: var(--brand-ink); }
+.btn-onbrand:hover { background: #eef3f5; }
+
+/* ---------- eyebrow / labels ---------- */
+.eyebrow {
+  font-size: 12.5px; font-weight: 650; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--cool); margin: 0;
+}
+
+/* ---------- cartões ---------- */
+.card {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 16px; box-shadow: var(--shadow-sm);
+}
+
+/* ---------- hero em tela cheia ---------- */
+.hero-scrim {
+  position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background:
+    linear-gradient(100deg, rgba(3,14,20,.74) 0%, rgba(3,14,20,.38) 45%, rgba(3,14,20,.1) 72%),
+    linear-gradient(0deg, rgba(3,14,20,.6) 0%, rgba(3,14,20,0) 42%);
+}
+.hero-chip {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 13px; font-weight: 650; letter-spacing: .02em;
+  color: #eaf6fa; background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.18);
+  backdrop-filter: blur(10px);
+  padding: 8px 16px; border-radius: 100px; margin-bottom: 24px;
+}
+.hero-title { font-size: clamp(2.5rem, 6vw, 4.25rem); line-height: 1.03; font-weight: 800; letter-spacing: -0.03em; color: #fff; margin-bottom: 22px; }
+.hero-title-accent {
+  background: linear-gradient(100deg, #8fe6f7 0%, #ffffff 45%, #5fc3dc 100%);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+}
+.hero-subtitle { font-size: 1.18rem; line-height: 1.6; color: rgba(234,246,250,.8); max-width: 520px; margin-bottom: 34px; }
+.hero-search { display: flex; gap: 10px; max-width: 460px; }
+.hero-search-input {
+  height: 56px; width: 100%; padding: 0 16px 0 44px; border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.2); background: rgba(255,255,255,.09);
+  color: #fff; font-size: 16px; backdrop-filter: blur(8px);
+}
+.hero-search-input::placeholder { color: rgba(234,246,250,.55); }
+.hero-search-icon { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: #7fe0f2; display: flex; z-index: 1; }
+.hero-trust { display: flex; gap: 24px; margin-top: 30px; flex-wrap: wrap; }
+.hero-badge {
+  position: absolute; right: 40px; bottom: 40px; z-index: 2;
+  background: rgba(8,28,38,.55); border: 1px solid rgba(255,255,255,.16);
+  backdrop-filter: blur(14px); border-radius: 16px; padding: 18px 22px;
+  color: #fff; box-shadow: var(--shadow-lg);
+}
+.hero-badge-value { font-size: 1.7rem; font-weight: 800; letter-spacing: -0.02em; }
+.hero-badge-value span { font-size: .82rem; font-weight: 600; color: rgba(234,246,250,.7); margin-left: 4px; }
+.hero-badge-label { font-size: .8rem; color: rgba(234,246,250,.65); margin-top: 4px; }
+@media (max-width: 760px) {
+  .hero-badge { display: none; }
+}
+
+/* ---------- nav ---------- */
+@media (max-width: 860px) { .site-nav-links { display: none !important; } }
+
+/* ---------- FAQ ---------- */
+.faq-mark { transition: transform .2s ease; display: inline-block; }
+details[open] .faq-mark { transform: rotate(45deg); }
+
+/* seleção de papel no cadastro */
+.role-radio:checked + .role-card {
+  border-color: var(--cool);
+  box-shadow: inset 0 0 0 1px var(--cool);
+  background: var(--cool-wash);
+}
+.role-radio:focus-visible + .role-card { outline: 2px solid var(--cool); outline-offset: 2px; }
