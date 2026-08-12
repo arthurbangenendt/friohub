@@ -6,6 +6,8 @@ import { formatarBtu } from "@/lib/btu";
 import { rotuloJob } from "../../solicitar/tipos";
 import { JobActions } from "./JobActions";
 import { ReviewForm } from "./ReviewForm";
+import { AvaliarCliente } from "./AvaliarCliente";
+import { TAG_LABEL } from "./tags-cliente";
 import { Star } from "@/components/icons";
 
 const mono = "var(--font-geist-mono), ui-monospace, monospace";
@@ -84,6 +86,19 @@ export default async function ServicoPage({ params }: { params: Promise<{ id: st
      tabela (enxerga a comissão descontada dele), o cliente lê a view sem margem
      nem comissão. Ver migration 20260812130000_orders_cliente_view. */
   const order = await carregarOrder(supabase, job.id, isPro);
+
+  /* Reputação do cliente: a RLS de `client_reviews` só entrega para profissional
+     e admin, então esta consulta volta vazia para o próprio cliente. */
+  const { data: repCliente } = isPro
+    ? await supabase.from("client_reviews").select("rating, tags, job_id").eq("cliente_id", job.cliente_id)
+    : { data: null };
+  const avaliacoesCliente = (repCliente ?? []) as { rating: number; tags: string[]; job_id: string }[];
+  const jaAvaliouCliente = avaliacoesCliente.some((a) => a.job_id === job.id);
+  const notaCliente = avaliacoesCliente.length
+    ? avaliacoesCliente.reduce((s2, a) => s2 + a.rating, 0) / avaliacoesCliente.length
+    : null;
+  const tagsCliente = [...new Set(avaliacoesCliente.flatMap((a) => a.tags ?? []))].slice(0, 6);
+  const podeAvaliarCliente = isPro && ["concluido", "avaliado"].includes(job.status) && !jaAvaliouCliente;
   const review = one(job.review) as { rating: number; comment: string | null } | null;
   const st = STATUS[job.status] ?? STATUS.aberto;
 
@@ -161,6 +176,37 @@ export default async function ServicoPage({ params }: { params: Promise<{ id: st
               ))}
             </div>
             {review.comment && <p style={{ color: "var(--ink-soft)", fontSize: 15 }}>{review.comment}</p>}
+          </div>
+        )}
+
+        {/* reputação do cliente — só o profissional enxerga este bloco */}
+        {isPro && (notaCliente !== null || podeAvaliarCliente) && (
+          <div className="card" style={{ padding: 22 }}>
+            <SecTitle>Sobre este cliente</SecTitle>
+            {notaCliente !== null && (
+              <div style={{ marginBottom: podeAvaliarCliente ? 18 : 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
+                  <span style={{ color: "var(--warm)", display: "flex" }}><Star size={16} filled /></span>
+                  <strong>{notaCliente.toFixed(1)}</strong>
+                  <span style={{ color: "var(--ink-faint)" }}>
+                    de {avaliacoesCliente.length} atendimento{avaliacoesCliente.length > 1 ? "s" : ""}
+                  </span>
+                </div>
+                {tagsCliente.length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginTop: 10 }}>
+                    {tagsCliente.map((t) => (
+                      <span key={t} style={{ fontSize: 12.5, padding: "4px 11px", borderRadius: 100, background: "var(--surface-2)", color: "var(--ink-soft)" }}>
+                        {TAG_LABEL[t] ?? t}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <p style={{ fontSize: 12, color: "var(--ink-faint)", margin: "10px 0 0" }}>
+                  Visível apenas para profissionais. O cliente não vê esta avaliação.
+                </p>
+              </div>
+            )}
+            {podeAvaliarCliente && <AvaliarCliente jobId={job.id} clienteNome={cliNome} />}
           </div>
         )}
       </div>

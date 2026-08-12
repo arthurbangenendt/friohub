@@ -2,23 +2,23 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { CIDADE } from "@/lib/regiao";
+import { EXIGIR_VERIFICACAO } from "@/lib/config";
 import { PerfilForm } from "./PerfilForm";
 import { PortfolioEditor } from "./PortfolioEditor";
+import { MidiaEditor } from "../MidiaEditor";
 import type { PerfilInput } from "./actions";
-
-const mono = "var(--font-geist-mono), ui-monospace, monospace";
 
 export default async function PerfilPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: profile } = await supabase.from("profiles").select("role, nome").eq("id", user.id).single();
+  const { data: profile } = await supabase.from("profiles").select("role, nome, avatar_url").eq("id", user.id).single();
   if (profile?.role !== "profissional") redirect("/painel");
 
   const { data: pro } = await supabase
     .from("professionals")
-    .select(`tipo, razao_social, bio, cidade, anos_experiencia, verification_status,
+    .select(`tipo, razao_social, bio, cidade, anos_experiencia, verification_status, banner_url,
              professional_skills ( specialty, years_experience ),
              service_areas ( cep_prefix ),
              professional_tags ( tag_slug )`)
@@ -35,7 +35,7 @@ export default async function PerfilPage() {
 
   const { data: portfolio } = await supabase
     .from("portfolio_items")
-    .select("id, url")
+    .select("id, url, grupo_id, momento, caption, position")
     .eq("professional_id", user.id)
     .eq("media_type", "foto")
     .order("position");
@@ -59,23 +59,36 @@ export default async function PerfilPage() {
 
   return (
     <main className="container-tight" style={{ padding: "40px 24px 80px" }}>
-      <Link href="/painel" style={{ fontFamily: mono, fontSize: 13, color: "var(--ink-faint)" }}>← Painel</Link>
-      <h1 style={{ fontSize: "1.8rem", fontWeight: 800, margin: "20px 0 6px" }}>Meu perfil profissional</h1>
+      <h1 style={{ fontSize: "1.8rem", fontWeight: 800, margin: "0 0 6px" }}>Meu perfil profissional</h1>
       <p style={{ color: "var(--ink-soft)", marginBottom: 8 }}>
         É isso que os clientes veem ao escolher um profissional. Capriche.
       </p>
       {pro && (
-        <p style={{ fontSize: 13.5, color: verificado ? "var(--good)" : "var(--warm)", marginBottom: 26, fontWeight: 600 }}>
-          {verificado ? "Perfil verificado — visível nas buscas." : "Perfil em análise."}
+        <Link href={`/profissional/${user.id}`} style={{ fontSize: 13.5, fontWeight: 600, color: "var(--cool-deep)" }}>
+          Ver meu perfil como o cliente vê →
+        </Link>
+      )}
+      {pro && (
+        <p style={{ fontSize: 13.5, color: verificado || !EXIGIR_VERIFICACAO ? "var(--good)" : "var(--warm)", marginBottom: 26, fontWeight: 600 }}>
+          {verificado
+            ? "Perfil verificado — visível nas buscas."
+            : EXIGIR_VERIFICACAO
+              ? "Perfil em análise — ainda não aparece nas buscas."
+              : "Perfil ativo — você já aparece nas buscas dos clientes."}
         </p>
       )}
       <div className="card" style={{ padding: 26, marginTop: 8 }}>
-        <PerfilForm inicial={inicial} catalogo={catalogo ?? []} />
+        <MidiaEditor uid={user.id} nome={profile?.nome ?? "Profissional"}
+          avatarUrl={profile?.avatar_url ?? null} bannerUrl={pro?.banner_url ?? null} mostrarBanner />
+      </div>
+
+      <div className="card" style={{ padding: 26, marginTop: 16 }}>
+        <PerfilForm uid={user.id} inicial={inicial} catalogo={catalogo ?? []} />
       </div>
 
       <div className="card" style={{ padding: 26, marginTop: 16 }}>
         <div style={{ fontSize: 12.5, fontWeight: 650, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--ink-faint)", marginBottom: 4 }}>Portfólio</div>
-        <p style={{ color: "var(--ink-soft)", fontSize: 14, marginBottom: 16 }}>Mostre fotos de trabalhos que você já fez.</p>
+        <p style={{ color: "var(--ink-soft)", fontSize: 14, marginBottom: 16 }}>Mostre o antes e o depois dos serviços que você já fez.</p>
         {pro ? (
           <PortfolioEditor uid={user.id} inicial={portfolio ?? []} />
         ) : (

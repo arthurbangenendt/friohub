@@ -21,6 +21,11 @@
   --warm:       #b9691f;   /* usado com parcimônia (ex.: Patrocinado) */
   --warm-wash:  #f6ecdf;
   --good:       #1f7a5c;
+  /* Cores de gráfico. Não são as da marca: o --cool (#0d6e8f) reprova no piso
+     de croma e lê como cinza numa barra. Estes passos foram validados para
+     banda de luminosidade, croma, separação em daltonismo e contraste. */
+  --chart-1:    #0b7cae;
+  --chart-2:    #b9691f;
   --shadow-sm:  0 1px 2px rgba(12,30,42,.05);
   --shadow-md:  0 4px 16px rgba(12,30,42,.07);
   --shadow-lg:  0 18px 48px rgba(12,30,42,.14);
@@ -42,6 +47,10 @@
     --brand-ink:  #081f2a;
     --warm:       #dfa05c;
     --warm-wash:  #291d12;
+    /* Passos próprios do modo escuro — validados contra o surface escuro,
+       não um clarão automático dos tokens claros. */
+    --chart-1:    #2492ae;
+    --chart-2:    #c78440;
     --good:       #49bd93;
     --shadow-sm:  0 1px 2px rgba(0,0,0,.3);
     --shadow-md:  0 4px 16px rgba(0,0,0,.35);
@@ -251,3 +260,147 @@ details[open] .faq-mark { transform: rotate(45deg); }
   width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center;
   font-weight: 700; font-size: 1.05rem; color: #fff; flex-shrink: 0;
 }
+
+/* ---------- SHELL DO PAINEL (sidebar) ---------- */
+.painel-shell { display: grid; grid-template-columns: 248px 1fr; min-height: 100dvh; }
+.painel-side {
+  border-right: 1px solid var(--line); background: var(--surface);
+  display: flex; flex-direction: column; gap: 18px; padding: 22px 16px;
+  position: sticky; top: 0; height: 100dvh; overflow-y: auto;
+}
+.painel-brand {
+  display: inline-flex; align-items: center; gap: 8px; text-decoration: none;
+  color: var(--ink); font-weight: 600; font-size: 14px; letter-spacing: .02em;
+  font-family: var(--font-geist-mono), ui-monospace, monospace; padding: 0 8px;
+}
+.painel-user {
+  display: flex; align-items: center; gap: 11px; padding: 10px; border-radius: 12px;
+  text-decoration: none; color: inherit; border: 1px solid var(--line); background: var(--bg);
+}
+.painel-user:hover { border-color: var(--ink-faint); }
+.painel-avatar {
+  width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0; overflow: hidden;
+  display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 15px;
+}
+.painel-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.painel-nav { display: flex; flex-direction: column; gap: 2px; }
+.painel-nav-t {
+  font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--ink-faint); padding: 14px 10px 6px;
+}
+.painel-link {
+  display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 9px;
+  text-decoration: none; color: var(--ink-soft); font-size: 14px; font-weight: 550;
+}
+.painel-link:hover { background: var(--surface-2); color: var(--ink); }
+.painel-link[data-on="true"] { background: var(--cool-wash); color: var(--cool-deep); font-weight: 650; }
+.painel-link-ic { display: flex; color: currentColor; opacity: .85; }
+.painel-main { min-width: 0; background: var(--bg); }
+.painel-sair-wrap { margin-top: auto; }
+.painel-sair {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 9px 10px; border-radius: 9px; border: none; background: none; cursor: pointer;
+  color: var(--ink-faint); font-size: 14px; font-weight: 550; text-align: left;
+  font-family: inherit;
+}
+.painel-sair:hover { background: var(--surface-2); color: var(--ink); }
+
+@media (max-width: 880px) {
+  .painel-shell { grid-template-columns: 1fr; }
+  /* Vira barra horizontal rolável no topo — sem menu escondido atrás de clique. */
+  .painel-side {
+    position: static; height: auto; flex-direction: row; align-items: center;
+    gap: 10px; overflow-x: auto; padding: 12px 16px;
+    border-right: none; border-bottom: 1px solid var(--line);
+  }
+  .painel-brand { display: none; }
+  .painel-nav { flex-direction: row; gap: 6px; }
+  .painel-nav-t { display: none; }
+  .painel-link { white-space: nowrap; }
+  .painel-user { padding: 6px 10px 6px 6px; flex-shrink: 0; }
+  .painel-user span[data-nome] { display: none; }
+  .painel-sair-wrap { margin-top: 0; margin-left: auto; flex-shrink: 0; }
+  .painel-sair { width: auto; }
+}
+
+/* ---------- PERFIL PÚBLICO DO PROFISSIONAL ---------- */
+.perfil-capa {
+  height: 210px; border-radius: 18px; overflow: hidden; position: relative;
+  border: 1px solid var(--line);
+  background: linear-gradient(155deg, #0e1b26 0%, #123243 55%, #0d2130 100%);
+}
+.perfil-capa img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* Escurece a base da capa para o nome sobreposto continuar legível em foto clara. */
+.perfil-capa::after {
+  content: ""; position: absolute; inset: auto 0 0 0; height: 60%;
+  background: linear-gradient(to top, rgba(8,20,28,.5), transparent);
+}
+.perfil-topo {
+  display: flex; align-items: flex-end; gap: 20px; flex-wrap: wrap;
+  margin-top: -46px; padding: 0 8px; position: relative; z-index: 1;
+}
+.perfil-foto {
+  border: 4px solid var(--bg); border-radius: 26px; overflow: hidden;
+  background: var(--bg); flex-shrink: 0; line-height: 0;
+}
+.perfil-id { flex: 1; min-width: 220px; padding-bottom: 4px; }
+.perfil-meta {
+  display: flex; align-items: center; gap: 8px 16px; margin-top: 8px;
+  flex-wrap: wrap; color: var(--ink-soft); font-size: 14.5px;
+}
+.perfil-selo {
+  display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 600;
+  padding: 4px 10px; border-radius: 100px; background: var(--cool-wash); color: var(--cool-deep);
+}
+@media (max-width: 620px) {
+  .perfil-capa { height: 150px; }
+  .perfil-topo { margin-top: -36px; }
+}
+
+/* ---------- CARDS DE PROFISSIONAL (grade de escolha no wizard) ---------- */
+.pro-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); gap: 16px; }
+.pro-card {
+  display: flex; flex-direction: column; cursor: pointer; overflow: hidden;
+  border: 1px solid var(--line); border-radius: 16px; background: var(--surface);
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.pro-card:hover { border-color: var(--ink-faint); }
+.pro-card[data-sel="true"] { border-color: var(--cool); box-shadow: inset 0 0 0 1px var(--cool); }
+.pro-card:focus-visible { outline: 2px solid var(--cool); outline-offset: 2px; }
+.pro-capa { position: relative; aspect-ratio: 4 / 3; background: var(--surface-2); }
+.pro-capa img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pro-capa-iniciais {
+  display: grid; place-items: center; width: 100%; height: 100%;
+  color: #fff; font-weight: 700; font-size: 2.6rem; letter-spacing: .02em;
+}
+.pro-patroc {
+  position: absolute; top: 9px; left: 9px; font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .06em; padding: 3px 8px; border-radius: 100px;
+  background: var(--warm-wash); color: var(--warm);
+}
+.pro-check {
+  position: absolute; top: 9px; right: 9px; width: 26px; height: 26px; border-radius: 50%;
+  display: grid; place-items: center; background: var(--cool); color: #fff;
+}
+.pro-corpo { display: flex; flex-direction: column; gap: 6px; padding: 14px; text-align: left; }
+.pro-chip {
+  font-size: 11.5px; padding: 3px 9px; border-radius: 100px;
+  background: var(--cool-wash); color: var(--cool-deep); font-weight: 600;
+}
+.pro-link { font-size: 12.5px; color: var(--cool-deep); font-weight: 600; margin-top: 4px; }
+
+/* ---------- PORTFÓLIO ANTES / DEPOIS ---------- */
+.pf-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 18px; }
+.pf-par { margin: 0; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--surface); }
+/* Duas colunas coladas: a comparação só funciona com as fotos encostadas. */
+.pf-fotos { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; background: var(--line); }
+.pf-fotos:has(.pf-foto:only-child) { grid-template-columns: 1fr; }
+.pf-foto { position: relative; aspect-ratio: 4 / 3; display: block; background: var(--surface-2); }
+.pf-foto img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pf-tag {
+  position: absolute; top: 8px; left: 8px; font-size: 10.5px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .06em; padding: 3px 8px; border-radius: 100px;
+  background: rgba(12,30,42,.72); color: #fff;
+}
+.pf-tag-depois { background: var(--cool); }
+.pf-legenda { padding: 12px 14px; font-size: 13.5px; color: var(--ink-soft); line-height: 1.5; }

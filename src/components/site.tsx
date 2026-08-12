@@ -7,7 +7,7 @@ import { Logo } from "./icons";
 /** Quando `overHero`, o header flutua transparente sobre a seção inicial e só
  * ganha fundo sólido depois que a página rola — usado na home, onde o hero
  * ocupa a tela inteira e não pode ter uma barra branca cortando o topo. */
-export function SiteHeader({ overHero = false }: { overHero?: boolean }) {
+export function SiteHeader({ overHero = false, logado = false }: { overHero?: boolean; logado?: boolean }) {
   const [solid, setSolid] = useState(!overHero);
 
   useEffect(() => {
@@ -46,9 +46,16 @@ export function SiteHeader({ overHero = false }: { overHero?: boolean }) {
           <Link href="/parceiros" style={{ ...navLink, color: solidLook ? "var(--ink-soft)" : "rgba(255,255,255,.82)" }}>Para profissionais</Link>
         </nav>
 
+        {/* Oferecer "Entrar" a quem já entrou é ruído. Logado vê o caminho de volta. */}
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <Link href="/login" style={{ ...navLink, fontWeight: 600, color: solidLook ? "var(--ink-soft)" : "rgba(255,255,255,.9)" }}>Entrar</Link>
-          <Link href="/signup" className="btn btn-primary" style={{ height: 40, padding: "0 16px", fontSize: 14 }}>Criar conta</Link>
+          {logado ? (
+            <Link href="/painel" className="btn btn-primary" style={{ height: 40, padding: "0 16px", fontSize: 14 }}>Ir para o painel</Link>
+          ) : (
+            <>
+              <Link href="/login" style={{ ...navLink, fontWeight: 600, color: solidLook ? "var(--ink-soft)" : "rgba(255,255,255,.9)" }}>Entrar</Link>
+              <Link href="/signup" className="btn btn-primary" style={{ height: 40, padding: "0 16px", fontSize: 14 }}>Criar conta</Link>
+            </>
+          )}
         </div>
       </div>
     </header>

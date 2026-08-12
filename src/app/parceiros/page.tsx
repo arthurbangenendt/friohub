@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { SiteHeader, SiteFooter } from "@/components/site";
 import { CIDADE, ESTADO } from "@/lib/regiao";
 import { TAXA_COMISSAO } from "@/lib/pricing";
 import { ArrowRight, Star, Shield, Bolt, Wrench, MapPin, Check } from "@/components/icons";
@@ -47,11 +48,13 @@ export default async function ParceirosPage() {
     porCategoria.set(t.categoria, arr);
   }
 
-  // Números reais. Se ainda não há base, não inventamos — o bloco some.
+  /* Números reais. Se ainda não há base, não inventamos — o bloco some.
+     Conta todos os profissionais, não só os verificados: com o portão de
+     verificação desligado no piloto, contar verificados mostraria zero mesmo
+     havendo parceiros ativos. */
   const { count: numPros } = await supabase
     .from("professionals")
-    .select("id", { count: "exact", head: true })
-    .eq("verification_status", "verificado");
+    .select("id", { count: "exact", head: true });
   const { count: numServicos } = await supabase
     .from("jobs")
     .select("id", { count: "exact", head: true })
@@ -60,8 +63,12 @@ export default async function ParceirosPage() {
   const temNumeros = (numPros ?? 0) > 0 || (numServicos ?? 0) > 0;
   const comissaoPct = Math.round(TAXA_COMISSAO * 100);
 
+  const { data: { user } } = await supabase.auth.getUser();
+
   return (
-    <main>
+    <>
+      <SiteHeader logado={!!user} />
+      <main>
       {/* ---------------- HERO ---------------- */}
       <section className="parc-hero">
         <div className="container">
@@ -97,7 +104,7 @@ export default async function ParceirosPage() {
       {temNumeros && (
         <section className="container" style={{ padding: "40px 24px 0" }}>
           <div className="parc-grid">
-            {(numPros ?? 0) > 0 && <Numero valor={String(numPros)} label="Profissionais verificados" />}
+            {(numPros ?? 0) > 0 && <Numero valor={String(numPros)} label="Profissionais na plataforma" />}
             {(numServicos ?? 0) > 0 && <Numero valor={String(numServicos)} label="Serviços concluídos" />}
             <Numero valor={`${comissaoPct}%`} label="Comissão sobre o serviço" />
           </div>
@@ -118,7 +125,7 @@ export default async function ParceirosPage() {
           <Beneficio Icon={Bolt} t="Sem custo para participar"
             d={`Não há mensalidade para entrar. A comissão de ${comissaoPct}% incide sobre o serviço realizado — se não fechou, não paga.`} />
           <Beneficio Icon={Shield} t="Perfil verificado"
-            d="Parceiros passam por análise antes de aparecer nas buscas. Isso protege quem trabalha certo da concorrência de quem não trabalha." />
+            d="Perfis conferidos pela equipe ganham o selo de verificado, que aparece para o cliente na hora de escolher." />
           <Beneficio Icon={Check} t="Portfólio que trabalha por você"
             d="Suba fotos dos seus serviços. É o que o cliente olha antes de escolher entre dois profissionais com a mesma nota." />
         </div>
@@ -132,7 +139,7 @@ export default async function ParceirosPage() {
           <div className="parc-grid" style={{ marginTop: 28 }}>
             <Passo n="01" t="Crie sua conta" d="Nome, contato e CPF ou CNPJ. Leva um minuto." />
             <Passo n="02" t="Monte seu perfil técnico" d="Marque suas especialidades, os equipamentos que domina, os ambientes que atende e sua região." />
-            <Passo n="03" t="Passe pela verificação" d="Nossa equipe confere seus dados antes de liberar o perfil nas buscas." />
+            <Passo n="03" t="Apareça nas buscas" d="Assim que o perfil técnico estiver completo, você já aparece para os clientes cuja necessidade bate com as suas especialidades." />
             <Passo n="04" t="Receba e execute" d="O cliente escolhe você, vocês combinam pelo painel e o serviço acontece." />
           </div>
         </div>
@@ -210,7 +217,7 @@ export default async function ParceirosPage() {
         <div style={{ marginTop: 22, display: "flex", flexDirection: "column", gap: 2 }}>
           <Faq q="Preciso ter CNPJ?" a="Não. Autônomos podem se cadastrar com CPF. Empresas usam CNPJ e podem informar a razão social." />
           <Faq q="Tem mensalidade?" a={`Não há mensalidade para participar. A plataforma retém ${comissaoPct}% sobre o serviço realizado — orçar não custa nada.`} />
-          <Faq q="Quanto tempo leva a verificação?" a="O perfil entra em análise assim que você o completa. Enquanto isso você já consegue navegar pelo painel, mas ainda não aparece nas buscas dos clientes." />
+          <Faq q="Quando eu começo a aparecer para os clientes?" a="Assim que você completar o perfil técnico com pelo menos uma especialidade e sua região. A partir daí você entra nas buscas dos clientes cuja necessidade bate com o que você faz." />
           <Faq q="Posso escolher onde atendo?" a={`Sim. Você cadastra a região de atendimento e só recebe solicitações dela. No momento a operação está concentrada em ${CIDADE} — ${ESTADO}.`} />
           <Faq q="Como recebo pelo serviço?" a="O painel do parceiro mostra o valor líquido de cada serviço, já descontada a comissão. O fluxo de repasse é informado no painel." />
         </div>
@@ -228,7 +235,9 @@ export default async function ParceirosPage() {
           </Link>
         </div>
       </section>
-    </main>
+      </main>
+      <SiteFooter />
+    </>
   );
 }
 

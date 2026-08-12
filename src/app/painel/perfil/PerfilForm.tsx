@@ -19,13 +19,15 @@ const CATEGORIAS: { id: string; titulo: string; ajuda: string }[] = [
   { id: "servico", titulo: "Serviços que você executa", ajuda: "O detalhe do que você faz dentro de cada especialidade." },
   { id: "equipamento", titulo: "Equipamentos que domina", ajuda: "Split, cassete, VRF, chiller — o cliente filtra por isso." },
   { id: "ambiente", titulo: "Ambientes que atende", ajuda: "Residencial, corporativo, industrial, hospitalar." },
-  { id: "credencial", titulo: "Credenciais e diferenciais", ajuda: "Conferidas na verificação do seu perfil." },
+  { id: "credencial", titulo: "Credenciais e diferenciais", ajuda: "Autodeclaradas. A equipe pode conferir e liberar o selo de verificado." },
 ];
 
 type SkillState = Record<string, { checked: boolean; years: number }>;
 
-export function PerfilForm({ inicial, catalogo }: { inicial: PerfilInput; catalogo: TagCatalogo[] }) {
+export function PerfilForm({ uid, inicial, catalogo }: { uid: string; inicial: PerfilInput; catalogo: TagCatalogo[] }) {
   const router = useRouter();
+  // Perfil ainda não montado: a primeira conclusão leva à vitrine pública.
+  const primeiraVez = inicial.skills.length === 0;
   const [tipo, setTipo] = useState<"autonomo" | "empresa">(inicial.tipo);
   const [razaoSocial, setRazaoSocial] = useState(inicial.razaoSocial);
   const [bio, setBio] = useState(inicial.bio);
@@ -64,8 +66,12 @@ export function PerfilForm({ inicial, catalogo }: { inicial: PerfilInput; catalo
     if (payload.skills.length === 0) { setErro("Selecione ao menos uma especialidade."); return; }
     start(async () => {
       const r = await salvarPerfil(payload);
-      if (r.ok) { setSalvo(true); router.refresh(); }
-      else setErro(r.error ?? "Erro ao salvar.");
+      if (!r.ok) { setErro(r.error ?? "Erro ao salvar."); return; }
+      setSalvo(true);
+      router.refresh();
+      /* Na primeira vez, mostramos o resultado: o profissional cai na própria
+         vitrine e entende o que o cliente vai ver antes de contratá-lo. */
+      if (primeiraVez) router.push(`/profissional/${uid}`);
     });
   }
 
@@ -155,7 +161,7 @@ export function PerfilForm({ inicial, catalogo }: { inicial: PerfilInput; catalo
       </div>
 
       {erro && <p style={{ color: "#b3261e", fontSize: 14 }}>{erro}</p>}
-      {salvo && <p style={{ color: "var(--good)", fontSize: 14, fontWeight: 600 }}>Perfil salvo! Você já aparece nas buscas.</p>}
+      {salvo && <p style={{ color: "var(--good)", fontSize: 14, fontWeight: 600 }}>Perfil salvo! Você já aparece nas buscas dos clientes.</p>}
 
       <button className="btn btn-primary" onClick={salvar} disabled={pending} style={{ alignSelf: "flex-start", opacity: pending ? 0.7 : 1 }}>
         {pending ? "Salvando..." : "Salvar perfil"}

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { TAG_IDS } from "./tags-cliente";
 
 import { SPECIALTY_OF } from "../../solicitar/tipos";
 import type { JobType } from "../../solicitar/tipos";
@@ -74,5 +75,51 @@ export async function avaliarJob(input: { jobId: string; rating: number; comment
   await supabase.from("jobs").update({ status: "avaliado" }).eq("id", job.id);
   revalidatePath(`/servico/${job.id}`);
   revalidatePath("/painel");
+  return { ok: true as const };
+}
+
+// ---------------------------------------------------------------------------
+// Reputação do CLIENTE, escrita pelo profissional.
+// Vocabulário fechado: o mesmo conjunto está no CHECK da tabela, então valor
+// fora da lista é barrado no banco mesmo que passe daqui.
+// ---------------------------------------------------------------------------
+
+export async function avaliarCliente(input: { jobId: string; rating: number; tags: string[] }) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false as const, error: "Não autenticado." };
+
+  if (!(input.rating >= 1 && input.rating <= 5)) {
+    return { ok: false as const, error: "Selecione uma nota de 1 a 5." };
+  }
+  const tags = [...new Set(input.tags)].filter((t) => TAG_IDS.includes(t));
+
+  const { data: job } = await supabase
+    .from("jobs")
+    .select("id, cliente_id, profissional_id, status")
+    .eq("id", input.jobId)
+    .single();
+
+  if (!job || job.profissional_id !== user.id) {
+    return { ok: false as const, error: "Serviço não encontrado." };
+  }
+  if (!["concluido", "avaliado"].includes(job.status)) {
+    return { ok: false as const, error: "Só é possível avaliar depois de concluir o serviço." };
+  }
+
+  const { error } = await supabase.from("client_reviews").insert({
+    job_id: job.id,
+    professional_id: user.id,
+    cliente_id: job.cliente_id,
+    rating: input.rating,
+    tags,
+  });
+  if (error) {
+    // unique(job_id): segunda avaliação do mesmo serviço
+    if (error.code === "23505") return { ok: false as const, error: "Você já avaliou este cliente." };
+    return { ok: false as const, error: error.message };
+  }
+
+  revalidatePath(`/servico/${job.id}`);
   return { ok: true as const };
 }

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { SiteHeader, SiteFooter } from "@/components/site";
+import { Avatar } from "@/app/painel/Avatar";
 import { Star, Shield, MapPin, Building, User, ArrowRight } from "@/components/icons";
 
 const SPEC_LABEL: Record<string, string> = {
@@ -28,22 +29,41 @@ export default async function ProfissionalPage({ params }: { params: Promise<{ i
 
   const { data: pro } = await supabase
     .from("professionals")
-    .select(`id, tipo, razao_social, bio, cidade, estado, verification_status,
-             profiles!inner ( nome ),
+    .select(`id, tipo, razao_social, bio, cidade, estado, verification_status, banner_url, anos_experiencia,
+             profiles!inner ( nome, avatar_url ),
              professional_skills ( specialty, rating_avg, rating_count, jobs_completed, years_experience ),
-             portfolio_items ( id, url, media_type, position ),
+             portfolio_items ( id, url, media_type, position, grupo_id, momento, caption ),
              professional_tags ( skill_tags ( slug, label, categoria, ordem ) )`)
     .eq("id", id)
     .maybeSingle();
 
   if (!pro) notFound();
 
-  const nome = one(pro.profiles)?.nome ?? "Profissional";
+  const { data: { user: usuario } } = await supabase.auth.getUser();
+
+  const perfil = one(pro.profiles) as { nome: string; avatar_url: string | null } | null;
+  const nome = perfil?.nome ?? "Profissional";
+  const avatarUrl = perfil?.avatar_url ?? null;
   const skills = ((pro.professional_skills ?? []) as { specialty: string; rating_avg: number; rating_count: number; jobs_completed: number; years_experience: number }[])
     .sort((a, b) => b.rating_avg - a.rating_avg);
-  const fotos = ((pro.portfolio_items ?? []) as { id: string; url: string; media_type: string; position: number }[])
+  type FotoRow = { id: string; url: string; media_type: string; position: number; grupo_id: string | null; momento: string | null; caption: string | null };
+  const fotos = ((pro.portfolio_items ?? []) as FotoRow[])
     .filter((i) => i.media_type === "foto")
     .sort((a, b) => a.position - b.position);
+
+  /* Agrupa em pares antes/depois. Foto sem grupo (avulsa) vira um par só com
+     "depois", para continuar aparecendo em vez de sumir da vitrine. */
+  const paresPortfolio = (() => {
+    const mapa = new Map<string, { antes: FotoRow | null; depois: FotoRow | null; caption: string | null }>();
+    for (const f of fotos) {
+      const chave = f.grupo_id ?? `avulsa-${f.id}`;
+      const par = mapa.get(chave) ?? { antes: null, depois: null, caption: null };
+      if (f.momento === "antes") par.antes = f; else par.depois = f;
+      if (f.caption) par.caption = f.caption;
+      mapa.set(chave, par);
+    }
+    return [...mapa.entries()].map(([chave, par]) => ({ chave, ...par }));
+  })();
   const verificado = pro.verification_status === "verificado";
 
   /* Skills detalhadas, agrupadas por categoria. É o que diferencia dois
@@ -77,30 +97,40 @@ export default async function ProfissionalPage({ params }: { params: Promise<{ i
 
   return (
     <>
-      <SiteHeader />
+      <SiteHeader logado={!!usuario} />
       <main className="container" style={{ padding: "40px 24px 80px", maxWidth: 900 }}>
         <Link href="/solicitar" style={{ fontSize: 13.5, color: "var(--ink-faint)" }}>← Voltar para a busca</Link>
 
-        {/* Cabeçalho */}
-        <div style={{ display: "flex", gap: 22, alignItems: "flex-start", margin: "24px 0 8px", flexWrap: "wrap" }}>
-          <div style={{ width: 84, height: 84, borderRadius: 20, overflow: "hidden", background: "var(--surface-2)", display: "grid", placeItems: "center", flexShrink: 0, color: "var(--ink-faint)" }}>
-            {fotos[0] ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={fotos[0].url} alt={nome} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-            ) : pro.tipo === "empresa" ? <Building size={34} /> : <User size={34} />}
-          </div>
-          <div style={{ flex: 1, minWidth: 240 }}>
+        {/* Capa: banner do parceiro, com degradê da marca quando não há imagem */}
+        <div className="perfil-capa" style={{ marginTop: 20 }}>
+          {pro.banner_url && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={pro.banner_url} alt="" />
+          )}
+        </div>
+
+        {/* Identificação, sobreposta à capa */}
+        <div className="perfil-topo">
+          <span className="perfil-foto">
+            <Avatar nome={nome} id={pro.id} url={avatarUrl} size={104} radius="22px" fontSize={36} />
+          </span>
+
+          <div className="perfil-id">
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <h1 style={{ fontSize: "1.9rem", fontWeight: 800 }}>{nome}</h1>
-              {verificado && (
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12.5, fontWeight: 600, padding: "4px 10px", borderRadius: 100, background: "var(--cool-wash)", color: "var(--cool-deep)" }}>
-                  <Shield size={14} /> Verificado
+              <h1 style={{ fontSize: "1.9rem", fontWeight: 800, letterSpacing: "-0.025em" }}>{nome}</h1>
+              {verificado && <span className="perfil-selo"><Shield size={14} /> Verificado</span>}
+            </div>
+            <div className="perfil-meta">
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                {pro.tipo === "empresa" ? <Building size={15} /> : <User size={15} />}
+                {pro.tipo === "empresa" ? "Empresa" : "Autônomo"}
+              </span>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><MapPin size={15} /> {pro.cidade} — {pro.estado}</span>
+              {(pro.anos_experiencia ?? 0) > 0 && (
+                <span style={{ color: "var(--ink-faint)" }}>
+                  {pro.anos_experiencia} {pro.anos_experiencia === 1 ? "ano" : "anos"} de experiência
                 </span>
               )}
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 8, flexWrap: "wrap", color: "var(--ink-soft)", fontSize: 14.5 }}>
-              <span>{pro.tipo === "empresa" ? "Empresa" : "Autônomo"}</span>
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><MapPin size={15} /> {pro.cidade} — {pro.estado}</span>
               {totalReviews > 0 && (
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                   <Estrelas nota={notaGeral} size={15} /> <strong>{notaGeral.toFixed(1)}</strong>
@@ -110,10 +140,13 @@ export default async function ProfissionalPage({ params }: { params: Promise<{ i
               {totalJobs > 0 && <span style={{ color: "var(--ink-faint)" }}>{totalJobs} serviços concluídos</span>}
             </div>
           </div>
-          <Link href="/solicitar" className="btn btn-primary">Solicitar serviço <ArrowRight size={18} /></Link>
+
+          <Link href="/solicitar" className="btn btn-primary" style={{ flexShrink: 0 }}>
+            Solicitar serviço <ArrowRight size={18} />
+          </Link>
         </div>
 
-        {pro.bio && <p style={{ color: "var(--ink-soft)", fontSize: 16, lineHeight: 1.6, maxWidth: 680, marginTop: 14 }}>{pro.bio}</p>}
+        {pro.bio && <p style={{ color: "var(--ink-soft)", fontSize: 16, lineHeight: 1.6, maxWidth: 680, marginTop: 20 }}>{pro.bio}</p>}
 
         {/* Especialidades */}
         <Secao titulo="Especialidades e avaliações">
@@ -159,15 +192,30 @@ export default async function ProfissionalPage({ params }: { params: Promise<{ i
           </Secao>
         )}
 
-        {/* Portfólio */}
-        {fotos.length > 0 && (
-          <Secao titulo="Portfólio">
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
-              {fotos.map((f) => (
-                <div key={f.id} style={{ aspectRatio: "4/3", borderRadius: 12, overflow: "hidden", border: "1px solid var(--line)" }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={f.url} alt="Trabalho" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                </div>
+        {/* Portfólio: antes e depois lado a lado */}
+        {paresPortfolio.length > 0 && (
+          <Secao titulo="Trabalhos realizados">
+            <div className="pf-grade">
+              {paresPortfolio.map((par) => (
+                <figure key={par.chave} className="pf-par">
+                  <div className="pf-fotos">
+                    {par.antes && (
+                      <span className="pf-foto">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={par.antes.url} alt="Antes do serviço" />
+                        <span className="pf-tag">Antes</span>
+                      </span>
+                    )}
+                    {par.depois && (
+                      <span className="pf-foto">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={par.depois.url} alt="Depois do serviço" />
+                        <span className="pf-tag pf-tag-depois">Depois</span>
+                      </span>
+                    )}
+                  </div>
+                  {par.caption && <figcaption className="pf-legenda">{par.caption}</figcaption>}
+                </figure>
               ))}
             </div>
           </Secao>

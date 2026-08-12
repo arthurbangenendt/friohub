@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { CIDADE } from "@/lib/regiao";
+import { EXIGIR_VERIFICACAO } from "@/lib/config";
 import { SolicitarWizard } from "./SolicitarWizard";
 
 export type ProdutoDTO = {
@@ -27,7 +28,8 @@ export type ProfissionalDTO = {
   tipo: "autonomo" | "empresa";
   nome: string;
   bio: string | null;
-  fotoUrl: string | null;
+  avatarUrl: string | null;
+  fotoUrl: string | null; // primeira foto do portfólio, usada como prévia do trabalho
   skills: SkillDTO[];
   destaqueEm: string[]; // especialidades patrocinadas
 };
@@ -44,6 +46,18 @@ export default async function SolicitarPage(props: PageProps<"/solicitar">) {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?aviso=" + encodeURIComponent("Entre para solicitar um serviço."));
 
+  // O filtro de verificação é opcional durante o piloto — ver lib/config.
+  let qPros = supabase
+    .from("professionals")
+    .select(
+      `id, tipo, bio, cidade, verification_status,
+       profiles!inner ( nome, avatar_url ),
+       professional_skills ( specialty, rating_avg, rating_count, jobs_completed, years_experience ),
+       portfolio_items ( url, media_type, position )`,
+    )
+    .eq("cidade", CIDADE);
+  if (EXIGIR_VERIFICACAO) qPros = qPros.eq("verification_status", "verificado");
+
   const [{ data: produtos }, { data: pros }, { data: destaques }] = await Promise.all([
     supabase
       .from("products")
@@ -51,16 +65,7 @@ export default async function SolicitarPage(props: PageProps<"/solicitar">) {
       .eq("ativo", true)
       .order("btu")
       .order("preco_venda"),
-    supabase
-      .from("professionals")
-      .select(
-        `id, tipo, bio, cidade, verification_status,
-         profiles!inner ( nome ),
-         professional_skills ( specialty, rating_avg, rating_count, jobs_completed, years_experience ),
-         portfolio_items ( url, media_type, position )`,
-      )
-      .eq("cidade", CIDADE)
-      .eq("verification_status", "verificado"),
+    qPros,
     supabase
       .from("featured_placements")
       .select("professional_id, specialty")
@@ -97,6 +102,7 @@ export default async function SolicitarPage(props: PageProps<"/solicitar">) {
       tipo: p.tipo as "autonomo" | "empresa",
       nome: perfil?.nome ?? "Profissional",
       bio: p.bio,
+      avatarUrl: perfil?.avatar_url ?? null,
       fotoUrl: fotos[0]?.url ?? null,
       skills: (p.professional_skills ?? []).map((s: {
         specialty: string; rating_avg: number; rating_count: number; jobs_completed: number; years_experience: number;

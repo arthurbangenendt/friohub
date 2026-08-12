@@ -10,6 +10,7 @@ import { criarSolicitacao } from "./actions";
 import { aceitaCatalogo, type JobType } from "./tipos";
 import type { ProdutoDTO, ProfissionalDTO } from "./page";
 import { Wind, Wrench, Droplet, Move, Tool, Check as CheckIcon, Star, Building, User, MapPin, Search } from "@/components/icons";
+import { corDoId, iniciais } from "../painel/Avatar";
 
 const mono = "var(--font-geist-mono), ui-monospace, monospace";
 
@@ -502,34 +503,57 @@ export function SolicitarWizard({
           {prosOrdenados.length === 0 ? (
             <Aviso>Nenhum profissional encontrado{specialty ? ` para “${SPECIALTY_LABEL[specialty]}”` : ""} {proBusca ? "com esse nome" : `em ${CIDADE}`}.</Aviso>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div className="pro-grade">
               {prosOrdenados.map((p) => {
                 const sel = p.id === profissionalId;
                 return (
                   <div key={p.id} onClick={() => setProfissionalId(p.id)} role="button" tabIndex={0}
+                    aria-pressed={sel}
                     onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setProfissionalId(p.id); } }}
-                    style={{ ...proCard, ...(sel ? proCardSel : {}) }}>
-                    <div style={avatar}>{p.fotoUrl
-                      // eslint-disable-next-line @next/next/no-img-element
-                      ? <img src={p.fotoUrl} alt={p.nome} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                      : <span style={{ color: "var(--ink-faint)", display: "flex" }}>{p.tipo === "empresa" ? <Building size={22} /> : <User size={22} />}</span>}
+                    className="pro-card" data-sel={String(sel)}>
+
+                    {/* Retrato: avatar do profissional; sem foto, bloco colorido com iniciais */}
+                    <div className="pro-capa">
+                      {p.avatarUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={p.avatarUrl} alt={p.nome} />
+                      ) : (
+                        <span className="pro-capa-iniciais" style={{ background: corDoId(p.id) }}>
+                          {iniciais(p.nome)}
+                        </span>
+                      )}
+                      {p.patrocinado && <span className="pro-patroc">Patrocinado</span>}
+                      {sel && <span className="pro-check"><CheckIcon size={15} /></span>}
                     </div>
-                    <div style={{ flex: 1, textAlign: "left" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                        <span style={{ fontWeight: 700 }}>{p.nome}</span>
-                        <span style={{ fontSize: 11, color: "var(--ink-faint)", fontFamily: mono }}>{p.tipo === "empresa" ? "Empresa" : "Autônomo"}</span>
-                        {p.patrocinado && <span style={patroc}>Patrocinado</span>}
-                      </div>
-                      <div style={{ fontSize: 13, color: "var(--ink-soft)", marginTop: 3, display: "flex", alignItems: "center", gap: 5 }}>
+
+                    <div className="pro-corpo">
+                      <span style={{ fontWeight: 700, fontSize: 15, lineHeight: 1.3 }}>{p.nome}</span>
+
+                      <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "var(--ink-faint)" }}>
+                        {p.tipo === "empresa" ? <Building size={14} /> : <User size={14} />}
+                        {p.tipo === "empresa" ? "Empresa" : "Autônomo"}
+                        <span>·</span>
+                        <MapPin size={13} /> {CIDADE}
+                      </span>
+
+                      <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 13 }}>
                         <span style={{ color: "var(--warm)", display: "flex" }}><Star size={14} filled /></span>
                         <strong>{p.skill.ratingAvg.toFixed(1)}</strong>
-                        <span style={{ color: "var(--ink-faint)" }}>({p.skill.ratingCount}) · {p.skill.jobsCompleted} serviços · {p.skill.yearsExperience} anos</span>
-                      </div>
-                      {p.bio && <div style={{ fontSize: 12.5, color: "var(--ink-faint)", marginTop: 4 }}>{p.bio}</div>}
+                        <span style={{ color: "var(--ink-faint)" }}>
+                          ({p.skill.ratingCount}) · {p.skill.jobsCompleted} serviços
+                        </span>
+                      </span>
+
+                      {/* Especialidades como chips — o cliente compara de relance */}
+                      <span style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 2 }}>
+                        {p.skills.slice(0, 3).map((s) => (
+                          <span key={s.specialty} className="pro-chip">{SPECIALTY_LABEL[s.specialty] ?? s.specialty}</span>
+                        ))}
+                      </span>
+
                       <Link href={`/profissional/${p.id}`} target="_blank" onClick={(e) => e.stopPropagation()}
-                        style={{ fontSize: 12.5, color: "var(--cool-deep)", fontWeight: 600, marginTop: 6, display: "inline-block" }}>Ver perfil completo →</Link>
+                        className="pro-link">Acessar perfil →</Link>
                     </div>
-                    <div style={{ width: 22, textAlign: "center", color: sel ? "var(--cool)" : "var(--ink-faint)" }}>{sel ? "◉" : "○"}</div>
                   </div>
                 );
               })}
@@ -739,10 +763,6 @@ const btuBox: CSSProperties = { marginTop: 20, padding: "18px 22px", borderRadiu
 const prodCard: CSSProperties = { position: "relative", display: "flex", flexDirection: "column", gap: 6, padding: 14, borderRadius: 14, border: "1px solid var(--line)", background: "var(--surface)", cursor: "pointer", textAlign: "left" };
 const prodCardSel: CSSProperties = { border: "1px solid var(--cool)", boxShadow: "inset 0 0 0 1px var(--cool)" };
 const badgeRec: CSSProperties = { position: "absolute", top: 10, right: 10, fontSize: 10, fontFamily: mono, textTransform: "uppercase", letterSpacing: "0.05em", padding: "3px 8px", borderRadius: 100, background: "var(--cool)", color: "#fff" };
-const proCard: CSSProperties = { display: "flex", gap: 14, alignItems: "center", padding: 16, borderRadius: 14, border: "1px solid var(--line)", background: "var(--surface)", cursor: "pointer", width: "100%" };
-const proCardSel: CSSProperties = { border: "1px solid var(--cool)", boxShadow: "inset 0 0 0 1px var(--cool)" };
-const avatar: CSSProperties = { width: 48, height: 48, borderRadius: "50%", overflow: "hidden", background: "var(--surface-2)", display: "grid", placeItems: "center", flexShrink: 0 };
-const patroc: CSSProperties = { fontSize: 10.5, fontFamily: mono, textTransform: "uppercase", letterSpacing: "0.05em", padding: "2px 8px", borderRadius: 100, background: "var(--warm-wash)", color: "var(--warm)" };
 const resumo: CSSProperties = { padding: "18px 22px", borderRadius: 14, background: "var(--surface)", border: "1px solid var(--line)" };
 const btnPrimary: CSSProperties = { height: 46, padding: "0 22px", borderRadius: 10, background: "var(--cool)", color: "#fff", fontWeight: 600, fontSize: 15, border: "none", cursor: "pointer", textDecoration: "none", display: "inline-flex", alignItems: "center", justifyContent: "center" };
 const btnGhost: CSSProperties = { height: 46, padding: "0 20px", borderRadius: 10, background: "var(--surface)", color: "var(--ink-soft)", fontWeight: 600, fontSize: 15, border: "1px solid var(--line)", cursor: "pointer" };

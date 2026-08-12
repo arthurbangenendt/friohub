@@ -1,6 +1,10 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import type { CSSProperties } from "react";
 import { createClient } from "@/lib/supabase/server";
+import { CIDADE } from "@/lib/regiao";
+import { Avatar } from "./painel/Avatar";
+import { EXIGIR_VERIFICACAO } from "@/lib/config";
 import { SiteHeader, SiteFooter } from "@/components/site";
 import { Wind, Wrench, Droplet, Move, Tool, ArrowRight, Star, Shield, Bolt, Check } from "@/components/icons";
 import { Hero } from "@/components/ui/hero";
@@ -26,26 +30,31 @@ const SPEC_LABEL: Record<string, string> = {
 export default async function Home() {
   const supabase = await createClient();
 
-  const [{ data: pros }, { count: numProdutos }] = await Promise.all([
-    supabase
-      .from("professionals")
-      .select(`id, tipo, bio, profiles!inner ( nome ), professional_skills ( specialty, rating_avg, rating_count, jobs_completed )`)
-      .eq("cidade", "São Paulo")
-      .eq("verification_status", "verificado")
-      .limit(6),
-    supabase.from("products").select("id", { count: "exact", head: true }).eq("ativo", true),
-  ]);
+  /* Quem já tem conta vai direto para a área logada. A home é peça de aquisição
+     — para quem já converteu, ela é um passo a mais até o que a pessoa veio
+     fazer. As demais páginas de marketing (/parceiros, /termos) seguem abertas. */
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user) redirect("/painel");
+
+  // O filtro de verificação é opcional durante o piloto — ver lib/config.
+  let qPros = supabase
+    .from("professionals")
+    .select(`id, tipo, bio, profiles!inner ( nome, avatar_url ), professional_skills ( specialty, rating_avg, rating_count, jobs_completed )`)
+    .eq("cidade", CIDADE);
+  if (EXIGIR_VERIFICACAO) qPros = qPros.eq("verification_status", "verificado");
+
+  const { data: pros } = await qPros.limit(6);
 
   const destaques = (pros ?? [])
     .map((p) => {
       const perfil = Array.isArray(p.profiles) ? p.profiles[0] : p.profiles;
       const skills = (p.professional_skills ?? []) as { specialty: string; rating_avg: number; rating_count: number; jobs_completed: number }[];
       const top = [...skills].sort((a, b) => b.rating_avg - a.rating_avg)[0];
-      return top ? { id: p.id, nome: perfil?.nome ?? "Profissional", tipo: p.tipo as string, top } : null;
+      return top ? { id: p.id, nome: perfil?.nome ?? "Profissional", avatarUrl: perfil?.avatar_url ?? null, tipo: p.tipo as string, top } : null;
     })
     .filter(Boolean)
     .sort((a, b) => (b!.top.rating_avg - a!.top.rating_avg))
-    .slice(0, 4) as { id: string; nome: string; tipo: string; top: { specialty: string; rating_avg: number; rating_count: number; jobs_completed: number } }[];
+    .slice(0, 4) as { id: string; nome: string; avatarUrl: string | null; tipo: string; top: { specialty: string; rating_avg: number; rating_count: number; jobs_completed: number } }[];
 
   const numPros = (pros ?? []).length;
 
@@ -104,14 +113,13 @@ export default async function Home() {
       {destaques.length > 0 && (
         <section style={{ padding: "84px 0" }}>
           <div className="container">
-            <SectionHead eyebrow="Profissionais" titulo="Gente de verdade, avaliada de verdade" sub={`${numPros} profissionais verificados atendendo São Paulo.`} />
+            <SectionHead eyebrow="Profissionais" titulo="Gente de verdade, avaliada de verdade" sub={`${numPros} ${numPros === 1 ? "profissional atendendo" : "profissionais atendendo"} ${CIDADE}.`} />
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 18, marginTop: 44 }}>
               {destaques.map((d) => (
-                <div key={d.id} className="card" style={{ padding: 22 }}>
+                // Card clicável: quem vê o profissional aqui precisa conseguir abrir o perfil.
+                <Link key={d.id} href={`/profissional/${d.id}`} className="card" style={{ padding: 22, display: "block", color: "inherit", textDecoration: "none" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
-                    <span style={{ display: "grid", placeItems: "center", width: 46, height: 46, borderRadius: "50%", background: "var(--surface-2)", color: "var(--ink-soft)", fontWeight: 700, fontSize: 17 }}>
-                      {d.nome.charAt(0)}
-                    </span>
+                    <Avatar nome={d.nome} id={d.id} url={d.avatarUrl} size={46} />
                     <div>
                       <div style={{ fontWeight: 700, fontSize: 15.5 }}>{d.nome}</div>
                       <div style={{ fontSize: 12.5, color: "var(--ink-faint)" }}>{d.tipo === "empresa" ? "Empresa" : "Autônomo"}</div>
@@ -125,7 +133,7 @@ export default async function Home() {
                   <span style={{ display: "inline-block", fontSize: 12.5, fontWeight: 600, padding: "4px 10px", borderRadius: 100, background: "var(--cool-wash)", color: "var(--cool-deep)" }}>
                     {SPEC_LABEL[d.top.specialty] ?? d.top.specialty}
                   </span>
-                </div>
+                </Link>
               ))}
             </div>
           </div>
