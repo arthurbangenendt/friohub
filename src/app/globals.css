@@ -188,3 +188,66 @@ details[open] .faq-mark { transform: rotate(45deg); }
   background: var(--cool-wash);
 }
 .role-radio:focus-visible + .role-card { outline: 2px solid var(--cool); outline-offset: 2px; }
+
+/* ---------- AUTH: duas colunas (form à direita, parceiro à esquerda) ---------- */
+.auth-split {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: stretch;
+}
+.auth-aside {
+  background: linear-gradient(155deg, var(--brand-ink, #0e1b26) 0%, #123243 60%, #0d2130 100%);
+  color: #eaf6fa;
+  padding: 56px 48px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 26px;
+}
+.auth-aside-title { font-size: clamp(1.7rem, 2.4vw, 2.3rem); font-weight: 800; letter-spacing: -0.025em; line-height: 1.12; }
+.auth-aside-sub { color: rgba(234,246,250,.76); font-size: 1.02rem; line-height: 1.6; max-width: 420px; }
+.auth-benefit { display: flex; gap: 12px; align-items: flex-start; }
+.auth-benefit-ic {
+  display: grid; place-items: center; width: 34px; height: 34px; flex-shrink: 0;
+  border-radius: 9px; background: rgba(127,224,242,.14); color: #7fe0f2;
+}
+.auth-benefit-t { font-weight: 650; font-size: .96rem; }
+.auth-benefit-d { color: rgba(234,246,250,.66); font-size: .86rem; margin-top: 2px; line-height: 1.5; }
+.auth-main { display: grid; place-items: center; padding: 40px 24px; background: var(--bg); }
+.auth-card { width: 100%; max-width: 420px; }
+
+/* abas Entrar / Criar conta */
+.auth-tabs {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px;
+  background: var(--surface-2); border-radius: 12px; margin-bottom: 24px;
+}
+.auth-tab {
+  height: 38px; display: grid; place-items: center; border-radius: 9px;
+  font-size: 14px; font-weight: 600; text-decoration: none; color: var(--ink-soft);
+}
+.auth-tab[data-on="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-sm); }
+
+@media (max-width: 900px) {
+  .auth-split { grid-template-columns: 1fr; min-height: auto; }
+  /* No mobile o formulário vem primeiro: quem abriu /login quer entrar, não ler o pitch. */
+  .auth-main { order: 1; padding-top: 32px; }
+  .auth-aside { order: 2; padding: 40px 24px; }
+}
+
+/* ---------- Landing Seja Parceiro ---------- */
+.parc-hero {
+  background: linear-gradient(155deg, var(--brand-ink, #0e1b26) 0%, #123243 60%, #0d2130 100%);
+  color: #eaf6fa; padding: 84px 0 76px;
+}
+.parc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; }
+.parc-num { font-size: 2.1rem; font-weight: 800; letter-spacing: -0.02em; color: var(--cool-deep); }
+.parc-exemplo {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .08em; padding: 4px 10px; border-radius: 100px;
+  background: var(--warm-wash); color: var(--warm);
+}
+.parc-avatar {
+  width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center;
+  font-weight: 700; font-size: 1.05rem; color: #fff; flex-shrink: 0;
+}

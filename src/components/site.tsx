@@ -40,9 +40,10 @@ export function SiteHeader({ overHero = false }: { overHero?: boolean }) {
         </Link>
 
         <nav style={{ display: "flex", alignItems: "center", gap: 30 }} className="site-nav-links">
-          <a href="/#como-funciona" style={{ ...navLink, color: solidLook ? "var(--ink-soft)" : "rgba(255,255,255,.82)" }}>Como funciona</a>
-          <a href="/#servicos" style={{ ...navLink, color: solidLook ? "var(--ink-soft)" : "rgba(255,255,255,.82)" }}>Serviços</a>
-          <a href="/#profissionais" style={{ ...navLink, color: solidLook ? "var(--ink-soft)" : "rgba(255,255,255,.82)" }}>Para profissionais</a>
+          <Link href="/#como-funciona" style={{ ...navLink, color: solidLook ? "var(--ink-soft)" : "rgba(255,255,255,.82)" }}>Como funciona</Link>
+          <Link href="/#servicos" style={{ ...navLink, color: solidLook ? "var(--ink-soft)" : "rgba(255,255,255,.82)" }}>Serviços</Link>
+          {/* Aponta para a landing de parceiros, não mais para uma âncora da home. */}
+          <Link href="/parceiros" style={{ ...navLink, color: solidLook ? "var(--ink-soft)" : "rgba(255,255,255,.82)" }}>Para profissionais</Link>
         </nav>
 
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>

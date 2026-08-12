@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { login } from "../actions";
 import { AuthShell } from "../AuthShell";
 import { Field, primaryBtn } from "../ui";
@@ -10,18 +9,11 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
 
   return (
     <AuthShell
+      aba="login"
       title="Entrar"
       subtitle="Acesse sua conta FrioHub."
       error={error}
       aviso={aviso}
-      footer={
-        <>
-          Ainda não tem conta?{" "}
-          <Link href="/signup" style={{ color: "var(--cool-deep)", fontWeight: 600 }}>
-            Criar conta
-          </Link>
-        </>
-      }
     >
       <form action={login}>
         <Field label="Email" name="email" type="email" autoComplete="email" placeholder="voce@email.com" />

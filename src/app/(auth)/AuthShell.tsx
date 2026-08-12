@@ -1,8 +1,14 @@
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
-import { Logo } from "@/components/icons";
+import { Logo, Wrench, Star, Bolt, ArrowRight } from "@/components/icons";
 
 const mono = "var(--font-geist-mono), ui-monospace, monospace";
+
+const BENEFICIOS = [
+  { Icon: Wrench, t: "Serviços na sua região", d: "Você escolhe os bairros que atende e recebe só o que faz sentido." },
+  { Icon: Star, t: "Reputação por especialidade", d: "Sua nota é separada por serviço — quem é bom em instalação aparece em instalação." },
+  { Icon: Bolt, t: "Sem taxa para orçar", d: "A comissão só existe quando o serviço acontece." },
+];
 
 export function AuthShell({
   title,
@@ -11,50 +17,81 @@ export function AuthShell({
   footer,
   error,
   aviso,
+  aba,
 }: {
   title: string;
   subtitle: string;
   children: ReactNode;
-  footer: ReactNode;
+  footer?: ReactNode;
   error?: string;
   aviso?: string;
+  /** Qual aba fica ativa. `null` esconde as abas (fluxos fora do par entrar/criar). */
+  aba?: "login" | "signup" | null;
 }) {
   return (
-    <main style={wrap}>
-      <div style={card}>
-        <Link href="/" style={brand}>
-          <span style={{ display: "grid", placeItems: "center", width: 28, height: 28, borderRadius: 8, background: "var(--cool)", color: "#fff" }}><Logo size={17} /></span>
-          FrioHub
+    <main className="auth-split">
+      {/* ---- coluna do formulário ---- */}
+      <section className="auth-main">
+        <div className="auth-card">
+          <Link href="/" style={brand}>
+            <span style={{ display: "grid", placeItems: "center", width: 28, height: 28, borderRadius: 8, background: "var(--cool)", color: "#fff" }}><Logo size={17} /></span>
+            FrioHub
+          </Link>
+
+          {aba !== null && (
+            <div className="auth-tabs">
+              <Link href="/login" className="auth-tab" data-on={String(aba === "login")}>Entrar</Link>
+              <Link href="/signup" className="auth-tab" data-on={String(aba === "signup")}>Criar conta</Link>
+            </div>
+          )}
+
+          <h1 style={h1}>{title}</h1>
+          <p style={sub}>{subtitle}</p>
+
+          {error ? <div style={alerta("erro")}>{error}</div> : null}
+          {aviso ? <div style={alerta("aviso")}>{aviso}</div> : null}
+
+          {children}
+
+          {footer ? <div style={foot}>{footer}</div> : null}
+        </div>
+      </section>
+
+      {/* ---- coluna "seja parceiro" ---- */}
+      <aside className="auth-aside">
+        <div>
+          <span style={{ fontFamily: mono, fontSize: 11.5, letterSpacing: "0.16em", textTransform: "uppercase", color: "#7fe0f2" }}>
+            Para técnicos e empresas
+          </span>
+          <h2 className="auth-aside-title" style={{ marginTop: 12 }}>
+            Seja parceiro<br />FrioHub
+          </h2>
+          <p className="auth-aside-sub" style={{ marginTop: 14 }}>
+            Receba serviços de climatização na sua região, construa sua reputação e
+            seja encontrado por quem já está pronto para contratar.
+          </p>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+          {BENEFICIOS.map((b) => (
+            <div key={b.t} className="auth-benefit">
+              <span className="auth-benefit-ic"><b.Icon size={17} /></span>
+              <div>
+                <div className="auth-benefit-t">{b.t}</div>
+                <div className="auth-benefit-d">{b.d}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <Link href="/parceiros" className="btn btn-onbrand" style={{ alignSelf: "flex-start", gap: 8 }}>
+          Quero ser parceiro <ArrowRight size={17} />
         </Link>
-        <h1 style={h1}>{title}</h1>
-        <p style={sub}>{subtitle}</p>
-
-        {error ? <div style={alert("erro")}>{error}</div> : null}
-        {aviso ? <div style={alert("aviso")}>{aviso}</div> : null}
-
-        {children}
-
-        <div style={foot}>{footer}</div>
-      </div>
+      </aside>
     </main>
   );
 }
 
-const wrap: CSSProperties = {
-  minHeight: "100dvh",
-  display: "grid",
-  placeItems: "center",
-  padding: 24,
-};
-const card: CSSProperties = {
-  width: "100%",
-  maxWidth: 400,
-  background: "var(--surface)",
-  border: "1px solid var(--line)",
-  borderRadius: 18,
-  padding: "34px 32px 28px",
-  boxShadow: "0 8px 30px rgba(14,27,38,.08)",
-};
 const brand: CSSProperties = {
   fontFamily: mono,
   fontSize: 14,
@@ -83,7 +120,7 @@ const foot: CSSProperties = {
   textAlign: "center",
 };
 
-function alert(kind: "erro" | "aviso"): CSSProperties {
+function alerta(kind: "erro" | "aviso"): CSSProperties {
   const erro = kind === "erro";
   return {
     fontSize: 13.5,

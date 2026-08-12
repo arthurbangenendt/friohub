@@ -3,13 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
-const SPEC_OF: Record<string, string> = {
-  instalacao_com_equipamento: "instalacao",
-  manutencao: "manutencao",
-  remanejamento: "remanejamento",
-  limpeza: "limpeza",
-  conserto: "conserto",
-};
+import { SPECIALTY_OF } from "../../solicitar/tipos";
+import type { JobType } from "../../solicitar/tipos";
 
 // Avança o status do job — só o profissional dono, e só a partir do estado esperado.
 async function avancar(jobId: string, de: string, para: string) {
@@ -58,7 +53,13 @@ export async function avaliarJob(input: { jobId: string; rating: number; comment
   if (job.status !== "concluido") return { ok: false as const, error: "O serviço ainda não foi concluído." };
   if (!job.profissional_id) return { ok: false as const, error: "Serviço sem profissional." };
 
-  const specialty = SPEC_OF[job.job_type] ?? "instalacao";
+  /* Sem especialidade correspondente (job "outros"), não há em que skill creditar
+     a nota. O fallback anterior mandava tudo para "instalacao", inflando a
+     reputação de uma especialidade que o profissional pode nem ter exercido. */
+  const specialty = SPECIALTY_OF[job.job_type as JobType] ?? null;
+  if (!specialty) {
+    return { ok: false as const, error: "Este tipo de serviço ainda não pode ser avaliado por especialidade." };
+  }
   const { error: rErr } = await supabase.from("reviews").insert({
     job_id: job.id,
     cliente_id: user.id,

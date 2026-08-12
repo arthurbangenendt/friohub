@@ -6,24 +6,30 @@ import { calcularBtu, formatarBtu } from "@/lib/btu";
 import { precoInstalacao, formatarBRL } from "@/lib/pricing";
 import { buscarCep, detectarLocalizacao, formatarCep } from "@/lib/cep";
 import { CIDADE, ESTADO } from "@/lib/regiao";
-import { criarSolicitacao, type JobType } from "./actions";
+import { criarSolicitacao } from "./actions";
+import { aceitaCatalogo, type JobType } from "./tipos";
 import type { ProdutoDTO, ProfissionalDTO } from "./page";
 import { Wind, Wrench, Droplet, Move, Tool, Check as CheckIcon, Star, Building, User, MapPin, Search } from "@/components/icons";
 
 const mono = "var(--font-geist-mono), ui-monospace, monospace";
 
 type IconType = (p: { size?: number }) => React.ReactElement;
-const JOBS: { tipo: JobType; titulo: string; desc: string; Icon: IconType; equip: boolean }[] = [
-  { tipo: "instalacao_com_equipamento", titulo: "Instalar ar novo", desc: "Comprar o aparelho + instalação", Icon: Wind, equip: true },
-  { tipo: "manutencao", titulo: "Manutenção", desc: "Revisão, gás, não gela", Icon: Wrench, equip: false },
-  { tipo: "limpeza", titulo: "Limpeza", desc: "Higienização completa", Icon: Droplet, equip: false },
-  { tipo: "remanejamento", titulo: "Remanejamento", desc: "Mudar o aparelho de lugar", Icon: Move, equip: false },
-  { tipo: "conserto", titulo: "Conserto", desc: "Reparo de defeito", Icon: Tool, equip: false },
+const JOBS: { tipo: JobType; titulo: string; desc: string; Icon: IconType; catalogo: boolean }[] = [
+  { tipo: "instalacao_com_equipamento", titulo: "Instalar ar novo", desc: "Comprar o aparelho + instalação", Icon: Wind, catalogo: true },
+  { tipo: "troca_equipamento", titulo: "Trocar equipamento", desc: "Substituir o aparelho antigo", Icon: Move, catalogo: true },
+  { tipo: "manutencao", titulo: "Manutenção", desc: "Revisão, gás, não gela", Icon: Wrench, catalogo: false },
+  { tipo: "limpeza", titulo: "Limpeza", desc: "Higienização completa", Icon: Droplet, catalogo: false },
+  { tipo: "remanejamento", titulo: "Remanejamento", desc: "Mudar o aparelho de lugar", Icon: Move, catalogo: false },
+  { tipo: "conserto", titulo: "Conserto", desc: "Reparo de defeito", Icon: Tool, catalogo: false },
+  { tipo: "outros", titulo: "Outro serviço", desc: "Descreva o que você precisa", Icon: Tool, catalogo: false },
 ];
 
-const SPECIALTY_OF: Record<JobType, string> = {
-  instalacao_com_equipamento: "instalacao", manutencao: "manutencao",
-  remanejamento: "remanejamento", limpeza: "limpeza", conserto: "conserto",
+// `outros` não mapeia especialidade: é um balde genérico, então mostramos todos
+// os profissionais em vez de filtrar por uma skill que não existe.
+const SPECIALTY_OF: Record<JobType, string | null> = {
+  instalacao_com_equipamento: "instalacao", troca_equipamento: "instalacao",
+  manutencao: "manutencao", remanejamento: "remanejamento",
+  limpeza: "limpeza", conserto: "conserto", outros: null,
 };
 const SPECIALTY_LABEL: Record<string, string> = {
   instalacao: "Instalação", manutencao: "Manutenção", remanejamento: "Remanejamento", limpeza: "Limpeza", conserto: "Conserto",
@@ -38,36 +44,76 @@ const PROBLEMAS: Partial<Record<JobType, string[]>> = {
 };
 const URGENCIAS = ["Sem pressa", "Nos próximos dias", "Urgente (hoje / amanhã)"];
 
-export function SolicitarWizard({ produtos, profissionais }: { produtos: ProdutoDTO[]; profissionais: ProfissionalDTO[] }) {
+const TIPOS_IMOVEL = ["Casa", "Apartamento", "Escritório", "Loja", "Galpão"];
+const AMBIENTES = ["Sala", "Quarto", "Cozinha", "Escritório", "Loja", "Outro"];
+const PERIODOS = ["Durante o dia", "À noite", "O dia inteiro"];
+
+/* Passos são declarados por id, não por número. Com sete tipos de serviço e
+   ramificações diferentes, indexar passo por `step === 3 && equip` é onde o bug
+   nasce — aqui a lista é montada e a navegação anda sobre ela. */
+type StepId = "servico" | "ambiente" | "detalhes" | "equipamento" | "catalogo" | "profissional" | "endereco" | "confirmar";
+const STEP_LABEL: Record<StepId, string> = {
+  servico: "Serviço", ambiente: "Ambiente", detalhes: "Detalhes", equipamento: "Aparelho",
+  catalogo: "Escolher aparelho", profissional: "Profissional", endereco: "Endereço", confirmar: "Confirmar",
+};
+
+function montarSteps(jobType: JobType | null, jaTemEquipamento: boolean | null): StepId[] {
+  if (!jobType) return ["servico"];
+  const fim: StepId[] = ["profissional", "endereco", "confirmar"];
+  if (aceitaCatalogo(jobType)) {
+    // O catálogo só entra quando o cliente diz que ainda não tem o aparelho.
+    return ["servico", "ambiente", "equipamento", ...(jaTemEquipamento === false ? ["catalogo" as StepId] : []), ...fim];
+  }
+  return ["servico", "detalhes", ...fim];
+}
+
+export function SolicitarWizard({
+  produtos, profissionais, cepInicial = "",
+}: {
+  produtos: ProdutoDTO[];
+  profissionais: ProfissionalDTO[];
+  cepInicial?: string;
+}) {
   const [jobType, setJobType] = useState<JobType | null>(null);
-  const [step, setStep] = useState(0);
+  const [idx, setIdx] = useState(0);
 
   // calculadora
+  const [tipoImovel, setTipoImovel] = useState("Apartamento");
   const [ambiente, setAmbiente] = useState("Sala");
   const [areaM2, setAreaM2] = useState(20);
   const [numPessoas, setNumPessoas] = useState(2);
+  const [eletronicos, setEletronicos] = useState(1);
+  const [periodo, setPeriodo] = useState(PERIODOS[0]);
   const [insolacaoAlta, setInsolacaoAlta] = useState(false);
   const [andarOuTelhado, setAndarOuTelhado] = useState(false);
 
-  // serviço (não-instalação)
+  // já tem equipamento?
+  const [jaTemEquipamento, setJaTemEquipamento] = useState<boolean | null>(null);
+
+  // serviço (não-catálogo)
   const [problemas, setProblemas] = useState<string[]>([]);
   const [urgencia, setUrgencia] = useState<string>("");
+  const [servicoOutro, setServicoOutro] = useState("");
 
   const [produtoId, setProdutoId] = useState<string | null>(null);
+  const [filtroDistribuidora, setFiltroDistribuidora] = useState("todas");
   const [profissionalId, setProfissionalId] = useState<string | null>(null);
 
-  // endereço
-  const [cep, setCep] = useState("");
+  // endereço — o CEP pode chegar já preenchido pelo hero da home
+  const [cep, setCep] = useState(() => formatarCep(cepInicial));
   const [rua, setRua] = useState("");
   const [numero, setNumero] = useState("");
   const [bairro, setBairro] = useState("");
   const [cidadeCep, setCidadeCep] = useState("");
   const [ufCep, setUfCep] = useState("");
-  const [cepStatus, setCepStatus] = useState<"idle" | "buscando" | "ok" | "nao">("idle");
+  // já entra em "buscando" quando o CEP veio da home — o efeito abaixo resolve
+  const [cepStatus, setCepStatus] = useState<"idle" | "buscando" | "ok" | "nao">(
+    () => (cepInicial.replace(/\D/g, "").length === 8 ? "buscando" : "idle"),
+  );
   const [descricao, setDescricao] = useState("");
 
   // geolocalização
-  const [geo, setGeo] = useState<{ status: string; cidade?: string; uf?: string }>({ status: "idle" });
+  const [geo, setGeo] = useState<{ status: string; cidade?: string; uf?: string }>({ status: "pedindo" });
 
   // busca de profissional
   const [proBusca, setProBusca] = useState("");
@@ -77,13 +123,15 @@ export function SolicitarWizard({ produtos, profissionais }: { produtos: Produto
   const [erro, setErro] = useState<string | null>(null);
   const [sucessoId, setSucessoId] = useState<string | null>(null);
 
-  const equip = jobType === "instalacao_com_equipamento";
-  const specialty = jobType ? SPECIALTY_OF[jobType] : "instalacao";
+  const comCatalogo = jobType ? aceitaCatalogo(jobType) : false;
+  const specialty = jobType ? SPECIALTY_OF[jobType] : null;
+
+  const steps = useMemo(() => montarSteps(jobType, jaTemEquipamento), [jobType, jaTemEquipamento]);
+  const stepAtual = steps[Math.min(idx, steps.length - 1)];
 
   // pede a localização assim que o cliente entra no fluxo
   useEffect(() => {
     let vivo = true;
-    setGeo({ status: "pedindo" });
     detectarLocalizacao().then((r) => {
       if (!vivo) return;
       if (r.status === "ok") setGeo({ status: "ok", cidade: r.cidade, uf: r.uf });
@@ -92,36 +140,83 @@ export function SolicitarWizard({ produtos, profissionais }: { produtos: Produto
     return () => { vivo = false; };
   }, []);
 
+  // CEP vindo da home já chega resolvido, sem o cliente digitar de novo
+  useEffect(() => {
+    const dig = cepInicial.replace(/\D/g, "");
+    if (dig.length !== 8) return;
+    let vivo = true;
+    buscarCep(dig).then((info) => {
+      if (!vivo) return;
+      if (info) {
+        setRua(info.logradouro); setBairro(info.bairro);
+        setCidadeCep(info.cidade); setUfCep(info.uf); setCepStatus("ok");
+      } else setCepStatus("nao");
+    });
+    return () => { vivo = false; };
+  }, [cepInicial]);
+
   const btu = useMemo(
-    () => calcularBtu({ areaM2, numPessoas, insolacaoAlta, andarOuTelhado }),
-    [areaM2, numPessoas, insolacaoAlta, andarOuTelhado],
+    () => calcularBtu({ areaM2, numPessoas, insolacaoAlta, andarOuTelhado, eletronicos }),
+    [areaM2, numPessoas, insolacaoAlta, andarOuTelhado, eletronicos],
   );
-  const produtosCompativeis = useMemo(() => produtos.filter((p) => p.btu === btu.btuRecomendado), [produtos, btu.btuRecomendado]);
+
+  const distribuidoras = useMemo(() => {
+    const s = new Set<string>();
+    for (const p of produtos) if (p.distribuidora) s.add(p.distribuidora);
+    return [...s].sort();
+  }, [produtos]);
+
+  /* O catálogo mostra TODOS os aparelhos para o cliente comparar preço, mas os
+     compatíveis com o BTU calculado vêm primeiro e marcados. Antes filtrávamos
+     só pelo BTU exato, o que deixava a tela vazia sempre que o catálogo não
+     tinha aquela capacidade. */
+  const produtosOrdenados = useMemo(() => {
+    return produtos
+      .filter((p) => filtroDistribuidora === "todas" || p.distribuidora === filtroDistribuidora)
+      .map((p) => ({ ...p, recomendado: p.btu === btu.btuRecomendado }))
+      .sort((a, b) => {
+        if (a.recomendado !== b.recomendado) return a.recomendado ? -1 : 1;
+        // fora os recomendados, o mais perto da capacidade ideal primeiro
+        const da = Math.abs(a.btu - btu.btuRecomendado), db = Math.abs(b.btu - btu.btuRecomendado);
+        return da !== db ? da - db : a.precoVenda - b.precoVenda;
+      });
+  }, [produtos, filtroDistribuidora, btu.btuRecomendado]);
+
+  const qtdRecomendados = produtosOrdenados.filter((p) => p.recomendado).length;
 
   const prosOrdenados = useMemo(() => {
     const termo = proBusca.trim().toLowerCase();
     return profissionais
-      .filter((p) => p.skills.some((s) => s.specialty === specialty))
+      .filter((p) => !specialty || p.skills.some((s) => s.specialty === specialty))
       .filter((p) => !termo || p.nome.toLowerCase().includes(termo))
-      .map((p) => ({ ...p, skill: p.skills.find((s) => s.specialty === specialty)!, patrocinado: p.destaqueEm.includes(specialty) }))
+      .map((p) => {
+        // sem especialidade (tipo "outros"), usa a skill mais forte do profissional
+        const skill = specialty
+          ? p.skills.find((s) => s.specialty === specialty)!
+          : [...p.skills].sort((a, b) => b.ratingAvg - a.ratingAvg)[0];
+        return { ...p, skill, patrocinado: specialty ? p.destaqueEm.includes(specialty) : false };
+      })
+      .filter((p) => p.skill)
       .sort((a, b) => {
         if (a.patrocinado !== b.patrocinado) return a.patrocinado ? -1 : 1;
         return proSort === "servicos" ? b.skill.jobsCompleted - a.skill.jobsCompleted : b.skill.ratingAvg - a.skill.ratingAvg;
       });
   }, [profissionais, specialty, proBusca, proSort]);
 
-  const steps: string[] = equip
-    ? ["Serviço", "Ambiente", "Aparelho", "Profissional", "Endereço", "Confirmar"]
-    : ["Serviço", "Detalhes", "Profissional", "Endereço", "Confirmar"];
-
   const produtoSel = produtos.find((p) => p.id === produtoId) ?? null;
   const proSel = prosOrdenados.find((p) => p.id === profissionalId) ?? profissionais.find((p) => p.id === profissionalId) ?? null;
-  const precoServico = equip ? precoInstalacao(btu.btuRecomendado) : 0;
+  const precoServico = comCatalogo ? precoInstalacao(btu.btuRecomendado) : 0;
   const foraDaArea = cepStatus === "ok" && ufCep && ufCep !== ESTADO;
 
   function goTriagem(t: JobType) {
     setJobType(t); setProdutoId(null); setProfissionalId(null);
-    setProblemas([]); setUrgencia(""); setStep(1);
+    setProblemas([]); setUrgencia(""); setServicoOutro(""); setJaTemEquipamento(null);
+    setIdx(1);
+  }
+  function avancar() { setIdx((i) => Math.min(i + 1, steps.length - 1)); }
+  function voltar() {
+    if (idx <= 1) { setIdx(0); setJobType(null); return; }
+    setIdx((i) => i - 1);
   }
   function toggleProblema(p: string) {
     setProblemas((cur) => cur.includes(p) ? cur.filter((x) => x !== p) : [...cur, p]);
@@ -142,6 +237,9 @@ export function SolicitarWizard({ produtos, profissionais }: { produtos: Produto
 
   function montarDescricao(): string {
     return [
+      servicoOutro.trim() ? `Serviço: ${servicoOutro.trim()}` : "",
+      comCatalogo ? `Imóvel: ${tipoImovel} · Uso: ${periodo}` : "",
+      jaTemEquipamento === true ? "Cliente já tem o equipamento" : "",
       problemas.length ? `Problemas: ${problemas.join(", ")}` : "",
       urgencia ? `Urgência: ${urgencia}` : "",
       descricao.trim(),
@@ -157,13 +255,13 @@ export function SolicitarWizard({ produtos, profissionais }: { produtos: Produto
     startTransition(async () => {
       const res = await criarSolicitacao({
         jobType, cep, endereco: montarEndereco(),
-        ambiente: equip ? ambiente : undefined,
-        areaM2: equip ? areaM2 : undefined,
-        numPessoas: equip ? numPessoas : undefined,
-        insolacaoAlta: equip ? insolacaoAlta : undefined,
-        andarOuTelhado: equip ? andarOuTelhado : undefined,
-        btuRecomendado: equip ? btu.btuRecomendado : undefined,
-        produtoId: equip ? produtoId : null,
+        ambiente: comCatalogo ? ambiente : undefined,
+        areaM2: comCatalogo ? areaM2 : undefined,
+        numPessoas: comCatalogo ? numPessoas : undefined,
+        insolacaoAlta: comCatalogo ? insolacaoAlta : undefined,
+        andarOuTelhado: comCatalogo ? andarOuTelhado : undefined,
+        btuRecomendado: comCatalogo ? btu.btuRecomendado : undefined,
+        produtoId: comCatalogo ? produtoId : null,
         profissionalId,
         descricao: montarDescricao() || undefined,
       });
@@ -190,92 +288,166 @@ export function SolicitarWizard({ produtos, profissionais }: { produtos: Produto
 
   return (
     <Shell geo={geo}>
-      <Progress steps={steps} current={jobType ? step : 0} />
+      <Progress steps={steps} current={idx} />
 
-      {/* STEP 0 — TRIAGEM */}
-      {step === 0 && (
+      {/* ---------- TRIAGEM ---------- */}
+      {stepAtual === "servico" && (
         <>
           <H titulo="Do que você precisa?" sub="Escolha o serviço para começarmos." />
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px,1fr))", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px,1fr))", gap: 12 }}>
             {JOBS.map((j) => (
               <button key={j.tipo} onClick={() => goTriagem(j.tipo)} style={cardBtn}>
                 <span style={{ display: "grid", placeItems: "center", width: 42, height: 42, borderRadius: 11, background: "var(--cool-wash)", color: "var(--cool-deep)" }}><j.Icon size={22} /></span>
                 <span style={{ fontWeight: 700, fontSize: 15 }}>{j.titulo}</span>
                 <span style={{ fontSize: 12.5, color: "var(--ink-faint)" }}>{j.desc}</span>
-                {j.equip && <span style={pill}>com aparelho</span>}
+                {j.catalogo && <span style={pill}>aparelho disponível</span>}
               </button>
             ))}
           </div>
         </>
       )}
 
-      {/* STEP CALCULADORA (equip) */}
-      {step === 1 && equip && (
+      {/* ---------- AMBIENTE (tipos com catálogo) ---------- */}
+      {stepAtual === "ambiente" && (
         <>
-          <H titulo="Sobre o ambiente" sub="Calculamos a capacidade ideal (BTU) para você." />
+          <H titulo="Sobre o ambiente" sub="Cada resposta refina o cálculo de capacidade ao lado." />
           <div style={grid2}>
-            <Campo label="Ambiente">
+            <Campo label="Tipo de imóvel">
+              <select value={tipoImovel} onChange={(e) => setTipoImovel(e.target.value)} style={input}>
+                {TIPOS_IMOVEL.map((t) => <option key={t}>{t}</option>)}
+              </select>
+            </Campo>
+            <Campo label="Cômodo">
               <select value={ambiente} onChange={(e) => setAmbiente(e.target.value)} style={input}>
-                {["Sala", "Quarto", "Cozinha", "Escritório", "Outro"].map((a) => <option key={a}>{a}</option>)}
+                {AMBIENTES.map((a) => <option key={a}>{a}</option>)}
               </select>
             </Campo>
             <Campo label={`Área: ${areaM2} m²`}>
-              <input type="range" min={6} max={60} value={areaM2} onChange={(e) => setAreaM2(+e.target.value)} style={{ width: "100%" }} />
+              <input type="range" min={6} max={120} value={areaM2} onChange={(e) => setAreaM2(+e.target.value)} style={{ width: "100%" }} />
             </Campo>
             <Campo label={`Pessoas no ambiente: ${numPessoas}`}>
-              <input type="range" min={1} max={10} value={numPessoas} onChange={(e) => setNumPessoas(+e.target.value)} style={{ width: "100%" }} />
+              <input type="range" min={1} max={20} value={numPessoas} onChange={(e) => setNumPessoas(+e.target.value)} style={{ width: "100%" }} />
             </Campo>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, justifyContent: "center" }}>
-              <Check label="Ambiente pega muito sol" checked={insolacaoAlta} onChange={setInsolacaoAlta} />
-              <Check label="Último andar / laje exposta" checked={andarOuTelhado} onChange={setAndarOuTelhado} />
-            </div>
+            <Campo label={`Eletrônicos que esquentam: ${eletronicos}`}>
+              <input type="range" min={0} max={10} value={eletronicos} onChange={(e) => setEletronicos(+e.target.value)} style={{ width: "100%" }} />
+              <span style={hint}>TV, computador, forno, geladeira no mesmo ambiente.</span>
+            </Campo>
+            <Campo label="Uso principal">
+              <select value={periodo} onChange={(e) => setPeriodo(e.target.value)} style={input}>
+                {PERIODOS.map((p) => <option key={p}>{p}</option>)}
+              </select>
+            </Campo>
           </div>
-          <div style={btuBox}>
-            <div>
-              <div style={{ fontSize: 12, fontFamily: mono, color: "var(--ink-faint)", textTransform: "uppercase", letterSpacing: "0.1em" }}>Recomendado</div>
-              <div style={{ fontSize: "1.7rem", fontWeight: 800, color: "var(--cool-deep)" }}>{formatarBtu(btu.btuRecomendado)}</div>
-            </div>
-            <div style={{ fontSize: 12.5, color: "var(--ink-faint)", maxWidth: 220, textAlign: "right" }}>Cálculo assistivo. O profissional confirma na visita.</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, margin: "4px 0 4px" }}>
+            <Check label="O ambiente pega muito sol" checked={insolacaoAlta} onChange={setInsolacaoAlta} />
+            <Check label="Último andar / laje exposta" checked={andarOuTelhado} onChange={setAndarOuTelhado} />
           </div>
-          <Nav onBack={() => setStep(0)} onNext={() => setStep(2)} nextLabel="Ver aparelhos" />
+
+          <AnaliseBtu btu={btu} />
+          <Nav onBack={voltar} onNext={avancar} nextLabel="Continuar" />
         </>
       )}
 
-      {/* STEP CATÁLOGO (equip) */}
-      {step === 2 && equip && (
+      {/* ---------- JÁ TEM EQUIPAMENTO? ---------- */}
+      {stepAtual === "equipamento" && (
         <>
-          <H titulo={`Aparelhos de ${formatarBtu(btu.btuRecomendado)}`} sub="Da distribuidora, com entrega na sua casa." />
-          {produtosCompativeis.length === 0 ? (
-            <Aviso>Nenhum modelo dessa capacidade no catálogo agora. Volte e ajuste o ambiente.</Aviso>
+          <H titulo="Você já tem o aparelho?" sub="Se ainda não tiver, mostramos as opções das distribuidoras parceiras." />
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px,1fr))", gap: 12 }}>
+            <EscolhaGrande
+              titulo="Já tenho o aparelho"
+              desc="Só preciso do serviço de instalação."
+              ativo={jaTemEquipamento === true}
+              onClick={() => setJaTemEquipamento(true)}
+            />
+            <EscolhaGrande
+              titulo="Ainda não tenho"
+              desc="Quero ver aparelhos e comparar preços."
+              ativo={jaTemEquipamento === false}
+              onClick={() => setJaTemEquipamento(false)}
+            />
+          </div>
+          {jaTemEquipamento === true && (
+            <div style={{ marginTop: 18 }}>
+              <Campo label="Qual aparelho você tem? (opcional)">
+                <input value={descricao} onChange={(e) => setDescricao(e.target.value)}
+                  placeholder="Ex.: Split 12.000 BTU marca X, comprado há 2 anos" style={input} />
+              </Campo>
+              <div style={{ ...avisoBox, background: "var(--cool-wash)", color: "var(--cool-deep)" }}>
+                Pela sua descrição do ambiente, a capacidade indicada é <strong>{formatarBtu(btu.btuRecomendado)}</strong>.
+                O profissional confirma na visita se o seu aparelho atende.
+              </div>
+            </div>
+          )}
+          <Nav onBack={voltar} onNext={avancar} nextLabel="Continuar" disabled={jaTemEquipamento === null} />
+        </>
+      )}
+
+      {/* ---------- CATÁLOGO ---------- */}
+      {stepAtual === "catalogo" && (
+        <>
+          <H titulo="Escolha o aparelho"
+            sub={qtdRecomendados > 0
+              ? `${qtdRecomendados} modelo(s) na capacidade ideal de ${formatarBtu(btu.btuRecomendado)} — aparecem primeiro.`
+              : `Nenhum modelo exatamente de ${formatarBtu(btu.btuRecomendado)}. Listamos do mais próximo ao mais distante.`} />
+
+          {distribuidoras.length > 1 && (
+            <div style={{ display: "flex", gap: 10, marginBottom: 18, flexWrap: "wrap", alignItems: "center" }}>
+              <span style={labelTxt}>Distribuidora</span>
+              <select value={filtroDistribuidora} onChange={(e) => setFiltroDistribuidora(e.target.value)} style={{ ...input, width: "auto" }}>
+                <option value="todas">Todas</option>
+                {distribuidoras.map((d) => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
+          )}
+
+          {produtosOrdenados.length === 0 ? (
+            <Aviso>Nenhum aparelho disponível no catálogo com esse filtro.</Aviso>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px,1fr))", gap: 14 }}>
-              {produtosCompativeis.map((p) => {
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px,1fr))", gap: 14 }}>
+              {produtosOrdenados.map((p) => {
                 const sel = p.id === produtoId;
                 return (
                   <button key={p.id} onClick={() => setProdutoId(p.id)} style={{ ...prodCard, ...(sel ? prodCardSel : {}) }}>
+                    {p.recomendado && <span style={badgeRec}>Ideal para seu ambiente</span>}
                     {p.imageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={p.imageUrl} alt={p.modelo} style={{ width: "100%", height: 120, objectFit: "contain", background: "#fff", borderRadius: 8 }} />
                     ) : <div style={{ height: 120 }} />}
                     <span style={{ fontSize: 11, fontFamily: mono, color: "var(--cool)", textTransform: "uppercase" }}>{p.marca}</span>
                     <span style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.3 }}>{p.modelo}</span>
+                    <span style={{ fontSize: 12, color: "var(--ink-faint)" }}>{formatarBtu(p.btu)}</span>
                     <span style={{ fontSize: "1.05rem", fontWeight: 800 }}>{formatarBRL(p.precoVenda)}</span>
+                    <span style={{ fontSize: 11.5, color: "var(--ink-faint)" }}>
+                      {p.distribuidora ? `Distribuidora: ${p.distribuidora}` : "Distribuidora não informada"}
+                    </span>
                   </button>
                 );
               })}
             </div>
           )}
-          <Nav onBack={() => setStep(1)} onNext={() => setStep(3)} nextLabel="Escolher profissional" disabled={!produtoId} />
+          <Nav onBack={voltar} onNext={avancar} nextLabel="Escolher profissional" disabled={!produtoId} />
         </>
       )}
 
-      {/* STEP DETALHES (serviço) — descrição rica */}
-      {step === 1 && !equip && (
+      {/* ---------- DETALHES (serviço sem catálogo) ---------- */}
+      {stepAtual === "detalhes" && (
         <>
-          <H titulo="Conte o que está acontecendo" sub="Selecione o que se aplica e descreva com suas palavras." />
-          <Campo label="Ambiente">
-            <input value={ambiente} onChange={(e) => setAmbiente(e.target.value)} placeholder="Ex.: Quarto do casal" style={input} />
-          </Campo>
+          <H titulo={jobType === "outros" ? "O que você precisa?" : "Conte o que está acontecendo"}
+            sub={jobType === "outros" ? "Descreva com suas palavras — encaminhamos ao profissional certo." : "Selecione o que se aplica e descreva com suas palavras."} />
+
+          {jobType === "outros" && (
+            <Campo label="Descreva o serviço">
+              <textarea value={servicoOutro} onChange={(e) => setServicoOutro(e.target.value)}
+                placeholder="Ex.: Preciso de um laudo técnico do sistema de climatização da loja."
+                rows={4} style={{ ...input, height: "auto", padding: 12, resize: "vertical" }} />
+            </Campo>
+          )}
+
+          {jobType !== "outros" && (
+            <Campo label="Ambiente">
+              <input value={ambiente} onChange={(e) => setAmbiente(e.target.value)} placeholder="Ex.: Quarto do casal" style={input} />
+            </Campo>
+          )}
 
           {PROBLEMAS[jobType!] && (
             <div style={{ marginBottom: 18 }}>
@@ -305,14 +477,16 @@ export function SolicitarWizard({ produtos, profissionais }: { produtos: Produto
             <textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="Ex.: Split 12k da marca X, tem uns 3 anos, começou a pingar água por dentro."
               rows={4} style={{ ...input, height: "auto", padding: 12, resize: "vertical" }} />
           </Campo>
-          <Nav onBack={() => setStep(0)} onNext={() => setStep(2)} nextLabel="Escolher profissional" />
+          <Nav onBack={voltar} onNext={avancar} nextLabel="Escolher profissional"
+            disabled={jobType === "outros" && servicoOutro.trim().length < 10} />
         </>
       )}
 
-      {/* STEP PROFISSIONAL — com busca e ordenação */}
-      {((equip && step === 3) || (!equip && step === 2)) && (
+      {/* ---------- PROFISSIONAL ---------- */}
+      {stepAtual === "profissional" && (
         <>
-          <H titulo="Escolha o profissional" sub={`Avaliados em ${SPECIALTY_LABEL[specialty]} · ${CIDADE}`} />
+          <H titulo="Escolha o profissional"
+            sub={specialty ? `Avaliados em ${SPECIALTY_LABEL[specialty]} · ${CIDADE}` : `Profissionais verificados em ${CIDADE}`} />
           <div style={{ display: "flex", gap: 10, marginBottom: 18, flexWrap: "wrap" }}>
             <div style={{ position: "relative", flex: 1, minWidth: 200 }}>
               <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--ink-faint)", display: "flex" }}><Search size={17} /></span>
@@ -326,7 +500,7 @@ export function SolicitarWizard({ produtos, profissionais }: { produtos: Produto
           </div>
 
           {prosOrdenados.length === 0 ? (
-            <Aviso>Nenhum profissional encontrado para “{SPECIALTY_LABEL[specialty]}” {proBusca ? "com esse nome" : `em ${CIDADE}`}.</Aviso>
+            <Aviso>Nenhum profissional encontrado{specialty ? ` para “${SPECIALTY_LABEL[specialty]}”` : ""} {proBusca ? "com esse nome" : `em ${CIDADE}`}.</Aviso>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {prosOrdenados.map((p) => {
@@ -361,12 +535,12 @@ export function SolicitarWizard({ produtos, profissionais }: { produtos: Produto
               })}
             </div>
           )}
-          <Nav onBack={() => setStep(equip ? 2 : 1)} onNext={() => setStep(equip ? 4 : 3)} nextLabel="Continuar" disabled={!profissionalId} />
+          <Nav onBack={voltar} onNext={avancar} nextLabel="Continuar" disabled={!profissionalId} />
         </>
       )}
 
-      {/* STEP ENDEREÇO — com CEP automático */}
-      {((equip && step === 4) || (!equip && step === 3)) && (
+      {/* ---------- ENDEREÇO ---------- */}
+      {stepAtual === "endereco" && (
         <>
           <H titulo="Onde é o serviço?" sub="Digite o CEP que a gente preenche o resto." />
           <div style={grid2}>
@@ -381,35 +555,37 @@ export function SolicitarWizard({ produtos, profissionais }: { produtos: Produto
           <Campo label="Rua"><input value={rua} onChange={(e) => setRua(e.target.value)} placeholder="Rua / avenida" style={input} /></Campo>
           <Campo label="Bairro"><input value={bairro} onChange={(e) => setBairro(e.target.value)} placeholder="Bairro" style={input} /></Campo>
           {foraDaArea && <Aviso>Este CEP fica em {ufCep}. No momento atendemos {CIDADE} — {ESTADO}. Você pode continuar, mas talvez não haja profissionais na região.</Aviso>}
-          <Nav onBack={() => setStep(equip ? 3 : 2)} onNext={() => setStep(equip ? 5 : 4)} nextLabel="Revisar" disabled={cep.replace(/\D/g, "").length !== 8 || !numero} />
+          <Nav onBack={voltar} onNext={avancar} nextLabel="Revisar" disabled={cep.replace(/\D/g, "").length !== 8 || !numero} />
         </>
       )}
 
-      {/* STEP CONFIRMAR */}
-      {((equip && step === 5) || (!equip && step === 4)) && (
+      {/* ---------- CONFIRMAR ---------- */}
+      {stepAtual === "confirmar" && (
         <>
           <H titulo="Confirme sua solicitação" sub="Revise antes de enviar." />
           <div style={resumo}>
             <LinhaResumo k="Serviço" v={JOBS.find((j) => j.tipo === jobType)!.titulo} />
+            {jobType === "outros" && servicoOutro && <LinhaResumo k="Descrição" v={servicoOutro} />}
             <LinhaResumo k="Profissional" v={proSel?.nome ?? "-"} />
-            {equip && <LinhaResumo k="Ambiente" v={`${ambiente} · ${areaM2} m² · ${formatarBtu(btu.btuRecomendado)}`} />}
-            {equip && produtoSel && <LinhaResumo k="Aparelho" v={produtoSel.modelo} />}
-            {!equip && problemas.length > 0 && <LinhaResumo k="Problemas" v={problemas.join(", ")} />}
-            {!equip && urgencia && <LinhaResumo k="Urgência" v={urgencia} />}
+            {comCatalogo && <LinhaResumo k="Ambiente" v={`${tipoImovel} · ${ambiente} · ${areaM2} m² · ${formatarBtu(btu.btuRecomendado)}`} />}
+            {comCatalogo && jaTemEquipamento === true && <LinhaResumo k="Aparelho" v="Cliente já possui" />}
+            {produtoSel && <LinhaResumo k="Aparelho" v={`${produtoSel.modelo}${produtoSel.distribuidora ? ` · ${produtoSel.distribuidora}` : ""}`} />}
+            {!comCatalogo && problemas.length > 0 && <LinhaResumo k="Problemas" v={problemas.join(", ")} />}
+            {urgencia && <LinhaResumo k="Urgência" v={urgencia} />}
             <LinhaResumo k="Endereço" v={`${montarEndereco()} · ${cep}`} />
-            {!equip && descricao && <LinhaResumo k="Detalhes" v={descricao} />}
+            {descricao && <LinhaResumo k="Detalhes" v={descricao} />}
 
             <div style={{ borderTop: "1px solid var(--line)", margin: "8px 0", paddingTop: 10 }} />
-            {equip && produtoSel && <LinhaResumo k="Aparelho" v={formatarBRL(produtoSel.precoVenda)} />}
-            {equip && <LinhaResumo k="Instalação" v={formatarBRL(precoServico)} />}
+            {produtoSel && <LinhaResumo k="Aparelho" v={formatarBRL(produtoSel.precoVenda)} />}
+            {comCatalogo && <LinhaResumo k="Instalação" v={formatarBRL(precoServico)} />}
             <LinhaResumo
-              k={<strong>Total{equip ? "" : " (a combinar)"}</strong>}
-              v={<strong>{equip && produtoSel ? formatarBRL(produtoSel.precoVenda + precoServico) : "Orçamento com o profissional"}</strong>}
+              k={<strong>Total{produtoSel ? "" : " (a combinar)"}</strong>}
+              v={<strong>{produtoSel ? formatarBRL(produtoSel.precoVenda + precoServico) : "Orçamento com o profissional"}</strong>}
             />
           </div>
           {erro && <Aviso erro>{erro}</Aviso>}
           <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-            <button onClick={() => setStep(equip ? 4 : 3)} style={btnGhost} disabled={pending}>Voltar</button>
+            <button onClick={voltar} style={btnGhost} disabled={pending}>Voltar</button>
             <button onClick={confirmar} style={{ ...btnPrimary, flex: 1, opacity: pending ? 0.7 : 1 }} disabled={pending}>
               {pending ? "Enviando..." : "Enviar solicitação"}
             </button>
@@ -428,6 +604,45 @@ function Shell({ children, geo }: { children: React.ReactNode; geo: { status: st
       <GeoBanner geo={geo} />
       <div style={{ marginTop: 20 }}>{children}</div>
     </main>
+  );
+}
+
+// Painel de análise ao vivo: mostra COMO a capacidade foi calculada, em vez de
+// só cuspir o número. `btu.detalhe` já existia em lib/btu e não era exibido.
+function AnaliseBtu({ btu }: { btu: ReturnType<typeof calcularBtu> }) {
+  return (
+    <div style={btuBox}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
+        <div>
+          <div style={{ fontSize: 12, fontFamily: mono, color: "var(--ink-faint)", textTransform: "uppercase", letterSpacing: "0.1em" }}>Capacidade recomendada</div>
+          <div style={{ fontSize: "1.7rem", fontWeight: 800, color: "var(--cool-deep)" }}>{formatarBtu(btu.btuRecomendado)}</div>
+        </div>
+        <div style={{ fontSize: 12.5, color: "var(--ink-faint)", maxWidth: 220, textAlign: "right" }}>
+          Cálculo assistivo. O profissional confirma na visita.
+        </div>
+      </div>
+      <div style={{ borderTop: "1px solid var(--line)", marginTop: 14, paddingTop: 12, display: "flex", flexDirection: "column", gap: 5 }}>
+        {btu.detalhe.map((d) => (
+          <div key={d.label} style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, color: "var(--ink-soft)" }}>
+            <span>{d.label}</span>
+            <span style={{ fontFamily: mono }}>+{d.valor.toLocaleString("pt-BR")}</span>
+          </div>
+        ))}
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, fontWeight: 700, color: "var(--ink)", marginTop: 3 }}>
+          <span>Carga térmica estimada</span>
+          <span style={{ fontFamily: mono }}>{btu.btuCalculado.toLocaleString("pt-BR")} BTU/h</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EscolhaGrande({ titulo, desc, ativo, onClick }: { titulo: string; desc: string; ativo: boolean; onClick: () => void }) {
+  return (
+    <button onClick={onClick} style={{ ...cardBtn, ...(ativo ? prodCardSel : {}), gap: 4 }}>
+      <span style={{ fontWeight: 700, fontSize: 15.5 }}>{titulo}</span>
+      <span style={{ fontSize: 13, color: "var(--ink-faint)" }}>{desc}</span>
+    </button>
   );
 }
 
@@ -452,7 +667,7 @@ function GeoBanner({ geo }: { geo: { status: string; cidade?: string; uf?: strin
   );
 }
 
-function Progress({ steps, current }: { steps: string[]; current: number }) {
+function Progress({ steps, current }: { steps: StepId[]; current: number }) {
   return (
     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 28 }}>
       {steps.map((s, i) => (
@@ -461,7 +676,7 @@ function Progress({ steps, current }: { steps: string[]; current: number }) {
           background: i === current ? "var(--cool)" : i < current ? "var(--cool-wash)" : "var(--surface-2)",
           color: i === current ? "#fff" : i < current ? "var(--cool-deep)" : "var(--ink-faint)",
           border: "1px solid var(--line)",
-        }}>{i + 1}. {s}</span>
+        }}>{i + 1}. {STEP_LABEL[s]}</span>
       ))}
     </div>
   );
@@ -499,7 +714,7 @@ function Nav({ onBack, onNext, nextLabel, disabled }: { onBack: () => void; onNe
   );
 }
 function Aviso({ children, erro }: { children: React.ReactNode; erro?: boolean }) {
-  return <div style={{ padding: "12px 16px", borderRadius: 10, background: erro ? "#fdeceb" : "var(--warm-wash)", color: erro ? "#b3261e" : "var(--warm)", fontSize: 14, marginTop: 12 }}>{children}</div>;
+  return <div style={{ ...avisoBox, background: erro ? "#fdeceb" : "var(--warm-wash)", color: erro ? "#b3261e" : "var(--warm)" }}>{children}</div>;
 }
 function LinhaResumo({ k, v }: { k: React.ReactNode; v: React.ReactNode }) {
   return (
@@ -515,13 +730,15 @@ const grid2: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(aut
 const labelTxt: CSSProperties = { fontSize: 13, fontWeight: 600, color: "var(--ink-soft)" };
 const input: CSSProperties = { height: 44, padding: "0 14px", borderRadius: 10, border: "1px solid var(--line)", background: "var(--bg)", color: "var(--ink)", fontSize: 15, width: "100%" };
 const hint: CSSProperties = { fontSize: 12.5, color: "var(--ink-faint)", marginTop: 2 };
+const avisoBox: CSSProperties = { padding: "12px 16px", borderRadius: 10, fontSize: 14, marginTop: 12 };
 const cardBtn: CSSProperties = { display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-start", padding: 16, borderRadius: 14, border: "1px solid var(--line)", background: "var(--surface)", cursor: "pointer", textAlign: "left" };
 const pill: CSSProperties = { fontSize: 10.5, fontFamily: mono, textTransform: "uppercase", letterSpacing: "0.06em", padding: "2px 8px", borderRadius: 100, background: "var(--warm-wash)", color: "var(--warm)" };
 const chip: CSSProperties = { padding: "8px 14px", borderRadius: 100, border: "1px solid var(--line)", background: "var(--surface)", color: "var(--ink-soft)", fontSize: 13.5, fontWeight: 500, cursor: "pointer" };
 const chipOn: CSSProperties = { border: "1px solid var(--cool)", background: "var(--cool-wash)", color: "var(--cool-deep)", fontWeight: 600 };
-const btuBox: CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, marginTop: 20, padding: "18px 22px", borderRadius: 14, background: "var(--cool-wash)", border: "1px solid var(--line)" };
-const prodCard: CSSProperties = { display: "flex", flexDirection: "column", gap: 6, padding: 14, borderRadius: 14, border: "1px solid var(--line)", background: "var(--surface)", cursor: "pointer", textAlign: "left" };
+const btuBox: CSSProperties = { marginTop: 20, padding: "18px 22px", borderRadius: 14, background: "var(--cool-wash)", border: "1px solid var(--line)" };
+const prodCard: CSSProperties = { position: "relative", display: "flex", flexDirection: "column", gap: 6, padding: 14, borderRadius: 14, border: "1px solid var(--line)", background: "var(--surface)", cursor: "pointer", textAlign: "left" };
 const prodCardSel: CSSProperties = { border: "1px solid var(--cool)", boxShadow: "inset 0 0 0 1px var(--cool)" };
+const badgeRec: CSSProperties = { position: "absolute", top: 10, right: 10, fontSize: 10, fontFamily: mono, textTransform: "uppercase", letterSpacing: "0.05em", padding: "3px 8px", borderRadius: 100, background: "var(--cool)", color: "#fff" };
 const proCard: CSSProperties = { display: "flex", gap: 14, alignItems: "center", padding: 16, borderRadius: 14, border: "1px solid var(--line)", background: "var(--surface)", cursor: "pointer", width: "100%" };
 const proCardSel: CSSProperties = { border: "1px solid var(--cool)", boxShadow: "inset 0 0 0 1px var(--cool)" };
 const avatar: CSSProperties = { width: 48, height: 48, borderRadius: "50%", overflow: "hidden", background: "var(--surface-2)", display: "grid", placeItems: "center", flexShrink: 0 };

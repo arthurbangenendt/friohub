@@ -31,7 +31,8 @@ export default async function ProfissionalPage({ params }: { params: Promise<{ i
     .select(`id, tipo, razao_social, bio, cidade, estado, verification_status,
              profiles!inner ( nome ),
              professional_skills ( specialty, rating_avg, rating_count, jobs_completed, years_experience ),
-             portfolio_items ( id, url, media_type, position )`)
+             portfolio_items ( id, url, media_type, position ),
+             professional_tags ( skill_tags ( slug, label, categoria, ordem ) )`)
     .eq("id", id)
     .maybeSingle();
 
@@ -44,6 +45,24 @@ export default async function ProfissionalPage({ params }: { params: Promise<{ i
     .filter((i) => i.media_type === "foto")
     .sort((a, b) => a.position - b.position);
   const verificado = pro.verification_status === "verificado";
+
+  /* Skills detalhadas, agrupadas por categoria. É o que diferencia dois
+     profissionais com a mesma nota — quem faz VRF corporativo de quem faz
+     split residencial. */
+  const tagsPorCategoria = new Map<string, string[]>();
+  for (const pt of (pro.professional_tags ?? []) as { skill_tags: unknown }[]) {
+    const t = one(pt.skill_tags) as { label: string; categoria: string; ordem: number } | null;
+    if (!t) continue;
+    const arr = tagsPorCategoria.get(t.categoria) ?? [];
+    arr.push(t.label);
+    tagsPorCategoria.set(t.categoria, arr);
+  }
+  const CAT_TITULO: Record<string, string> = {
+    servico: "Serviços que executa",
+    equipamento: "Equipamentos que domina",
+    ambiente: "Ambientes que atende",
+    credencial: "Credenciais declaradas",
+  };
 
   const totalReviews = skills.reduce((s, k) => s + k.rating_count, 0);
   const totalJobs = skills.reduce((s, k) => s + k.jobs_completed, 0);
@@ -114,6 +133,31 @@ export default async function ProfissionalPage({ params }: { params: Promise<{ i
             ))}
           </div>
         </Secao>
+
+        {tagsPorCategoria.size > 0 && (
+          <Secao titulo="O que este profissional faz">
+            <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+              {["servico", "equipamento", "ambiente", "credencial"].map((cat) => {
+                const itens = tagsPorCategoria.get(cat);
+                if (!itens?.length) return null;
+                return (
+                  <div key={cat}>
+                    <h3 style={{ fontSize: 12.5, fontWeight: 650, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--ink-faint)", margin: "0 0 10px" }}>
+                      {CAT_TITULO[cat] ?? cat}
+                    </h3>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                      {itens.map((label) => (
+                        <span key={label} style={{ fontSize: 13.5, padding: "7px 13px", borderRadius: 100, border: "1px solid var(--line)", background: "var(--surface)", color: "var(--ink-soft)" }}>
+                          {label}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Secao>
+        )}
 
         {/* Portfólio */}
         {fotos.length > 0 && (

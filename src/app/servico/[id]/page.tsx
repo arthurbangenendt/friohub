@@ -3,15 +3,12 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatarBRL, TAXA_COMISSAO } from "@/lib/pricing";
 import { formatarBtu } from "@/lib/btu";
+import { rotuloJob } from "../../solicitar/tipos";
 import { JobActions } from "./JobActions";
 import { ReviewForm } from "./ReviewForm";
 import { Star } from "@/components/icons";
 
 const mono = "var(--font-geist-mono), ui-monospace, monospace";
-const JOB_LABEL: Record<string, string> = {
-  instalacao_com_equipamento: "Instalação de ar novo",
-  manutencao: "Manutenção", remanejamento: "Remanejamento", limpeza: "Limpeza", conserto: "Conserto",
-};
 const STATUS: Record<string, { label: string; cor: string; bg: string }> = {
   aberto: { label: "Aberto", cor: "var(--ink-faint)", bg: "var(--surface-2)" },
   aguardando_profissional: { label: "Aguardando profissional", cor: "var(--warm)", bg: "var(--warm-wash)" },
@@ -26,6 +23,38 @@ function one<T>(v: T | T[] | null | undefined): T | null {
   return Array.isArray(v) ? v[0] ?? null : v ?? null;
 }
 
+type OrderView = {
+  preco_produto: number;
+  preco_servico: number;
+  total: number;
+  payment_status: string;
+  comissao_servico?: number; // só existe para o profissional
+};
+
+/* Profissional lê `orders` direto; cliente lê a view `orders_cliente`, que não
+   expõe margem nem comissão da plataforma. As duas fontes são protegidas no
+   banco — se o papel não bater, o retorno é vazio, não um erro. */
+async function carregarOrder(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  jobId: string,
+  isPro: boolean,
+): Promise<OrderView | null> {
+  if (isPro) {
+    const { data } = await supabase
+      .from("orders")
+      .select("preco_produto, preco_servico, comissao_servico, total, payment_status")
+      .eq("job_id", jobId)
+      .maybeSingle();
+    return data as OrderView | null;
+  }
+  const { data } = await supabase
+    .from("orders_cliente")
+    .select("preco_produto, preco_servico, total, payment_status")
+    .eq("job_id", jobId)
+    .maybeSingle();
+  return data as OrderView | null;
+}
+
 export default async function ServicoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
@@ -38,7 +67,6 @@ export default async function ServicoPage({ params }: { params: Promise<{ id: st
              produto:products ( marca, modelo, btu, preco_venda ),
              profissional:professionals ( id, tipo, profiles ( nome ) ),
              cliente:profiles!jobs_cliente_id_fkey ( nome ),
-             order:orders ( preco_produto, preco_servico, comissao_servico, margem_produto, total, payment_status ),
              review:reviews ( rating, comment )`)
     .eq("id", id)
     .single();
@@ -52,7 +80,10 @@ export default async function ServicoPage({ params }: { params: Promise<{ id: st
   const produto = one(job.produto) as { marca: string; modelo: string; btu: number; preco_venda: number } | null;
   const proNome = one(one(job.profissional)?.profiles)?.nome ?? "Profissional";
   const cliNome = one(job.cliente)?.nome ?? "Cliente";
-  const order = one(job.order) as { preco_produto: number; preco_servico: number; comissao_servico: number; margem_produto: number; total: number; payment_status: string } | null;
+  /* A order vem de fonte diferente conforme quem olha: o profissional lê a
+     tabela (enxerga a comissão descontada dele), o cliente lê a view sem margem
+     nem comissão. Ver migration 20260812130000_orders_cliente_view. */
+  const order = await carregarOrder(supabase, job.id, isPro);
   const review = one(job.review) as { rating: number; comment: string | null } | null;
   const st = STATUS[job.status] ?? STATUS.aberto;
 
@@ -61,7 +92,7 @@ export default async function ServicoPage({ params }: { params: Promise<{ id: st
       <Link href="/painel" style={{ fontFamily: mono, fontSize: 13, color: "var(--ink-faint)" }}>← Painel</Link>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, margin: "20px 0 6px" }}>
-        <h1 style={{ fontSize: "1.7rem", fontWeight: 800 }}>{JOB_LABEL[job.job_type] ?? job.job_type}</h1>
+        <h1 style={{ fontSize: "1.7rem", fontWeight: 800 }}>{rotuloJob(job.job_type)}</h1>
         <span style={{ fontSize: 13, fontFamily: mono, padding: "6px 12px", borderRadius: 100, background: st.bg, color: st.cor, whiteSpace: "nowrap" }}>{st.label}</span>
       </div>
       <p style={{ color: "var(--ink-faint)", fontSize: 14, marginBottom: 28 }}>
@@ -87,8 +118,8 @@ export default async function ServicoPage({ params }: { params: Promise<{ id: st
             {isPro ? (
               <>
                 <Linha k="Mão de obra (instalação)" v={formatarBRL(order.preco_servico)} />
-                <Linha k={`Taxa FrioHub (${Math.round(TAXA_COMISSAO * 100)}%)`} v={`- ${formatarBRL(order.comissao_servico)}`} />
-                <Linha k={<strong>Você recebe</strong>} v={<strong>{formatarBRL(order.preco_servico - order.comissao_servico)}</strong>} />
+                <Linha k={`Taxa FrioHub (${Math.round(TAXA_COMISSAO * 100)}%)`} v={`- ${formatarBRL(order.comissao_servico ?? 0)}`} />
+                <Linha k={<strong>Você recebe</strong>} v={<strong>{formatarBRL(order.preco_servico - (order.comissao_servico ?? 0))}</strong>} />
               </>
             ) : (
               <>

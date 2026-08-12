@@ -4,12 +4,9 @@ import { createClient } from "@/lib/supabase/server";
 import { precoInstalacao, TAXA_COMISSAO } from "@/lib/pricing";
 import { CIDADE } from "@/lib/regiao";
 
-export type JobType =
-  | "instalacao_com_equipamento"
-  | "manutencao"
-  | "remanejamento"
-  | "limpeza"
-  | "conserto";
+import { aceitaCatalogo, type JobType } from "./tipos";
+
+export type { JobType };
 
 export type CriarSolicitacaoInput = {
   jobType: JobType;
@@ -34,7 +31,9 @@ export async function criarSolicitacao(input: CriarSolicitacaoInput) {
 
   if (!user) return { ok: false as const, error: "Faça login para solicitar." };
 
-  const hasEquipment = input.jobType === "instalacao_com_equipamento";
+  // O job só "carrega equipamento" quando há de fato um produto escolhido — não
+  // basta ser um tipo que aceita catálogo. Evita order fantasma sem produto.
+  const hasEquipment = aceitaCatalogo(input.jobType) && !!input.produtoId;
 
   const { data: job, error: jobErr } = await supabase
     .from("jobs")

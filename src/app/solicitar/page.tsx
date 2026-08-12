@@ -11,6 +11,7 @@ export type ProdutoDTO = {
   categoria: string;
   precoVenda: number;
   imageUrl: string | null;
+  distribuidora: string | null;
 };
 
 export type SkillDTO = {
@@ -31,7 +32,12 @@ export type ProfissionalDTO = {
   destaqueEm: string[]; // especialidades patrocinadas
 };
 
-export default async function SolicitarPage() {
+export default async function SolicitarPage(props: PageProps<"/solicitar">) {
+  // A home já manda o CEP digitado no hero (?cep=). Sem ler aqui, o cliente
+  // precisava digitar de novo lá no passo de endereço.
+  const sp = await props.searchParams;
+  const cepInicial = typeof sp.cep === "string" ? sp.cep : "";
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -41,7 +47,7 @@ export default async function SolicitarPage() {
   const [{ data: produtos }, { data: pros }, { data: destaques }] = await Promise.all([
     supabase
       .from("products")
-      .select("id, marca, modelo, btu, categoria, preco_venda, image_url")
+      .select("id, marca, modelo, btu, categoria, preco_venda, image_url, supplier")
       .eq("ativo", true)
       .order("btu")
       .order("preco_venda"),
@@ -77,6 +83,7 @@ export default async function SolicitarPage() {
     categoria: p.categoria,
     precoVenda: Number(p.preco_venda),
     imageUrl: p.image_url,
+    distribuidora: p.supplier,
   }));
 
   const prosDTO: ProfissionalDTO[] = (pros ?? []).map((p) => {
@@ -104,5 +111,5 @@ export default async function SolicitarPage() {
     };
   });
 
-  return <SolicitarWizard produtos={produtosDTO} profissionais={prosDTO} />;
+  return <SolicitarWizard produtos={produtosDTO} profissionais={prosDTO} cepInicial={cepInicial} />;
 }
