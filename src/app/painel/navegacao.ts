@@ -16,30 +16,37 @@ export const NAV_POR_PAPEL: Record<Papel, ItemNav[]> = {
   cliente: [
     { href: "/painel", label: "Meus pedidos", icone: "servicos" },
     { href: "/painel/orcamentos", label: "Orçamentos", icone: "orcamentos" },
+    { href: "/painel/pmoc", label: "PMOC", icone: "pmoc" },
     { href: "/painel/mensagens", label: "Mensagens", icone: "mensagens" },
     { href: "/painel/financeiro", label: "Financeiro", icone: "financeiro" },
+    { href: "/painel/notificacoes", label: "Notificações", icone: "notificacoes" },
     { href: "/painel/perfil-cliente", label: "Meu perfil", icone: "perfil" },
   ],
   profissional: [
     { href: "/painel", label: "Visão geral", icone: "visao" },
     { href: "/painel/orcamentos", label: "Orçamentos", icone: "orcamentos" },
+    { href: "/painel/pmoc", label: "PMOC", icone: "pmoc" },
     { href: "/painel/mensagens", label: "Mensagens", icone: "mensagens" },
     { href: "/painel/financeiro", label: "Financeiro", icone: "financeiro" },
     { href: "/painel/avaliacoes", label: "Avaliações", icone: "avaliacoes" },
     { href: "/painel/ferramentas", label: "Ferramentas", icone: "ferramentas" },
+    { href: "/painel/notificacoes", label: "Notificações", icone: "notificacoes" },
     { href: "/painel/perfil", label: "Meu perfil", icone: "perfil" },
   ],
   distribuidora: [
     { href: "/painel/distribuidora", label: "Visão geral", icone: "visao" },
     { href: "/painel/distribuidora/pedidos", label: "Pedidos", icone: "orcamentos" },
     { href: "/painel/distribuidora/catalogo", label: "Catálogo", icone: "servicos" },
+    { href: "/painel/notificacoes", label: "Notificações", icone: "notificacoes" },
     { href: "/painel/distribuidora/perfil", label: "Meu perfil", icone: "perfil" },
   ],
   /* O admin também é um usuário comum do lado cliente, então mantém os pedidos
      dele — mas a moderação vem primeiro, que é o motivo de ele entrar aqui. */
   admin: [
     { href: "/admin", label: "Administração", icone: "admin" },
+    { href: "/painel/pmoc", label: "PMOC", icone: "pmoc" },
     { href: "/painel", label: "Meus pedidos", icone: "servicos" },
+    { href: "/painel/notificacoes", label: "Notificações", icone: "notificacoes" },
     { href: "/painel/perfil-cliente", label: "Meu perfil", icone: "perfil" },
   ],
 };

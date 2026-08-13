@@ -1,22 +1,25 @@
 # FrioHub
 
-Marketplace de HVAC residencial: o cliente descreve o que precisa, escolhe o profissional
-pelo perfil/skill/avaliação, e o equipamento vem da distribuidora em dropship.
-A experiência é de serviço; a monetização é de loja.
+Marketplace de climatização em São Paulo: clientes enviam pedidos de orçamento para profissionais,
+comparam propostas e podem comprar equipamentos de distribuidoras em dropship.
 
-**Stack:** Next.js 16 (App Router) · Tailwind · Supabase (Postgres + Auth) · Vercel
+**Stack:** Next.js 16 (App Router) · React 19 · Supabase (Postgres, Auth, Storage e Realtime) · Vercel
+
+> O sistema está em hardening. Comissão e margem são calculadas, mas ainda não existe gateway de
+> pagamento. Não usar para movimentar dinheiro real antes de concluir os bloqueadores P0 descritos
+> em [`docs/ROADMAP_10_DE_10.md`](docs/ROADMAP_10_DE_10.md).
 
 ---
 
-## Modelo de receita (4 fontes)
+## Modelo de receita planejado
 
-1. **Margem do equipamento** (dropship) — motor, ativo desde o dia 1
-2. **Comissão do serviço** — por job fechado, ativo desde o dia 1
-3. **Assinatura do profissional** — construída, cobrança ligada depois
-4. **Destaque patrocinado** — construído, cobrança ligada depois
+1. **Margem do equipamento** — calculada no banco; cobrança pendente.
+2. **Comissão do serviço** — calculada no banco; cobrança pendente.
+3. **Assinatura do profissional** — schema inicial existente; produto e cobrança pendentes.
+4. **Destaque patrocinado** — elegibilidade modelada; compra e cobrança pendentes.
 
-As 4 soluções de risco estão embutidas no schema (`supabase/migrations/0001_init.sql`),
-marcadas com `[RISCO N]`:
+As primeiras decisões de risco estão registradas nas migrations versionadas em
+`supabase/migrations/`:
 
 - **[RISCO 1] Cold start** → `city_billing_config.cobranca_ativa` (piloto entra grátis)
 - **[RISCO 2] Confiança x destaque** → `featured_placements` + `is_featured_eligible()`
@@ -33,6 +36,8 @@ cp .env.local.example .env.local   # preencha com as chaves do Supabase (abaixo)
 npm run dev                        # http://localhost:3000
 ```
 
+O projeto usa `next/font`; o primeiro build precisa de acesso à internet para obter as fontes.
+
 ---
 
 ## Conectar o Supabase (passo a passo)
@@ -42,20 +47,38 @@ npm run dev                        # http://localhost:3000
    - **Project URL** → `NEXT_PUBLIC_SUPABASE_URL`
    - **anon public key** → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - Cole ambos no `.env.local`.
-3. Rode o schema: **SQL Editor → New query** → cole o conteúdo de
-   `supabase/migrations/0001_init.sql` → **Run**.
-4. **Authentication → Providers**: mantenha **Email** ativo (login por email + senha).
-   Para testar rápido, desative "Confirm email" em Auth → Settings.
+3. Instale um runtime compatível com Docker e a Supabase CLI.
+4. Rode `supabase start` e `npm run db:reset`. Todas as migrations serão aplicadas em ordem.
+5. Use confirmação de e-mail em produção. O ambiente local pode desativá-la para testes.
+
+Nunca copie dados reais para o seed local e nunca execute `db reset --linked`.
+
+---
+
+## Qualidade
+
+```bash
+npm run lint             # ESLint
+npm run typecheck        # TypeScript
+npm run build            # build de produção
+npm run db:reset         # recria apenas o banco local
+npm run db:lint          # lint do schema local
+npm run db:test          # pgTAP: contratos e regressões de RLS
+npm run db:types         # atualiza tipos a partir do banco local
+npm run db:types:check   # falha se o schema e os tipos divergirem
+```
+
+O workflow `.github/workflows/quality.yml` executa aplicação e banco em jobs separados. Os testes
+P0 conhecidos estão marcados como `TODO` até a migration de hardening; cada correção deve remover o
+respectivo `TODO` e transformar o contrato em obrigatório.
 
 ---
 
 ## Deploy na Vercel
 
-1. Suba o repositório no GitHub.
-2. Em **https://vercel.com/new**, importe o repo.
-3. Em **Environment Variables**, adicione `NEXT_PUBLIC_SUPABASE_URL` e
-   `NEXT_PUBLIC_SUPABASE_ANON_KEY` (os mesmos do `.env.local`).
-4. Deploy.
+Deploy de aplicação pode ser feito pela Vercel, mas migrations não devem ser aplicadas manualmente
+pelo SQL Editor. Mudanças de banco devem nascer em migration, passar pelo CI e ser promovidas de
+staging para produção por um único pipeline autorizado.
 
 ---
 
@@ -71,5 +94,11 @@ src/
   proxy.ts              # convenção Next 16 (ex-"middleware")
 supabase/
   migrations/
-    0001_init.sql       # schema completo do MVP
+    *.sql                # histórico completo, aplicado em ordem
+  tests/database/        # contratos pgTAP de schema e segurança
+src/types/
+  database.generated.ts # tipos gerados do schema Supabase
+docs/
+  ROADMAP_10_DE_10.md
+  SECURITY_PERMISSION_MATRIX.md
 ```

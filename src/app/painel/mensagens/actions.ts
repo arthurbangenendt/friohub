@@ -11,13 +11,20 @@ import { createClient } from "@/lib/supabase/server";
  * pela `revelar_contato`, que confere handoff liberado + consentimento dos dois.
  */
 
-/** Abre (ou reencontra) a conversa do cliente logado com um profissional. */
-export async function abrirConversa(professionalId: string) {
+/** Abre (ou reencontra) uma conversa e registra o pedido/serviço que levou a ela. */
+export async function abrirConversa(
+  professionalId: string,
+  contexto?: { pedidoId?: string; jobId?: string },
+) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false as const, error: "Faça login para enviar mensagem." };
 
-  const { data, error } = await supabase.rpc("abrir_conversa", { p_professional_id: professionalId });
+  const { data, error } = await supabase.rpc("abrir_conversa_contextual", {
+    p_professional_id: professionalId,
+    p_quote_request_id: contexto?.pedidoId ?? undefined,
+    p_job_id: contexto?.jobId ?? undefined,
+  });
   if (error || !data) return { ok: false as const, error: error?.message ?? "Não foi possível abrir a conversa." };
 
   revalidatePath("/painel/mensagens");

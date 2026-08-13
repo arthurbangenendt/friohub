@@ -93,9 +93,6 @@ export async function salvarProduto(input: ProdutoInput) {
     image_url: input.imageUrl?.trim() || null,
     ativo: input.ativo,
     estoque_disponivel: input.estoqueDisponivel,
-    // Obrigatório no schema (not null) e imediatamente sobrescrito pelo trigger
-    // de markup. Ver `aplica_markup_produto`.
-    preco_venda: 0,
   };
 
   const { error } = input.id
@@ -124,17 +121,7 @@ export async function alternarEstoque(produtoId: string, disponivel: boolean) {
   return { ok: true as const };
 }
 
-const FLUXO: Record<string, string[]> = {
-  a_repassar: ["confirmado", "cancelado"],
-  confirmado: ["faturado", "cancelado"],
-  faturado: ["enviado", "cancelado"],
-  enviado: ["entregue"],
-  entregue: [],
-  cancelado: [],
-};
-
-/** Avança o repasse. A ordem dos estados é validada aqui porque o banco só
- *  restringe o VOCABULÁRIO (CHECK), não a sequência. */
+/** Avança o repasse pela máquina de estados transacional do banco. */
 export async function avancarRepasse(
   purchaseOrderId: string,
   para: string,
@@ -144,28 +131,16 @@ export async function avancarRepasse(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false as const, error: "Não autenticado." };
 
-  const { data: atual } = await supabase
-    .from("purchase_orders")
-    .select("status")
-    .eq("id", purchaseOrderId)
-    .maybeSingle();
-
-  if (!atual) return { ok: false as const, error: "Pedido não encontrado." };
-  if (!(FLUXO[atual.status] ?? []).includes(para)) {
-    return { ok: false as const, error: `Não é possível ir de "${atual.status}" para "${para}".` };
-  }
   if (para === "enviado" && !extra?.codigoRastreio?.trim()) {
     return { ok: false as const, error: "Informe o código de rastreio para marcar como enviado." };
   }
 
-  const { error } = await supabase
-    .from("purchase_orders")
-    .update({
-      status: para,
-      ...(extra?.codigoRastreio ? { codigo_rastreio: extra.codigoRastreio.trim() } : {}),
-      ...(extra?.notaFiscalUrl ? { nota_fiscal_url: extra.notaFiscalUrl.trim() } : {}),
-    })
-    .eq("id", purchaseOrderId);
+  const { error } = await supabase.rpc("avancar_purchase_order", {
+    p_purchase_order_id: purchaseOrderId,
+    p_status: para,
+    p_codigo_rastreio: extra?.codigoRastreio?.trim() || undefined,
+    p_nota_fiscal_url: extra?.notaFiscalUrl?.trim() || undefined,
+  });
 
   if (error) return { ok: false as const, error: error.message };
 

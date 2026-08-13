@@ -10,6 +10,7 @@ import { AvaliarCliente } from "./AvaliarCliente";
 import { AbrirChat } from "./AbrirChat";
 import { TAG_LABEL } from "./tags-cliente";
 import { Star } from "@/components/icons";
+import { Agendamento, type AgendamentoView } from "./Agendamento";
 
 const mono = "var(--font-geist-mono), ui-monospace, monospace";
 const STATUS: Record<string, { label: string; cor: string; bg: string }> = {
@@ -35,6 +36,13 @@ const ENTREGA_LABEL: Record<string, string> = {
   enviado: "A caminho",
   entregue: "Entregue",
   cancelado: "Cancelado",
+};
+
+const PAGAMENTO_LABEL: Record<string, string> = {
+  pendente: "Pendente",
+  pago: "Pago e liquidado",
+  reembolsado: "Reembolsado",
+  falhou: "Falhou ou foi cancelado",
 };
 
 type OrderView = {
@@ -99,6 +107,20 @@ export default async function ServicoPage({ params }: { params: Promise<{ id: st
      nem comissão. Ver migration 20260812130000_orders_cliente_view. */
   const order = await carregarOrder(supabase, job.id, isPro);
 
+  const { data: agendamento } = await supabase
+    .from("job_appointments")
+    .select("id, proposed_by, starts_at, ends_at, status, notes")
+    .eq("job_id", job.id)
+    .in("status", ["proposed", "confirmed"])
+    .maybeSingle();
+
+  const { data: eventosServico } = await supabase
+    .from("job_events")
+    .select("id, event_type, from_status, to_status, reason, created_at")
+    .eq("job_id", job.id)
+    .order("created_at", { ascending: false })
+    .limit(30);
+
   /* Entrega do equipamento (dropship). Vem da view `entregas_cliente`, que não
      expõe o custo da distribuidora — mesma razão de `orders_cliente`.
      Ver 20260812260000_distribuidoras.sql. */
@@ -140,6 +162,7 @@ export default async function ServicoPage({ params }: { params: Promise<{ id: st
         {job.profissional_id && (
           <AbrirChat
             professionalId={job.profissional_id}
+            jobId={job.id}
             rotulo={isPro ? `Conversar com ${cliNome.split(" ")[0]}` : `Conversar com ${proNome.split(" ")[0]}`}
           />
         )}
@@ -172,7 +195,7 @@ export default async function ServicoPage({ params }: { params: Promise<{ id: st
                 {order.preco_produto > 0 && <Linha k="Aparelho" v={formatarBRL(order.preco_produto)} />}
                 <Linha k="Instalação" v={formatarBRL(order.preco_servico)} />
                 <Linha k={<strong>Total</strong>} v={<strong>{formatarBRL(order.total)}</strong>} />
-                <Linha k="Pagamento" v={order.payment_status === "pago" ? "Pago" : "Pendente"} />
+                <Linha k="Pagamento" v={PAGAMENTO_LABEL[order.payment_status] ?? order.payment_status} />
               </>
             )}
           </div>
@@ -192,6 +215,32 @@ export default async function ServicoPage({ params }: { params: Promise<{ id: st
         )}
 
         {/* ações do profissional */}
+        {["aguardando_profissional", "aceito"].includes(job.status) && (
+          <div className="card" style={{ padding: 22 }}>
+            <SecTitle>Agendamento</SecTitle>
+            <Agendamento jobId={job.id} userId={user.id} atual={agendamento as AgendamentoView | null} />
+          </div>
+        )}
+
+        {eventosServico && eventosServico.length > 0 && (
+          <div className="card" style={{ padding: 22 }}>
+            <SecTitle>Histórico do serviço</SecTitle>
+            <div style={{ display: "grid", gap: 10 }}>
+              {eventosServico.map((evento) => (
+                <div key={evento.id} style={{ display: "flex", justifyContent: "space-between", gap: 16, fontSize: 13.5 }}>
+                  <span>
+                    <strong>{rotuloEventoServico(evento.event_type, evento.to_status)}</strong>
+                    {evento.reason && <span style={{ display: "block", color: "var(--ink-soft)", marginTop: 2 }}>{evento.reason}</span>}
+                  </span>
+                  <time style={{ color: "var(--ink-faint)", whiteSpace: "nowrap" }}>
+                    {new Date(evento.created_at).toLocaleString("pt-BR")}
+                  </time>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {isPro && ["aguardando_profissional", "aceito", "em_execucao"].includes(job.status) && (
           <div className="card" style={{ padding: 22 }}>
             <SecTitle>Ação</SecTitle>
@@ -268,4 +317,14 @@ function Linha({ k, v }: { k: React.ReactNode; v: React.ReactNode }) {
       <span style={{ textAlign: "right" }}>{v}</span>
     </div>
   );
+}
+
+function rotuloEventoServico(evento: string, status: string | null) {
+  if (evento === "created_from_quote") return "Serviço criado a partir da proposta";
+  if (evento === "status_changed") return status ? `Status alterado para ${STATUS[status]?.label ?? status}` : "Status alterado";
+  if (evento === "appointment_proposed") return "Novo horário proposto";
+  if (evento === "appointment_confirmed") return "Horário confirmado";
+  if (evento === "appointment_declined") return "Horário recusado";
+  if (evento === "appointment_cancelled") return "Horário cancelado";
+  return evento;
 }

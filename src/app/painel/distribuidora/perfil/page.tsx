@@ -22,9 +22,13 @@ export default async function PerfilDistribuidoraPage() {
 
   const { data: dist } = await supabase
     .from("distributors")
-    .select("razao_social, cnpj, cidade, prazo_entrega_dias, verification_status, ativo")
+    .select("razao_social, cidade, prazo_entrega_dias, verification_status, ativo")
     .eq("id", user.id)
     .maybeSingle();
+
+  const { data: cnpj } = await supabase.rpc("obter_cnpj_distribuidora", {
+    p_distributor_id: user.id,
+  });
 
   const { data: areas } = await supabase
     .from("distributor_areas")
@@ -51,7 +55,7 @@ export default async function PerfilDistribuidoraPage() {
       <PerfilDistribuidoraForm
         inicial={{
           razaoSocial: dist?.razao_social ?? "",
-          cnpj: dist?.cnpj ?? "",
+          cnpj: cnpj ?? "",
           cidade: dist?.cidade ?? CIDADE,
           prazoEntregaDias: dist?.prazo_entrega_dias ?? 5,
           ufs: (areas ?? []).map((a) => (a as { uf: string }).uf),

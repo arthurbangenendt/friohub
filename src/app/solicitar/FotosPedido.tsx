@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 /* Fotos do pedido de orçamento.
@@ -16,17 +16,37 @@ import { createClient } from "@/lib/supabase/client";
  */
 const MAX_FOTOS = 6;
 const MAX_BYTES = 8 * 1024 * 1024;
+const EXTENSAO: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
+
+export type FotoPendente = {
+  path: string;
+  previewUrl: string;
+};
 
 export function FotosPedido({
   userId, fotos, onChange,
 }: {
   userId: string;
-  fotos: string[];
-  onChange: (urls: string[]) => void;
+  fotos: FotoPendente[];
+  onChange: (fotos: FotoPendente[]) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const supabase = createClient();
+  const fotosRef = useRef(fotos);
+
+  useEffect(() => {
+    fotosRef.current = fotos;
+  }, [fotos]);
+
+  useEffect(() => () => {
+    for (const foto of fotosRef.current) URL.revokeObjectURL(foto.previewUrl);
+  }, []);
 
   async function aoEscolher(e: React.ChangeEvent<HTMLInputElement>) {
     const arquivos = Array.from(e.target.files ?? []);
@@ -38,26 +58,25 @@ export function FotosPedido({
     if (espaco <= 0) return setErro(`Máximo de ${MAX_FOTOS} fotos.`);
 
     setEnviando(true);
-    const supabase = createClient();
-    const novas: string[] = [];
+    const novas: FotoPendente[] = [];
 
     for (const file of arquivos.slice(0, espaco)) {
-      if (!file.type.startsWith("image/")) {
-        setErro("Envie apenas imagens.");
+      const ext = EXTENSAO[file.type];
+      if (!ext) {
+        setErro("Envie uma imagem JPG, PNG ou WebP.");
         continue;
       }
       if (file.size > MAX_BYTES) {
         setErro(`"${file.name}" passa de 8 MB.`);
         continue;
       }
-      const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
       const caminho = `${userId}/${crypto.randomUUID()}.${ext}`;
       const { error } = await supabase.storage.from("orcamentos").upload(caminho, file);
       if (error) {
         setErro(error.message);
         continue;
       }
-      novas.push(supabase.storage.from("orcamentos").getPublicUrl(caminho).data.publicUrl);
+      novas.push({ path: caminho, previewUrl: URL.createObjectURL(file) });
     }
 
     setEnviando(false);
@@ -74,13 +93,18 @@ export function FotosPedido({
       </p>
 
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-        {fotos.map((url) => (
-          <div key={url} style={{ position: "relative" }}>
+        {fotos.map((foto) => (
+          <div key={foto.path} style={{ position: "relative" }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={url} alt="Foto do local"
+            <img src={foto.previewUrl} alt="Foto do local"
               style={{ width: 84, height: 84, objectFit: "cover", borderRadius: 10, display: "block" }} />
             <button
-              onClick={() => onChange(fotos.filter((f) => f !== url))}
+              onClick={async () => {
+                const { error } = await supabase.storage.from("orcamentos").remove([foto.path]);
+                if (error) return setErro(error.message);
+                URL.revokeObjectURL(foto.previewUrl);
+                onChange(fotos.filter((f) => f.path !== foto.path));
+              }}
               aria-label="Remover foto"
               style={{
                 position: "absolute", top: -6, right: -6, width: 22, height: 22, borderRadius: "50%",

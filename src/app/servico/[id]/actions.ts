@@ -38,6 +38,65 @@ export async function concluirJob(jobId: string) {
   return avancar(jobId, "em_execucao", "concluido");
 }
 
+export async function proporAgendamento(input: {
+  jobId: string;
+  inicio: string;
+  fim: string;
+  observacoes: string;
+}) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false as const, error: "Não autenticado." };
+
+  const inicio = new Date(input.inicio);
+  const fim = new Date(input.fim);
+  if (Number.isNaN(inicio.getTime()) || Number.isNaN(fim.getTime())) {
+    return { ok: false as const, error: "Informe data e horário válidos." };
+  }
+
+  const { error } = await supabase.rpc("propor_agendamento", {
+    p_job_id: input.jobId,
+    p_starts_at: inicio.toISOString(),
+    p_ends_at: fim.toISOString(),
+    p_notes: input.observacoes,
+  });
+  if (error) return { ok: false as const, error: error.message };
+  revalidatePath(`/servico/${input.jobId}`);
+  return { ok: true as const };
+}
+
+export async function responderAgendamento(input: {
+  jobId: string;
+  appointmentId: string;
+  aceitar: boolean;
+  motivo?: string;
+}) {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("responder_agendamento", {
+    p_appointment_id: input.appointmentId,
+    p_accept: input.aceitar,
+    p_reason: input.motivo ?? "",
+  });
+  if (error) return { ok: false as const, error: error.message };
+  revalidatePath(`/servico/${input.jobId}`);
+  return { ok: true as const };
+}
+
+export async function cancelarAgendamento(input: {
+  jobId: string;
+  appointmentId: string;
+  motivo: string;
+}) {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("cancelar_agendamento", {
+    p_appointment_id: input.appointmentId,
+    p_reason: input.motivo,
+  });
+  if (error) return { ok: false as const, error: error.message };
+  revalidatePath(`/servico/${input.jobId}`);
+  return { ok: true as const };
+}
+
 export async function avaliarJob(input: { jobId: string; rating: number; comment: string }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();

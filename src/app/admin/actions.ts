@@ -3,11 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
-async function ehAdmin(supabase: Awaited<ReturnType<typeof createClient>>, uid: string) {
-  const { data } = await supabase.from("profiles").select("role").eq("id", uid).single();
-  return data?.role === "admin";
-}
-
 /* Uma função para as duas tabelas que têm verificação. `professionals` e
    `distributors` têm exatamente o mesmo trio de colunas de confiança, então
    duplicar a lógica só criaria duas versões para divergirem depois.
@@ -21,36 +16,38 @@ async function definirVerificacao(
   tabela: TabelaVerificavel,
   id: string,
   status: "verificado" | "rejeitado",
+  motivo: string,
 ) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false as const, error: "Não autenticado." };
-  if (!(await ehAdmin(supabase, user.id))) return { ok: false as const, error: "Acesso restrito." };
 
-  const aprovado = status === "verificado";
-  const { error } = await supabase
-    .from(tabela)
-    .update({
-      verification_status: status,
-      verified_at: aprovado ? new Date().toISOString() : null,
-      ...(tabela === "distributors" ? { ativo: aprovado } : {}),
-    })
-    .eq("id", id);
+  const justificativa = motivo.trim();
+  if (justificativa.length < 5) {
+    return { ok: false as const, error: "Informe uma justificativa com pelo menos 5 caracteres." };
+  }
+
+  const { error } = await supabase.rpc("definir_verificacao", {
+    p_entity_type: tabela === "professionals" ? "professional" : "distributor",
+    p_entity_id: id,
+    p_status: status,
+    p_reason: justificativa,
+  });
   if (error) return { ok: false as const, error: error.message };
 
   revalidatePath("/admin");
   return { ok: true as const };
 }
 
-export async function aprovarProfissional(id: string) {
-  return definirVerificacao("professionals", id, "verificado");
+export async function aprovarProfissional(id: string, motivo: string) {
+  return definirVerificacao("professionals", id, "verificado", motivo);
 }
-export async function rejeitarProfissional(id: string) {
-  return definirVerificacao("professionals", id, "rejeitado");
+export async function rejeitarProfissional(id: string, motivo: string) {
+  return definirVerificacao("professionals", id, "rejeitado", motivo);
 }
-export async function aprovarDistribuidora(id: string) {
-  return definirVerificacao("distributors", id, "verificado");
+export async function aprovarDistribuidora(id: string, motivo: string) {
+  return definirVerificacao("distributors", id, "verificado", motivo);
 }
-export async function rejeitarDistribuidora(id: string) {
-  return definirVerificacao("distributors", id, "rejeitado");
+export async function rejeitarDistribuidora(id: string, motivo: string) {
+  return definirVerificacao("distributors", id, "rejeitado", motivo);
 }

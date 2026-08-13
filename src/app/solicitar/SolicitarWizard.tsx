@@ -8,9 +8,9 @@ import { buscarCep, detectarLocalizacao, formatarCep } from "@/lib/cep";
 import { CIDADE, ESTADO } from "@/lib/regiao";
 import { criarPedidoOrcamento } from "@/app/painel/orcamentos/actions";
 import { MAX_DESTINATARIOS } from "@/app/painel/orcamentos/config";
-import { FotosPedido } from "./FotosPedido";
+import { FotosPedido, type FotoPendente } from "./FotosPedido";
 import { aceitaCatalogo, type JobType } from "./tipos";
-import type { ProdutoDTO, ProfissionalDTO } from "./page";
+import type { PaginaMarketplace, ProdutoDTO, ProfissionalDTO } from "./marketplace-types";
 import { Wind, Wrench, Droplet, Move, Tool, Check as CheckIcon, Star, Building, User, MapPin, Search } from "@/components/icons";
 import { corDoId, iniciais } from "../painel/Avatar";
 
@@ -57,6 +57,15 @@ const TIPOS_IMOVEL = ["Casa", "Apartamento", "Escritório", "Loja", "Galpão"];
 const AMBIENTES = ["Sala", "Quarto", "Cozinha", "Escritório", "Loja", "Outro"];
 const PERIODOS = ["Durante o dia", "À noite", "O dia inteiro"];
 
+async function carregarPagina<T>(params: URLSearchParams, signal?: AbortSignal) {
+  const response = await fetch(`/api/marketplace/catalogo?${params}`, { signal });
+  const body = await response.json() as PaginaMarketplace<T> | { error?: string };
+  if (!response.ok || !("items" in body)) {
+    throw new Error("error" in body && body.error ? body.error : "Não foi possível carregar os resultados.");
+  }
+  return body;
+}
+
 /* Passos são declarados por id, não por número. Com sete tipos de serviço e
    ramificações diferentes, indexar passo por `step === 3 && equip` é onde o bug
    nasce — aqui a lista é montada e a navegação anda sobre ela. */
@@ -94,9 +103,10 @@ function montarSteps(jobType: JobType | null, jaTemEquipamento: boolean | null):
 }
 
 export function SolicitarWizard({
-  produtos, profissionais, cepInicial = "", userId,
+  produtos, totalProdutos, profissionais, cepInicial = "", userId,
 }: {
   produtos: ProdutoDTO[];
+  totalProdutos: number;
   profissionais: ProfissionalDTO[];
   cepInicial?: string;
   /** Dono do upload: as policies do bucket exigem a pasta {uid}/. */
@@ -124,11 +134,20 @@ export function SolicitarWizard({
   const [servicoOutro, setServicoOutro] = useState("");
 
   const [produtoId, setProdutoId] = useState<string | null>(null);
-  const [filtroDistribuidora, setFiltroDistribuidora] = useState("todas");
+  const [produtoSelecionado, setProdutoSelecionado] = useState<ProdutoDTO | null>(null);
+  const [produtosLista, setProdutosLista] = useState(produtos);
+  const [produtosTotal, setProdutosTotal] = useState(totalProdutos);
+  const [produtosPagina, setProdutosPagina] = useState(1);
+  const [produtoBusca, setProdutoBusca] = useState("");
+  const [produtosCarregando, setProdutosCarregando] = useState(false);
   /* Multi-cotação: o cliente descreve uma vez e envia para vários. É o padrão do
      mercado, e é o que faz a rede responder — quem demora, perde o serviço. */
-  const [profissionaisIds, setProfissionaisIds] = useState<string[]>([]);
-  const [fotos, setFotos] = useState<string[]>([]);
+  const [profissionaisLista, setProfissionaisLista] = useState(profissionais);
+  const [profissionaisTotal, setProfissionaisTotal] = useState(profissionais.length);
+  const [profissionaisPagina, setProfissionaisPagina] = useState(1);
+  const [profissionaisSelecionados, setProfissionaisSelecionados] = useState<ProfissionalDTO[]>([]);
+  const [profissionaisCarregando, setProfissionaisCarregando] = useState(false);
+  const [fotos, setFotos] = useState<FotoPendente[]>([]);
   const [quantidade, setQuantidade] = useState(1);
 
   // endereço — o CEP pode chegar já preenchido pelo hero da home
@@ -149,7 +168,8 @@ export function SolicitarWizard({
 
   // busca de profissional
   const [proBusca, setProBusca] = useState("");
-  const [proSort, setProSort] = useState<"nota" | "servicos">("nota");
+  const [proSort, setProSort] = useState<"relevancia" | "nota" | "servicos" | "resposta" | "disponibilidade">("relevancia");
+  const [buscaErro, setBuscaErro] = useState<string | null>(null);
 
   const [pending, startTransition] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
@@ -193,35 +213,82 @@ export function SolicitarWizard({
     [areaM2, numPessoas, insolacaoAlta, andarOuTelhado, eletronicos],
   );
 
-  const distribuidoras = useMemo(() => {
-    const s = new Set<string>();
-    for (const p of produtos) if (p.distribuidora) s.add(p.distribuidora);
-    return [...s].sort();
-  }, [produtos]);
+  useEffect(() => {
+    if (stepAtual !== "catalogo") return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setProdutosCarregando(true);
+      setBuscaErro(null);
+      try {
+        const params = new URLSearchParams({
+          kind: "produtos",
+          page: "1",
+          btu: String(btu.btuRecomendado),
+          q: produtoBusca,
+        });
+        const pagina = await carregarPagina<ProdutoDTO>(params, controller.signal);
+        setProdutosLista(pagina.items);
+        setProdutosTotal(pagina.total);
+        setProdutosPagina(1);
+      } catch (error) {
+        if (!(error instanceof DOMException && error.name === "AbortError")) {
+          setBuscaErro(error instanceof Error ? error.message : "Não foi possível carregar o catálogo.");
+        }
+      } finally {
+        if (!controller.signal.aborted) setProdutosCarregando(false);
+      }
+    }, 250);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [stepAtual, btu.btuRecomendado, produtoBusca]);
 
-  /* O catálogo mostra TODOS os aparelhos para o cliente comparar preço, mas os
-     compatíveis com o BTU calculado vêm primeiro e marcados. Antes filtrávamos
-     só pelo BTU exato, o que deixava a tela vazia sempre que o catálogo não
-     tinha aquela capacidade. */
+  useEffect(() => {
+    if (stepAtual !== "profissional") return;
+    const cepDigitos = cep.replace(/\D/g, "");
+    if (cepDigitos.length !== 8 || cepStatus !== "ok") return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setProfissionaisCarregando(true);
+      setBuscaErro(null);
+      try {
+        const params = new URLSearchParams({
+          kind: "profissionais",
+          page: "1",
+          cep: cepDigitos,
+          specialty: specialty ?? "",
+          sort: proSort,
+          q: proBusca,
+        });
+        const pagina = await carregarPagina<ProfissionalDTO>(params, controller.signal);
+        setProfissionaisLista(pagina.items);
+        setProfissionaisTotal(pagina.total);
+        setProfissionaisPagina(1);
+      } catch (error) {
+        if (!(error instanceof DOMException && error.name === "AbortError")) {
+          setBuscaErro(error instanceof Error ? error.message : "Não foi possível carregar os profissionais.");
+        }
+      } finally {
+        if (!controller.signal.aborted) setProfissionaisCarregando(false);
+      }
+    }, 250);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [stepAtual, cep, cepStatus, specialty, proBusca, proSort]);
+
+  /* A ordenação pesada acontece no banco antes da paginação. A UI apenas marca
+     os itens com capacidade exata, sem reordenar páginas isoladamente. */
   const produtosOrdenados = useMemo(() => {
-    return produtos
-      .filter((p) => filtroDistribuidora === "todas" || p.distribuidora === filtroDistribuidora)
-      .map((p) => ({ ...p, recomendado: p.btu === btu.btuRecomendado }))
-      .sort((a, b) => {
-        if (a.recomendado !== b.recomendado) return a.recomendado ? -1 : 1;
-        // fora os recomendados, o mais perto da capacidade ideal primeiro
-        const da = Math.abs(a.btu - btu.btuRecomendado), db = Math.abs(b.btu - btu.btuRecomendado);
-        return da !== db ? da - db : a.precoVenda - b.precoVenda;
-      });
-  }, [produtos, filtroDistribuidora, btu.btuRecomendado]);
+    return produtosLista.map((p) => ({ ...p, recomendado: p.btu === btu.btuRecomendado }));
+  }, [produtosLista, btu.btuRecomendado]);
 
   const qtdRecomendados = produtosOrdenados.filter((p) => p.recomendado).length;
 
   const prosOrdenados = useMemo(() => {
-    const termo = proBusca.trim().toLowerCase();
-    return profissionais
-      .filter((p) => !specialty || p.skills.some((s) => s.specialty === specialty))
-      .filter((p) => !termo || p.nome.toLowerCase().includes(termo))
+    return profissionaisLista
       .map((p) => {
         // sem especialidade (tipo "outros"), usa a skill mais forte do profissional
         const skill = specialty
@@ -229,15 +296,12 @@ export function SolicitarWizard({
           : [...p.skills].sort((a, b) => b.ratingAvg - a.ratingAvg)[0];
         return { ...p, skill, patrocinado: specialty ? p.destaqueEm.includes(specialty) : false };
       })
-      .filter((p) => p.skill)
-      .sort((a, b) => {
-        if (a.patrocinado !== b.patrocinado) return a.patrocinado ? -1 : 1;
-        return proSort === "servicos" ? b.skill.jobsCompleted - a.skill.jobsCompleted : b.skill.ratingAvg - a.skill.ratingAvg;
-      });
-  }, [profissionais, specialty, proBusca, proSort]);
+      .filter((p) => p.skill);
+  }, [profissionaisLista, specialty]);
 
-  const produtoSel = produtos.find((p) => p.id === produtoId) ?? null;
-  const prosSel = profissionais.filter((p) => profissionaisIds.includes(p.id));
+  const produtoSel = produtoSelecionado;
+  const profissionaisIds = profissionaisSelecionados.map((p) => p.id);
+  const prosSel = profissionaisSelecionados;
   /* Estimativa de mão de obra, exibida apenas como referência. O preço real vem
      da proposta de cada profissional — instalação varia demais com metragem de
      linha, parede e acesso para ter tabela fixa. */
@@ -245,17 +309,60 @@ export function SolicitarWizard({
   const foraDaArea = cepStatus === "ok" && ufCep && ufCep !== ESTADO;
 
   function goTriagem(t: JobType) {
-    setJobType(t); setProdutoId(null); setProfissionaisIds([]);
+    setJobType(t); setProdutoId(null); setProdutoSelecionado(null); setProfissionaisSelecionados([]);
     setProblemas([]); setUrgencia(""); setServicoOutro(""); setJaTemEquipamento(null);
     setFotos([]); setQuantidade(1);
     setIdx(1);
   }
-  function toggleProfissional(id: string) {
-    setProfissionaisIds((cur) =>
-      cur.includes(id)
-        ? cur.filter((x) => x !== id)
-        : cur.length >= MAX_DESTINATARIOS ? cur : [...cur, id],
+  function toggleProfissional(profissional: ProfissionalDTO) {
+    setProfissionaisSelecionados((cur) =>
+      cur.some((item) => item.id === profissional.id)
+        ? cur.filter((item) => item.id !== profissional.id)
+        : cur.length >= MAX_DESTINATARIOS ? cur : [...cur, profissional],
     );
+  }
+
+  async function carregarMaisProdutos() {
+    setProdutosCarregando(true);
+    setBuscaErro(null);
+    try {
+      const proxima = produtosPagina + 1;
+      const params = new URLSearchParams({
+        kind: "produtos", page: String(proxima), btu: String(btu.btuRecomendado), q: produtoBusca,
+      });
+      const pagina = await carregarPagina<ProdutoDTO>(params);
+      setProdutosLista((atuais) => [...atuais, ...pagina.items.filter((p) => !atuais.some((a) => a.id === p.id))]);
+      setProdutosPagina(proxima);
+      setProdutosTotal(pagina.total);
+    } catch (error) {
+      setBuscaErro(error instanceof Error ? error.message : "Não foi possível carregar mais produtos.");
+    } finally {
+      setProdutosCarregando(false);
+    }
+  }
+
+  async function carregarMaisProfissionais() {
+    setProfissionaisCarregando(true);
+    setBuscaErro(null);
+    try {
+      const proxima = profissionaisPagina + 1;
+      const params = new URLSearchParams({
+        kind: "profissionais",
+        page: String(proxima),
+        cep: cep.replace(/\D/g, ""),
+        specialty: specialty ?? "",
+        sort: proSort,
+        q: proBusca,
+      });
+      const pagina = await carregarPagina<ProfissionalDTO>(params);
+      setProfissionaisLista((atuais) => [...atuais, ...pagina.items.filter((p) => !atuais.some((a) => a.id === p.id))]);
+      setProfissionaisPagina(proxima);
+      setProfissionaisTotal(pagina.total);
+    } catch (error) {
+      setBuscaErro(error instanceof Error ? error.message : "Não foi possível carregar mais profissionais.");
+    } finally {
+      setProfissionaisCarregando(false);
+    }
   }
   function avancar() { setIdx((i) => Math.min(i + 1, steps.length - 1)); }
   function voltar() {
@@ -319,7 +426,7 @@ export function SolicitarWizard({
         produtoId: comCatalogo ? produtoId : null,
         btuRecomendado: comCatalogo ? btu.btuRecomendado : null,
         profissionaisIds,
-        fotos,
+        fotos: fotos.map((foto) => foto.path),
       });
       if (res.ok) {
         setSucessoId(res.pedidoId);
@@ -455,40 +562,53 @@ export function SolicitarWizard({
               ? `${qtdRecomendados} modelo(s) na capacidade ideal de ${formatarBtu(btu.btuRecomendado)} — aparecem primeiro.`
               : `Nenhum modelo exatamente de ${formatarBtu(btu.btuRecomendado)}. Listamos do mais próximo ao mais distante.`} />
 
-          {distribuidoras.length > 1 && (
-            <div style={{ display: "flex", gap: 10, marginBottom: 18, flexWrap: "wrap", alignItems: "center" }}>
-              <span style={labelTxt}>Distribuidora</span>
-              <select value={filtroDistribuidora} onChange={(e) => setFiltroDistribuidora(e.target.value)} style={{ ...input, width: "auto" }}>
-                <option value="todas">Todas</option>
-                {distribuidoras.map((d) => <option key={d} value={d}>{d}</option>)}
-              </select>
-            </div>
-          )}
+          <div style={{ position: "relative", marginBottom: 18 }}>
+            <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--ink-faint)", display: "flex" }}>
+              <Search size={17} />
+            </span>
+            <input
+              value={produtoBusca}
+              onChange={(e) => setProdutoBusca(e.target.value)}
+              placeholder="Buscar por marca, modelo ou distribuidora"
+              style={{ ...input, paddingLeft: 38 }}
+            />
+          </div>
 
-          {produtosOrdenados.length === 0 ? (
-            <Aviso>Nenhum aparelho disponível no catálogo com esse filtro.</Aviso>
+          {buscaErro && <Aviso>{buscaErro}</Aviso>}
+          {produtosCarregando && produtosOrdenados.length === 0 ? (
+            <Aviso>Carregando aparelhos disponíveis…</Aviso>
+          ) : produtosOrdenados.length === 0 ? (
+            <Aviso>Nenhum aparelho disponível no catálogo com essa busca.</Aviso>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px,1fr))", gap: 14 }}>
-              {produtosOrdenados.map((p) => {
-                const sel = p.id === produtoId;
-                return (
-                  <button key={p.id} onClick={() => setProdutoId(p.id)} style={{ ...prodCard, ...(sel ? prodCardSel : {}) }}>
-                    {p.recomendado && <span style={badgeRec}>Ideal para seu ambiente</span>}
-                    {p.imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={p.imageUrl} alt={p.modelo} style={{ width: "100%", height: 120, objectFit: "contain", background: "#fff", borderRadius: 8 }} />
-                    ) : <div style={{ height: 120 }} />}
-                    <span style={{ fontSize: 11, fontFamily: mono, color: "var(--cool)", textTransform: "uppercase" }}>{p.marca}</span>
-                    <span style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.3 }}>{p.modelo}</span>
-                    <span style={{ fontSize: 12, color: "var(--ink-faint)" }}>{formatarBtu(p.btu)}</span>
-                    <span style={{ fontSize: "1.05rem", fontWeight: 800 }}>{formatarBRL(p.precoVenda)}</span>
-                    <span style={{ fontSize: 11.5, color: "var(--ink-faint)" }}>
-                      {p.distribuidora ? `Distribuidora: ${p.distribuidora}` : "Distribuidora não informada"}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+            <>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px,1fr))", gap: 14 }}>
+                {produtosOrdenados.map((p) => {
+                  const sel = p.id === produtoId;
+                  return (
+                    <button key={p.id} onClick={() => { setProdutoId(p.id); setProdutoSelecionado(p); }} style={{ ...prodCard, ...(sel ? prodCardSel : {}) }}>
+                      {p.recomendado && <span style={badgeRec}>Ideal para seu ambiente</span>}
+                      {p.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={p.imageUrl} alt={p.modelo} style={{ width: "100%", height: 120, objectFit: "contain", background: "#fff", borderRadius: 8 }} />
+                      ) : <div style={{ height: 120 }} />}
+                      <span style={{ fontSize: 11, fontFamily: mono, color: "var(--cool)", textTransform: "uppercase" }}>{p.marca}</span>
+                      <span style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.3 }}>{p.modelo}</span>
+                      <span style={{ fontSize: 12, color: "var(--ink-faint)" }}>{formatarBtu(p.btu)}</span>
+                      <span style={{ fontSize: "1.05rem", fontWeight: 800 }}>{formatarBRL(p.precoVenda)}</span>
+                      <span style={{ fontSize: 11.5, color: "var(--ink-faint)" }}>
+                        {p.distribuidora ? `Distribuidora: ${p.distribuidora}` : "Distribuidora não informada"}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              {produtosLista.length < produtosTotal && (
+                <button type="button" className="btn" onClick={carregarMaisProdutos} disabled={produtosCarregando}
+                  style={{ marginTop: 16, width: "100%" }}>
+                  {produtosCarregando ? "Carregando…" : `Mostrar mais (${produtosLista.length} de ${produtosTotal})`}
+                </button>
+              )}
+            </>
           )}
           <Nav onBack={voltar} onNext={avancar} nextLabel="Escolher profissional" disabled={!produtoId} />
         </>
@@ -558,23 +678,29 @@ export function SolicitarWizard({
               <input value={proBusca} onChange={(e) => setProBusca(e.target.value)} placeholder="Buscar por nome"
                 style={{ ...input, paddingLeft: 38 }} />
             </div>
-            <select value={proSort} onChange={(e) => setProSort(e.target.value as "nota" | "servicos")} style={{ ...input, width: "auto" }}>
+            <select value={proSort} onChange={(e) => setProSort(e.target.value as typeof proSort)} style={{ ...input, width: "auto" }}>
+              <option value="relevancia">Relevância</option>
               <option value="nota">Melhor avaliados</option>
               <option value="servicos">Mais serviços</option>
+              <option value="resposta">Maior taxa de resposta</option>
+              <option value="disponibilidade">Menor agenda ativa</option>
             </select>
           </div>
 
-          {prosOrdenados.length === 0 ? (
-            <Aviso>Nenhum profissional encontrado{specialty ? ` para “${SPECIALTY_LABEL[specialty]}”` : ""} {proBusca ? "com esse nome" : `em ${CIDADE}`}.</Aviso>
+          {buscaErro && <Aviso>{buscaErro}</Aviso>}
+          {profissionaisCarregando && prosOrdenados.length === 0 ? (
+            <Aviso>Buscando profissionais que atendem este CEP…</Aviso>
+          ) : prosOrdenados.length === 0 ? (
+            <Aviso>Nenhum profissional atende este CEP{specialty ? ` para “${SPECIALTY_LABEL[specialty]}”` : ""}{proBusca ? " com esse nome" : ""}.</Aviso>
           ) : (
             <div className="pro-grade">
               {prosOrdenados.map((p) => {
                 const sel = profissionaisIds.includes(p.id);
                 const cheio = !sel && profissionaisIds.length >= MAX_DESTINATARIOS;
                 return (
-                  <div key={p.id} onClick={() => toggleProfissional(p.id)} role="button" tabIndex={0}
+                  <div key={p.id} onClick={() => toggleProfissional(p)} role="button" tabIndex={0}
                     aria-pressed={sel}
-                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleProfissional(p.id); } }}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleProfissional(p); } }}
                     className="pro-card" data-sel={String(sel)}
                     style={cheio ? { opacity: 0.45, cursor: "not-allowed" } : undefined}
                     title={cheio ? `Você já escolheu ${MAX_DESTINATARIOS} profissionais` : undefined}>
@@ -611,6 +737,10 @@ export function SolicitarWizard({
                         </span>
                       </span>
 
+                      <span style={{ fontSize: 12, color: "var(--ink-faint)" }}>
+                        {Math.round(p.responseRate * 100)}% de resposta · {p.activeJobs} serviço(s) ativo(s)
+                      </span>
+
                       {/* Especialidades como chips — o cliente compara de relance */}
                       <span style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 2 }}>
                         {p.skills.slice(0, 3).map((s) => (
@@ -625,6 +755,12 @@ export function SolicitarWizard({
                 );
               })}
             </div>
+          )}
+          {profissionaisLista.length < profissionaisTotal && (
+            <button type="button" className="btn" onClick={carregarMaisProfissionais} disabled={profissionaisCarregando}
+              style={{ marginTop: 16, width: "100%" }}>
+              {profissionaisCarregando ? "Carregando…" : `Mostrar mais (${profissionaisLista.length} de ${profissionaisTotal})`}
+            </button>
           )}
           {profissionaisIds.length > 0 && (
             <p style={{ fontSize: 13.5, color: "var(--ink-soft)", marginTop: 16 }}>

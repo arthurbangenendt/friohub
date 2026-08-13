@@ -11,7 +11,7 @@ import { Chat } from "@/components/icons";
  * par (cliente, profissional), então os dois lados chegam na mesma thread. Quem
  * for o profissional já terá a conversa criada pelo cliente ou pelo próprio
  * fluxo — a função devolve a existente em vez de duplicar. */
-export function AbrirChat({ professionalId, rotulo }: { professionalId: string; rotulo: string }) {
+export function AbrirChat({ professionalId, jobId, rotulo }: { professionalId: string; jobId: string; rotulo: string }) {
   const router = useRouter();
   const [erro, setErro] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -19,7 +19,7 @@ export function AbrirChat({ professionalId, rotulo }: { professionalId: string; 
   function abrir() {
     setErro(null);
     startTransition(async () => {
-      const r = await abrirConversa(professionalId);
+      const r = await abrirConversa(professionalId, { jobId });
       if (!r.ok) return setErro(r.error);
       router.push(`/painel/mensagens/${r.conversaId}`);
     });

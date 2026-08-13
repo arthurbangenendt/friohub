@@ -8,6 +8,8 @@ import { rotuloPergunta } from "@/app/solicitar/perguntas-orcamento";
 import { dataCurta, mono, one, wrap } from "../../shared";
 import { PropostaForm } from "./PropostaForm";
 import { Propostas, type PropostaView } from "./Propostas";
+import { CancelarPedido } from "./CancelarPedido";
+import { AbrirChatPedido } from "./AbrirChatPedido";
 
 const URGENCIA: Record<string, string> = {
   sem_pressa: "Sem pressa",
@@ -26,11 +28,18 @@ export default async function PedidoPage({ params }: { params: Promise<{ id: str
     .select(`id, cliente_id, job_type, status, created_at, cep, bairro, cidade, quantidade,
              urgencia, descricao, detalhes, btu_recomendado, expira_em,
              produto:products ( marca, modelo, btu, preco_venda ),
-             fotos:quote_request_photos ( id, url )`)
+             fotos:quote_request_photos ( id, storage_path )`)
     .eq("id", id)
     .maybeSingle();
 
   if (!pedido) redirect("/painel/orcamentos");
+
+  const { data: eventosPedido } = await supabase
+    .from("quote_request_events")
+    .select("id, event_type, reason, created_at")
+    .eq("quote_request_id", id)
+    .order("created_at", { ascending: false })
+    .limit(20);
 
   const souCliente = pedido.cliente_id === user.id;
 
@@ -48,7 +57,15 @@ export default async function PedidoPage({ params }: { params: Promise<{ id: str
 
   const produto = one(pedido.produto) as { marca: string; modelo: string; btu: number; preco_venda: number } | null;
   const detalhes = (pedido.detalhes ?? {}) as Record<string, unknown>;
-  const fotos = (pedido.fotos ?? []) as { id: string; url: string }[];
+  const fotosPrivadas = (pedido.fotos ?? []) as { id: string; storage_path: string }[];
+  const fotos = (await Promise.all(
+    fotosPrivadas.map(async (foto) => {
+      const { data } = await supabase.storage
+        .from("orcamentos")
+        .createSignedUrl(foto.storage_path, 10 * 60);
+      return data?.signedUrl ? { id: foto.id, signedUrl: data.signedUrl } : null;
+    }),
+  )).filter((foto): foto is { id: string; signedUrl: string } => foto !== null);
   const jobType = pedido.job_type as JobType;
 
   /* O profissional só enxerga a PRÓPRIA proposta (RLS de `quotes`) — de
@@ -132,11 +149,30 @@ export default async function PedidoPage({ params }: { params: Promise<{ id: str
             <SecTitle>Fotos do local</SecTitle>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 10 }}>
               {fotos.map((f) => (
-                <a key={f.id} href={f.url} target="_blank" rel="noopener noreferrer">
+                <a key={f.id} href={f.signedUrl} target="_blank" rel="noopener noreferrer">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={f.url} alt="Foto enviada pelo cliente"
+                  <img src={f.signedUrl} alt="Foto enviada pelo cliente"
                     style={{ width: "100%", height: 110, objectFit: "cover", borderRadius: 10, display: "block" }} />
                 </a>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {eventosPedido && eventosPedido.length > 0 && (
+          <div className="card" style={{ padding: 22 }}>
+            <SecTitle>Histórico do pedido</SecTitle>
+            <div style={{ display: "grid", gap: 10 }}>
+              {eventosPedido.map((evento) => (
+                <div key={evento.id} style={{ display: "flex", justifyContent: "space-between", gap: 16, fontSize: 13.5 }}>
+                  <span>
+                    <strong>{ROTULO_EVENTO[evento.event_type] ?? evento.event_type}</strong>
+                    {evento.reason && <span style={{ display: "block", color: "var(--ink-soft)", marginTop: 2 }}>{evento.reason}</span>}
+                  </span>
+                  <time style={{ color: "var(--ink-faint)", whiteSpace: "nowrap" }}>
+                    {new Date(evento.created_at).toLocaleString("pt-BR")}
+                  </time>
+                </div>
               ))}
             </div>
           </div>
@@ -146,6 +182,9 @@ export default async function PedidoPage({ params }: { params: Promise<{ id: str
         {souDestinatario && (
           <div className="card" style={{ padding: 22 }}>
             <SecTitle>{minhaProposta ? "Sua proposta" : "Responder com uma proposta"}</SecTitle>
+            <div style={{ marginBottom: 16 }}>
+              <AbrirChatPedido pedidoId={pedido.id} professionalId={user.id} />
+            </div>
             {alvo?.recusado_em ? (
               <p style={{ color: "var(--ink-faint)", fontSize: 14.5, margin: 0 }}>
                 Você recusou este pedido.
@@ -154,7 +193,7 @@ export default async function PedidoPage({ params }: { params: Promise<{ id: str
               <Propostas
                 propostas={[minhaProposta]} podeAceitar={false} enderecoSugerido=""
                 produtoPreco={Number(produto?.preco_venda ?? 0)}
-                pedidoId={pedido.id} jobType={jobType} detalhesAtuais={{}}
+                jobType={jobType} detalhesAtuais={{}}
               />
             ) : aberto ? (
               <PropostaForm pedidoId={pedido.id} taxaComissao={TAXA_COMISSAO} />
@@ -177,18 +216,39 @@ export default async function PedidoPage({ params }: { params: Promise<{ id: str
               podeAceitar={aberto}
               enderecoSugerido=""
               produtoPreco={Number(produto?.preco_venda ?? 0)}
-              pedidoId={pedido.id}
               jobType={jobType}
               detalhesAtuais={Object.fromEntries(
                 Object.entries(detalhes).map(([k, v]) => [k, v == null ? "" : String(v)]),
               )}
             />
+            {propostas.length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 16 }}>
+                {propostas.map((proposta) => (
+                  <AbrirChatPedido
+                    key={proposta.professional_id}
+                    pedidoId={pedido.id}
+                    professionalId={proposta.professional_id}
+                  />
+                ))}
+              </div>
+            )}
+            {aberto && (
+              <div style={{ marginTop: 16 }}>
+                <CancelarPedido pedidoId={pedido.id} />
+              </div>
+            )}
           </div>
         )}
       </div>
     </div>
   );
 }
+
+const ROTULO_EVENTO: Record<string, string> = {
+  cancelled: "Pedido cancelado",
+  declined: "Profissional recusou",
+  expired: "Pedido expirado",
+};
 
 function SecTitle({ children }: { children: React.ReactNode }) {
   return (

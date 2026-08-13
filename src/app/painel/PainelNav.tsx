@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bolt, Wrench, User, Shield, Star, Tool, Droplet, Chat, Doc } from "@/components/icons";
+import { Bell, Bolt, Wrench, User, Shield, Star, Tool, Droplet, Chat, Doc } from "@/components/icons";
 
 export type ItemNav = { href: string; label: string; icone: keyof typeof ICONE };
 
 const ICONE = {
   visao: Bolt, servicos: Wrench, financeiro: Droplet, orcamentos: Doc,
   avaliacoes: Star, ferramentas: Tool, perfil: User, admin: Shield, mensagens: Chat,
+  notificacoes: Bell, pmoc: Shield,
 };
 
 /* Único pedaço cliente do shell: só existe para marcar o link ativo, que

@@ -30,11 +30,6 @@ export async function salvarPerfil(input: PerfilInput) {
 
   const cidade = input.cidade.trim() || CIDADE;
 
-  // Não rebaixa quem já é verificado; novos/editados entram em análise (RISCO 4).
-  const { data: atual } = await supabase
-    .from("professionals").select("verification_status").eq("id", user.id).maybeSingle();
-  const novoStatus = atual?.verification_status === "verificado" ? "verificado" : "em_analise";
-
   const { error: pErr } = await supabase.from("professionals").upsert({
     id: user.id,
     tipo: input.tipo,
@@ -43,7 +38,6 @@ export async function salvarPerfil(input: PerfilInput) {
     cidade,
     estado: ESTADO,
     anos_experiencia: Math.min(60, Math.max(0, input.anosExperiencia || 0)),
-    verification_status: novoStatus,
   });
   if (pErr) return { ok: false as const, error: pErr.message };
 

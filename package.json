@@ -6,7 +6,17 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run lint && npm run typecheck && npm run build",
+    "db:reset": "SUPABASE_TELEMETRY_DISABLED=1 supabase db reset --local",
+    "db:lint": "SUPABASE_TELEMETRY_DISABLED=1 supabase db lint --local --fail-on error",
+    "db:test": "SUPABASE_TELEMETRY_DISABLED=1 supabase test db --local",
+    "db:types": "SUPABASE_TELEMETRY_DISABLED=1 supabase gen types --local --schema public > src/types/database.generated.ts",
+    "db:types:check": "sh scripts/check-generated-types.sh",
+    "db:restore:verify": "sh scripts/verify-backup-restore.sh",
+    "load:db": "sh scripts/load-db.sh",
+    "load:smoke": "node scripts/load-smoke.mjs"
   },
   "dependencies": {
     "@paper-design/shaders-react": "^0.0.80",

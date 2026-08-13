@@ -38,6 +38,8 @@ export function PropostaForm({ pedidoId, taxaComissao }: { pedidoId: string; tax
   const [garantia, setGarantia] = useState("90");
   const [validade, setValidade] = useState(emDias(7));
   const [obs, setObs] = useState("");
+  const [recusando, setRecusando] = useState(false);
+  const [motivoRecusa, setMotivoRecusa] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -67,8 +69,14 @@ export function PropostaForm({ pedidoId, taxaComissao }: { pedidoId: string; tax
   }
 
   function recusar() {
+    setErro(null);
+    if (motivoRecusa.trim().length < 3) {
+      setErro("Informe brevemente por que você não vai atender.");
+      return;
+    }
     startTransition(async () => {
-      await recusarPedido(pedidoId, "");
+      const r = await recusarPedido(pedidoId, motivoRecusa);
+      if (!r.ok) return setErro(r.error);
       router.refresh();
     });
   }
@@ -162,13 +170,40 @@ export function PropostaForm({ pedidoId, taxaComissao }: { pedidoId: string; tax
         </div>
       )}
 
+      {recusando && (
+        <div style={{ padding: 15, borderRadius: 12, border: "1px solid var(--line)", background: "var(--surface-2)" }}>
+          <label>
+            <span style={rotulo}>Por que você não vai atender?</span>
+            <textarea
+              value={motivoRecusa}
+              onChange={(event) => setMotivoRecusa(event.target.value)}
+              rows={2}
+              maxLength={500}
+              autoFocus
+              placeholder="Ex.: agenda lotada nesta semana."
+              style={{ ...campo, resize: "vertical" }}
+            />
+          </label>
+          <div style={{ display: "flex", gap: 9, marginTop: 10 }}>
+            <button className="btn" onClick={recusar} disabled={pending}
+              style={{ background: "#b3261e", color: "white" }}>
+              {pending ? "Registrando…" : "Confirmar recusa"}
+            </button>
+            <button className="btn" onClick={() => { setRecusando(false); setErro(null); }} disabled={pending}
+              style={{ border: "1px solid var(--line)", background: "var(--surface)" }}>
+              Voltar
+            </button>
+          </div>
+        </div>
+      )}
+
       {erro && <p style={{ color: "#b3261e", fontSize: 13.5, margin: 0 }}>{erro}</p>}
 
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         <button className="btn btn-primary" onClick={enviar} disabled={pending}>
           {pending ? "Enviando…" : "Enviar proposta"}
         </button>
-        <button className="btn" onClick={recusar} disabled={pending}
+        <button className="btn" onClick={() => { setRecusando(true); setErro(null); }} disabled={pending || recusando}
           style={{ border: "1px solid var(--line)", background: "var(--surface)" }}>
           Não vou atender
         </button>

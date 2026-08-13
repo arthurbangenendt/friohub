@@ -9,7 +9,7 @@ export default function PrivacidadePage() {
       <Secao t="1. Quais dados coletamos">
         Nome, e-mail, telefone e CPF ou CNPJ no cadastro. Endereço e CEP quando você
         solicita um serviço. Dados do ambiente (área, número de pessoas, insolação)
-        para calcular a capacidade recomendada. Para parceiros, também dados
+        e fotos opcionais do local para calcular e orçar o serviço. Para parceiros, também dados
         profissionais: especialidades, equipamentos que domina, região de atendimento
         e fotos de portfólio que você mesmo envia. Também guardamos as{" "}
         <strong>mensagens trocadas no chat</strong> da plataforma.
@@ -22,8 +22,9 @@ export default function PrivacidadePage() {
       <Secao t="3. O que é público e o que não é">
         São públicos: nome do profissional, foto de portfólio, especialidades,
         avaliações e nota. <strong>Não são públicos</strong>: CPF ou CNPJ, telefone,
-        endereço e mensagens — esses ficam em armazenamento restrito, acessível apenas
-        a você e à administração da plataforma. O perfil de cliente não é exibido
+        endereço, fotos de pedidos e mensagens — esses ficam em armazenamento restrito,
+        acessível apenas aos participantes do pedido quando necessário e à administração
+        da plataforma. O perfil de cliente não é exibido
         publicamente.
       </Secao>
       <Secao t="4. Com quem compartilhamos">

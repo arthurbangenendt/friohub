@@ -46,13 +46,12 @@ const campoAceite: React.CSSProperties = {
  * fora do escopo aparecem lado a lado. Comparar só por preço é o que leva a rede
  * à corrida para o fundo, e o cliente ao serviço malfeito. */
 export function Propostas({
-  propostas, podeAceitar, enderecoSugerido, produtoPreco, pedidoId, jobType, detalhesAtuais,
+  propostas, podeAceitar, enderecoSugerido, produtoPreco, jobType, detalhesAtuais,
 }: {
   propostas: PropostaView[];
   podeAceitar: boolean;
   enderecoSugerido: string;
   produtoPreco: number;
-  pedidoId: string;
   jobType: JobType;
   detalhesAtuais: Record<string, string>;
 }) {
@@ -70,7 +69,7 @@ export function Propostas({
   function confirmar(quoteId: string) {
     setErro(null);
     startTransition(async () => {
-      const r = await aceitarProposta(quoteId, endereco, pedidoId, respostas);
+      const r = await aceitarProposta(quoteId, endereco, respostas);
       if (!r.ok) return setErro(r.error);
       router.push(`/servico/${r.jobId}`);
     });

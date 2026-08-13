@@ -1,5 +1,5 @@
 // Seed de profissionais demo (Fortaleza). Cria contas reais via signUp e preenche
-// professionals + skills + áreas + destaque, respeitando o RLS (age como o próprio pro).
+// professionals + skills + áreas, respeitando o RLS (age como o próprio pro).
 //
 // Rodar:  node --env-file=.env.local scripts/seed-pros.mjs
 // Requer: "Confirm email" DESLIGADO em Auth -> Settings (senão não há sessão).
@@ -23,7 +23,6 @@ const PROS = [
       { specialty: "instalacao", rating: 4.9, count: 42, jobs: 42, anos: 8 },
       { specialty: "manutencao", rating: 4.7, count: 30, jobs: 30, anos: 8 },
     ],
-    destaque: ["instalacao"], // patrocinado (passa na trava de qualidade)
   },
   {
     email: "contato@climanorte.demo.friohub.app", nome: "Clima Norte Refrigeração", tipo: "empresa",
@@ -33,7 +32,6 @@ const PROS = [
       { specialty: "instalacao", rating: 4.6, count: 80, jobs: 80, anos: 12 },
       { specialty: "limpeza", rating: 4.9, count: 65, jobs: 65, anos: 12 },
     ],
-    destaque: ["manutencao"],
   },
   {
     email: "maria.andrade@demo.friohub.app", nome: "Maria Andrade", tipo: "autonomo",
@@ -42,7 +40,6 @@ const PROS = [
       { specialty: "limpeza", rating: 5.0, count: 60, jobs: 60, anos: 6 },
       { specialty: "manutencao", rating: 4.9, count: 55, jobs: 55, anos: 6 },
     ],
-    destaque: [],
   },
   {
     email: "contato@argelado.demo.friohub.app", nome: "Ar Gelado Serviços", tipo: "empresa",
@@ -52,7 +49,6 @@ const PROS = [
       { specialty: "remanejamento", rating: 4.7, count: 35, jobs: 35, anos: 10 },
       { specialty: "conserto", rating: 4.6, count: 40, jobs: 40, anos: 10 },
     ],
-    destaque: [],
   },
   {
     email: "pedro.costa@demo.friohub.app", nome: "Pedro Costa", tipo: "autonomo",
@@ -61,7 +57,6 @@ const PROS = [
       { specialty: "conserto", rating: 4.8, count: 38, jobs: 38, anos: 7 },
       { specialty: "manutencao", rating: 4.6, count: 25, jobs: 25, anos: 7 },
     ],
-    destaque: [],
   },
 ];
 
@@ -91,7 +86,7 @@ async function main() {
     await sb.auth.setSession({ access_token: session.access_token, refresh_token: session.refresh_token });
     const uid = session.user.id;
 
-    // 3) professionals (verificado, para poder ser exibido e comprar destaque)
+    // 3) professionals
     await sb.from("professionals").upsert({
       id: uid, tipo: pro.tipo, cidade: "São Paulo", estado: "SP",
       bio: pro.bio, verification_status: "verificado", verified_at: new Date().toISOString(),
@@ -106,21 +101,11 @@ async function main() {
       }, { onConflict: "professional_id,specialty" });
     }
 
-    // 5) área de atendimento (São Paulo capital — CEPs iniciados em 0)
+    // 5) áreas de atendimento do demo (faixas válidas da capital)
     await sb.from("service_areas").delete().eq("professional_id", uid);
-    await sb.from("service_areas").insert({ professional_id: uid, cep_prefix: "0", cidade: "São Paulo" });
-
-    // 6) destaque patrocinado (a trava de qualidade valida no banco)
-    for (const spec of pro.destaque) {
-      const { data: existe } = await sb.from("featured_placements")
-        .select("id").eq("professional_id", uid).eq("specialty", spec).limit(1);
-      if (existe && existe.length) continue;
-      const ends = new Date(); ends.setMonth(ends.getMonth() + 1);
-      const { error: fErr } = await sb.from("featured_placements").insert({
-        professional_id: uid, specialty: spec, cidade: "São Paulo", ends_at: ends.toISOString(),
-      });
-      if (fErr) console.warn(`  ! destaque ${spec} p/ ${pro.nome}: ${fErr.message}`);
-    }
+    await sb.from("service_areas").insert(["01", "02", "03", "04", "05"].map((cep_prefix) => ({
+      professional_id: uid, cep_prefix, cidade: "São Paulo",
+    })));
 
     console.log(`✓ ${pro.nome} (${pro.skills.map((s) => s.specialty).join(", ")})`);
     ok++;
