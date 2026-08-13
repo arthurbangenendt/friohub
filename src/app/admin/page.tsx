@@ -98,6 +98,7 @@ export default async function AdminPage() {
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 18 }}>
         <Link href="/admin/saude" className="btn">Saúde operacional</Link>
         <Link href="/admin/pmoc" className="btn">Fila PMOC</Link>
+        <Link href="/admin/assinaturas" className="btn">Assinaturas</Link>
       </div>
       <h1 style={{ fontSize: "1.8rem", fontWeight: 800, margin: "20px 0 6px" }}>Verificação de profissionais</h1>
       <p style={{ color: "var(--ink-soft)", marginBottom: 30 }}>

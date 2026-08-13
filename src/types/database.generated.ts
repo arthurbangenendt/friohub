@@ -251,6 +251,98 @@ export type Database = {
           },
         ]
       }
+      customer_equipment: {
+        Row: {
+          brand: string | null
+          capacity_btu: number | null
+          created_at: string
+          customer_id: string
+          id: string
+          installed_at: string | null
+          kind: string
+          model: string | null
+          notes: string | null
+          serial_number: string | null
+          site_id: string | null
+        }
+        Insert: {
+          brand?: string | null
+          capacity_btu?: number | null
+          created_at?: string
+          customer_id: string
+          id?: string
+          installed_at?: string | null
+          kind?: string
+          model?: string | null
+          notes?: string | null
+          serial_number?: string | null
+          site_id?: string | null
+        }
+        Update: {
+          brand?: string | null
+          capacity_btu?: number | null
+          created_at?: string
+          customer_id?: string
+          id?: string
+          installed_at?: string | null
+          kind?: string
+          model?: string | null
+          notes?: string | null
+          serial_number?: string | null
+          site_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_equipment_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_equipment_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "customer_sites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_sites: {
+        Row: {
+          address: string
+          cep: string | null
+          created_at: string
+          customer_id: string
+          id: string
+          label: string
+        }
+        Insert: {
+          address: string
+          cep?: string | null
+          created_at?: string
+          customer_id: string
+          id?: string
+          label: string
+        }
+        Update: {
+          address?: string
+          cep?: string | null
+          created_at?: string
+          customer_id?: string
+          id?: string
+          label?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_sites_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       distributor_areas: {
         Row: {
           cep_prefix: string | null
@@ -329,6 +421,72 @@ export type Database = {
             columns: ["id"]
             isOneToOne: true
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      equipment_pmoc_links: {
+        Row: {
+          equipment_id: string
+          linked_at: string
+          plan_id: string
+        }
+        Insert: {
+          equipment_id: string
+          linked_at?: string
+          plan_id: string
+        }
+        Update: {
+          equipment_id?: string
+          linked_at?: string
+          plan_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "equipment_pmoc_links_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "customer_equipment"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "equipment_pmoc_links_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "pmoc_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      equipment_service_links: {
+        Row: {
+          equipment_id: string
+          job_id: string
+          linked_at: string
+        }
+        Insert: {
+          equipment_id: string
+          job_id: string
+          linked_at?: string
+        }
+        Update: {
+          equipment_id?: string
+          job_id?: string
+          linked_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "equipment_service_links_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "customer_equipment"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "equipment_service_links_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "jobs"
             referencedColumns: ["id"]
           },
         ]
@@ -719,6 +877,105 @@ export type Database = {
         }
         Relationships: []
       }
+      follow_up_events: {
+        Row: {
+          actor_id: string | null
+          created_at: string
+          event_type: string
+          id: string
+          metadata: Json
+          task_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          metadata?: Json
+          task_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          metadata?: Json
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "follow_up_events_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "follow_up_events_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "follow_up_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      follow_up_tasks: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          due_at: string
+          id: string
+          notes: string | null
+          outcome: string | null
+          professional_id: string
+          quote_request_id: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          due_at: string
+          id?: string
+          notes?: string | null
+          outcome?: string | null
+          professional_id: string
+          quote_request_id: string
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          due_at?: string
+          id?: string
+          notes?: string | null
+          outcome?: string | null
+          professional_id?: string
+          quote_request_id?: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "follow_up_tasks_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
+            referencedRelation: "professionals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "follow_up_tasks_quote_request_id_fkey"
+            columns: ["quote_request_id"]
+            isOneToOne: false
+            referencedRelation: "quote_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_appointments: {
         Row: {
           cancellation_reason: string | null
@@ -941,6 +1198,54 @@ export type Database = {
             columns: ["quote_request_id"]
             isOneToOne: true
             referencedRelation: "quote_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      maintenance_recommendations: {
+        Row: {
+          created_at: string
+          due_on: string
+          equipment_id: string
+          id: string
+          professional_id: string
+          reason: string
+          reminder_consent: boolean
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          due_on: string
+          equipment_id: string
+          id?: string
+          professional_id: string
+          reason: string
+          reminder_consent?: boolean
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          due_on?: string
+          equipment_id?: string
+          id?: string
+          professional_id?: string
+          reason?: string
+          reminder_consent?: boolean
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maintenance_recommendations_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "customer_equipment"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_recommendations_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
+            referencedRelation: "professionals"
             referencedColumns: ["id"]
           },
         ]
@@ -1549,6 +1854,7 @@ export type Database = {
           interval_months: number
           next_due_date: string | null
           notes: string | null
+          origin: string
           price_per_visit: number | null
           professional_id: string | null
           site_name: string
@@ -1566,6 +1872,7 @@ export type Database = {
           interval_months: number
           next_due_date?: string | null
           notes?: string | null
+          origin?: string
           price_per_visit?: number | null
           professional_id?: string | null
           site_name: string
@@ -1583,6 +1890,7 @@ export type Database = {
           interval_months?: number
           next_due_date?: string | null
           notes?: string | null
+          origin?: string
           price_per_visit?: number | null
           professional_id?: string | null
           site_name?: string
@@ -1749,6 +2057,80 @@ export type Database = {
             columns: ["distributor_id"]
             isOneToOne: false
             referencedRelation: "distributors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      professional_client_notes: {
+        Row: {
+          customer_id: string
+          id: string
+          notes: string
+          professional_id: string
+          updated_at: string
+        }
+        Insert: {
+          customer_id: string
+          id?: string
+          notes: string
+          professional_id: string
+          updated_at?: string
+        }
+        Update: {
+          customer_id?: string
+          id?: string
+          notes?: string
+          professional_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "professional_client_notes_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "professional_client_notes_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
+            referencedRelation: "professionals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      professional_goals: {
+        Row: {
+          created_at: string
+          id: string
+          month: string
+          professional_id: string
+          revenue_target: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          month: string
+          professional_id: string
+          revenue_target: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          month?: string
+          professional_id?: string
+          revenue_target?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "professional_goals_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
+            referencedRelation: "professionals"
             referencedColumns: ["id"]
           },
         ]
@@ -2468,6 +2850,157 @@ export type Database = {
           },
         ]
       }
+      service_checklist_templates: {
+        Row: {
+          active: boolean
+          code: string
+          created_at: string
+          id: string
+          items: Json
+          job_type: string
+          title: string
+          version: number
+        }
+        Insert: {
+          active?: boolean
+          code: string
+          created_at?: string
+          id?: string
+          items: Json
+          job_type: string
+          title: string
+          version: number
+        }
+        Update: {
+          active?: boolean
+          code?: string
+          created_at?: string
+          id?: string
+          items?: Json
+          job_type?: string
+          title?: string
+          version?: number
+        }
+        Relationships: []
+      }
+      service_executions: {
+        Row: {
+          checklist: Json
+          evidence_paths: string[]
+          finalized_at: string | null
+          id: string
+          job_id: string
+          maintenance_due: string | null
+          materials: Json
+          measurements: Json
+          notes: string | null
+          professional_id: string
+          started_at: string
+          status: string
+          template_id: string
+          updated_at: string
+          warranty_until: string | null
+        }
+        Insert: {
+          checklist?: Json
+          evidence_paths?: string[]
+          finalized_at?: string | null
+          id?: string
+          job_id: string
+          maintenance_due?: string | null
+          materials?: Json
+          measurements?: Json
+          notes?: string | null
+          professional_id: string
+          started_at?: string
+          status?: string
+          template_id: string
+          updated_at?: string
+          warranty_until?: string | null
+        }
+        Update: {
+          checklist?: Json
+          evidence_paths?: string[]
+          finalized_at?: string | null
+          id?: string
+          job_id?: string
+          maintenance_due?: string | null
+          materials?: Json
+          measurements?: Json
+          notes?: string | null
+          professional_id?: string
+          started_at?: string
+          status?: string
+          template_id?: string
+          updated_at?: string
+          warranty_until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_executions_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_executions_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
+            referencedRelation: "professionals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_executions_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "service_checklist_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_reports: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          execution_id: string
+          id: string
+          snapshot: Json
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          execution_id: string
+          id?: string
+          snapshot: Json
+          version: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          execution_id?: string
+          id?: string
+          snapshot?: Json
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_reports_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_reports_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "service_executions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       skill_tags: {
         Row: {
           ativo: boolean
@@ -2791,6 +3324,10 @@ export type Database = {
         Args: { p_detalhes: Json; p_endereco: string; p_quote_id: string }
         Returns: string
       }
+      adiar_follow_up: {
+        Args: { p_due_at: string; p_task_id: string }
+        Returns: undefined
+      }
       atribuir_pmoc: {
         Args: { p_plan_id: string; p_professional_id: string }
         Returns: undefined
@@ -2884,6 +3421,10 @@ export type Database = {
         Args: { p_order_id: string }
         Returns: boolean
       }
+      concluir_follow_up: {
+        Args: { p_notes?: string; p_outcome: string; p_task_id: string }
+        Returns: undefined
+      }
       concluir_visita_pmoc: {
         Args: { p_notes?: string; p_visit_id: string }
         Returns: undefined
@@ -2896,6 +3437,10 @@ export type Database = {
           p_window_seconds: number
         }
         Returns: undefined
+      }
+      criar_follow_up: {
+        Args: { p_due_at: string; p_quote_request_id: string; p_title?: string }
+        Returns: string
       }
       criar_order: {
         Args: { p_job_id: string; p_preco_servico: number }
@@ -2956,6 +3501,10 @@ export type Database = {
           p_subject_id?: string
         }
         Returns: boolean
+      }
+      finalizar_execucao_servico: {
+        Args: { p_job_id: string }
+        Returns: string
       }
       handoff_liberado: {
         Args: { p_conversation_id: string }
@@ -3037,6 +3586,25 @@ export type Database = {
         }
         Returns: string
       }
+      propor_pmoc_profissional: {
+        Args: {
+          p_cep: string
+          p_cidade: string
+          p_client_id: string
+          p_company_name: string
+          p_equipment_count: number
+          p_first_due_date: string
+          p_interval_months: number
+          p_notes?: string
+          p_price_per_visit: number
+          p_site_name: string
+        }
+        Returns: string
+      }
+      recomendar_manutencao: {
+        Args: { p_due_on: string; p_equipment_id: string; p_reason: string }
+        Returns: string
+      }
       reconciliar_financeiro: { Args: never; Returns: string }
       recusar_pedido_orcamento: {
         Args: { p_quote_request_id: string; p_reason: string }
@@ -3085,6 +3653,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      responder_proposta_pmoc: {
+        Args: { p_accept: boolean; p_plan_id: string; p_reason?: string }
+        Returns: undefined
+      }
       revelar_contato: {
         Args: { p_conversation_id: string }
         Returns: {
@@ -3092,6 +3664,19 @@ export type Database = {
           telefone: string
           whatsapp_url: string
         }[]
+      }
+      salvar_execucao_servico: {
+        Args: {
+          p_checklist: Json
+          p_evidence_paths: string[]
+          p_job_id: string
+          p_maintenance_due: string
+          p_materials: Json
+          p_measurements: Json
+          p_notes: string
+          p_warranty_until: string
+        }
+        Returns: string
       }
       solicitar_pmoc: {
         Args: {
@@ -3112,6 +3697,10 @@ export type Database = {
           p_due_date: string
           p_gateway_payment_id: string
         }
+        Returns: undefined
+      }
+      vincular_equipamento_pmoc: {
+        Args: { p_equipment_id: string; p_plan_id: string }
         Returns: undefined
       }
     }

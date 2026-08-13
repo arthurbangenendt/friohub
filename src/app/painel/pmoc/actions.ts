@@ -86,6 +86,16 @@ export async function concluirVisitaPmoc(visitaId: string, observacoes: string) 
   return { ok: true as const };
 }
 
+export async function vincularEquipamentoPmoc(formData: FormData) {
+  const { supabase, user } = await clienteAutenticado();
+  if (!user) return;
+  const planoId = String(formData.get("planoId") ?? "");
+  const equipamentoId = String(formData.get("equipamentoId") ?? "");
+  if (!planoId || !equipamentoId) return;
+  await supabase.rpc("vincular_equipamento_pmoc", { p_equipment_id: equipamentoId, p_plan_id: planoId });
+  revalidatePath("/painel/pmoc");
+}
+
 export async function cancelarPmoc(planoId: string, motivo: string) {
   const { supabase, user } = await clienteAutenticado();
   if (!user) return { ok: false as const, error: "Não autenticado." };

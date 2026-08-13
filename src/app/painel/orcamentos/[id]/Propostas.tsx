@@ -9,6 +9,7 @@ import { Star } from "@/components/icons";
 import { perguntasDe } from "@/app/solicitar/perguntas-orcamento";
 import type { JobType } from "@/app/solicitar/tipos";
 import { aceitarProposta } from "../actions";
+import { ANALYTICS_VERSION, captureAnalytics } from "@/lib/analytics";
 
 export type PropostaView = {
   id: string;
@@ -71,6 +72,8 @@ export function Propostas({
     startTransition(async () => {
       const r = await aceitarProposta(quoteId, endereco, respostas);
       if (!r.ok) return setErro(r.error);
+      const escolhida = propostas.find((proposta) => proposta.id === quoteId);
+      if (escolhida) captureAnalytics("proposal_comparison_decision", { proposal_count: propostas.length, quote_type: escolhida.tipo, result: "accepted", experience_version: ANALYTICS_VERSION });
       router.push(`/servico/${r.jobId}`);
     });
   }

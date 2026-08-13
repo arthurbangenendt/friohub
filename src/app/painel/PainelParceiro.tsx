@@ -2,9 +2,10 @@ import Link from "next/link";
 import { formatarBRL } from "@/lib/pricing";
 import { Star } from "@/components/icons";
 import { ATIVOS, FECHADOS, Cabecalho, Kpi, ListaJobs, wrap, type Filtro, type JobRow, type OrderRow } from "./shared";
+import { CentralAcoesProfissional, type ResumoCentral } from "./CentralAcoes";
 
 export function PainelParceiro({
-  nome, jobs, orderPorJob, filtro, notaMedia, semPerfilPro,
+  nome, jobs, orderPorJob, filtro, notaMedia, semPerfilPro, central,
 }: {
   nome: string;
   jobs: JobRow[];
@@ -12,6 +13,7 @@ export function PainelParceiro({
   filtro: Filtro;
   notaMedia: number | null;
   semPerfilPro: boolean;
+  central: ResumoCentral;
 }) {
   const ativos = jobs.filter((j) => ATIVOS.includes(j.status));
   const concluidos = jobs.filter((j) => FECHADOS.includes(j.status));
@@ -27,7 +29,9 @@ export function PainelParceiro({
     <div style={wrap}>
       <Cabecalho eyebrow="Painel do profissional" titulo={`Olá, ${nome}`} />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px,1fr))", gap: 12, marginTop: 28 }}>
+      <CentralAcoesProfissional resumo={central} />
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px,1fr))", gap: 12, marginTop: 22 }}>
         <Kpi label="Serviços ativos" valor={String(ativos.length)} />
         <Kpi label="Concluídos" valor={String(concluidos.length)} />
         <Kpi

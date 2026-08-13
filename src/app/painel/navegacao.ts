@@ -17,6 +17,7 @@ export const NAV_POR_PAPEL: Record<Papel, ItemNav[]> = {
     { href: "/painel", label: "Meus pedidos", icone: "servicos" },
     { href: "/painel/orcamentos", label: "Orçamentos", icone: "orcamentos" },
     { href: "/painel/pmoc", label: "PMOC", icone: "pmoc" },
+    { href: "/painel/equipamentos", label: "Equipamentos", icone: "equipamentos" },
     { href: "/painel/mensagens", label: "Mensagens", icone: "mensagens" },
     { href: "/painel/financeiro", label: "Financeiro", icone: "financeiro" },
     { href: "/painel/notificacoes", label: "Notificações", icone: "notificacoes" },
@@ -24,6 +25,12 @@ export const NAV_POR_PAPEL: Record<Papel, ItemNav[]> = {
   ],
   profissional: [
     { href: "/painel", label: "Visão geral", icone: "visao" },
+    /* Agenda vem cedo de propósito: é a tela que o técnico abre de manhã,
+       antes de qualquer outra, para saber onde precisa estar. */
+    { href: "/painel/agenda", label: "Agenda", icone: "agenda" },
+    { href: "/painel/oportunidades", label: "Oportunidades", icone: "oportunidades" },
+    { href: "/painel/clientes", label: "Clientes", icone: "clientes" },
+    { href: "/painel/desempenho", label: "Desempenho", icone: "desempenho" },
     { href: "/painel/orcamentos", label: "Orçamentos", icone: "orcamentos" },
     { href: "/painel/pmoc", label: "PMOC", icone: "pmoc" },
     { href: "/painel/mensagens", label: "Mensagens", icone: "mensagens" },

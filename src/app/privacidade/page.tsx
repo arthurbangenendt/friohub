@@ -59,7 +59,11 @@ export default function PrivacidadePage() {
         dos dados de exibição pública. O acesso administrativo é restrito e registrado.
       </Secao>
       <Secao t="8. Cookies">
-        Usamos cookies estritamente necessários para manter sua sessão autenticada.
+        Usamos cookies estritamente necessários para manter sua sessão autenticada. Analytics de
+        produto é opcional e só é ativado após sua autorização. Quando autorizado, registramos
+        páginas normalizadas e ações de uso, sem conteúdo de mensagens, endereço, telefone, fotos
+        ou valores financeiros. A preferência pode ser revogada limpando os dados do site ou pelas
+        preferências de analytics disponibilizadas na plataforma.
       </Secao>
       <Secao t="9. Alterações">
         Esta política pode ser atualizada. A versão vigente e a data do seu aceite ficam

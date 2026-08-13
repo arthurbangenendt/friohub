@@ -45,6 +45,9 @@ export function SiteHeader({ overHero = false, logado = false }: { overHero?: bo
           <Link href="/#servicos" style={{ ...navLink, color: solidLook ? "var(--ink-soft)" : "rgba(255,255,255,.82)" }}>Serviços</Link>
           {/* Aponta para a landing de parceiros, não mais para uma âncora da home. */}
           <Link href="/parceiros" style={{ ...navLink, color: solidLook ? "var(--ink-soft)" : "rgba(255,255,255,.82)" }}>Para profissionais</Link>
+          {/* Planos fica colado em "Para profissionais": quem clica ali é quem
+              cogita ser parceiro, e preço é a próxima pergunta dele. */}
+          <Link href="/planos" style={{ ...navLink, color: solidLook ? "var(--ink-soft)" : "rgba(255,255,255,.82)" }}>Planos</Link>
           <Link href="/distribuidoras" style={{ ...navLink, color: solidLook ? "var(--ink-soft)" : "rgba(255,255,255,.82)" }}>Para distribuidoras</Link>
         </nav>
 

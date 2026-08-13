@@ -13,6 +13,7 @@ import { aceitaCatalogo, type JobType } from "./tipos";
 import type { PaginaMarketplace, ProdutoDTO, ProfissionalDTO } from "./marketplace-types";
 import { Wind, Wrench, Droplet, Move, Tool, Check as CheckIcon, Star, Building, User, MapPin, Search } from "@/components/icons";
 import { corDoId, iniciais } from "../painel/Avatar";
+import { ANALYTICS_VERSION, captureAnalytics } from "@/lib/analytics";
 
 const mono = "var(--font-geist-mono), ui-monospace, monospace";
 
@@ -103,17 +104,18 @@ function montarSteps(jobType: JobType | null, jaTemEquipamento: boolean | null):
 }
 
 export function SolicitarWizard({
-  produtos, totalProdutos, profissionais, cepInicial = "", userId,
+  produtos, totalProdutos, profissionais, cepInicial = "", userId, equipmentInitial,
 }: {
   produtos: ProdutoDTO[];
   totalProdutos: number;
   profissionais: ProfissionalDTO[];
   cepInicial?: string;
+  equipmentInitial?: { id: string; label: string; brand: string | null; model: string | null; capacityBtu: number | null } | null;
   /** Dono do upload: as policies do bucket exigem a pasta {uid}/. */
   userId: string;
 }) {
-  const [jobType, setJobType] = useState<JobType | null>(null);
-  const [idx, setIdx] = useState(0);
+  const [jobType, setJobType] = useState<JobType | null>(() => equipmentInitial ? "manutencao" : null);
+  const [idx, setIdx] = useState(() => equipmentInitial ? 1 : 0);
 
   // calculadora
   const [tipoImovel, setTipoImovel] = useState("Apartamento");
@@ -126,7 +128,7 @@ export function SolicitarWizard({
   const [andarOuTelhado, setAndarOuTelhado] = useState(false);
 
   // já tem equipamento?
-  const [jaTemEquipamento, setJaTemEquipamento] = useState<boolean | null>(null);
+  const [jaTemEquipamento, setJaTemEquipamento] = useState<boolean | null>(() => equipmentInitial ? true : null);
 
   // serviço (não-catálogo)
   const [problemas, setProblemas] = useState<string[]>([]);
@@ -161,7 +163,7 @@ export function SolicitarWizard({
   const [cepStatus, setCepStatus] = useState<"idle" | "buscando" | "ok" | "nao">(
     () => (cepInicial.replace(/\D/g, "").length === 8 ? "buscando" : "idle"),
   );
-  const [descricao, setDescricao] = useState("");
+  const [descricao, setDescricao] = useState(() => equipmentInitial ? `Atendimento para ${[equipmentInitial.brand, equipmentInitial.model].filter(Boolean).join(" ") || "equipamento"} em ${equipmentInitial.label}.` : "");
 
   // geolocalização
   const [geo, setGeo] = useState<{ status: string; cidade?: string; uf?: string }>({ status: "pedindo" });
@@ -401,6 +403,7 @@ export function SolicitarWizard({
      Os nomes precisam bater com a função no banco — ver perguntas-orcamento.ts. */
   function detalhesCompletos(): Record<string, string> {
     const base: Record<string, string> = {};
+    if (equipmentInitial) base.equipment_id = equipmentInitial.id;
     if (comCatalogo) {
       base.area_m2 = String(areaM2);
       base.ambiente = ambiente;
@@ -429,6 +432,7 @@ export function SolicitarWizard({
         fotos: fotos.map((foto) => foto.path),
       });
       if (res.ok) {
+        captureAnalytics("request_created", { job_type: jobType, target_count: res.enviados, reused_equipment: Boolean(equipmentInitial), experience_version: ANALYTICS_VERSION });
         setSucessoId(res.pedidoId);
         setEnviados(res.enviados);
       } else setErro(res.error);

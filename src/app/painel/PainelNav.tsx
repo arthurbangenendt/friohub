@@ -2,14 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, Bolt, Wrench, User, Shield, Star, Tool, Droplet, Chat, Doc } from "@/components/icons";
+import { Bell, Bolt, Wrench, User, Shield, Star, Tool, Droplet, Chat, Doc, MapPin } from "@/components/icons";
 
 export type ItemNav = { href: string; label: string; icone: keyof typeof ICONE };
 
 const ICONE = {
   visao: Bolt, servicos: Wrench, financeiro: Droplet, orcamentos: Doc,
   avaliacoes: Star, ferramentas: Tool, perfil: User, admin: Shield, mensagens: Chat,
-  notificacoes: Bell, pmoc: Shield,
+  notificacoes: Bell, pmoc: Shield, oportunidades: Bolt, equipamentos: Wrench, clientes: User, desempenho: Bolt,
+  // Agenda é trabalho de rua: o alfinete de mapa é o que o técnico procura.
+  agenda: MapPin,
 };
 
 /* Único pedaço cliente do shell: só existe para marcar o link ativo, que

@@ -45,9 +45,9 @@ export default async function FinanceiroPage() {
 
   // Despesas só existem para o profissional — é custo operacional dele.
   const { data: despesasData } = isPro
-    ? await supabase.from("expenses").select("id, categoria, descricao, valor, data").order("data", { ascending: false }).limit(100)
+    ? await supabase.from("expenses").select("id, job_id, categoria, descricao, valor, data").order("data", { ascending: false }).limit(100)
     : { data: [] };
-  const despesas = ((despesasData ?? []) as Despesa[]).map((d) => ({ ...d, valor: Number(d.valor) }));
+  const despesas = ((despesasData ?? []) as (Despesa & { job_id?: string | null })[]).map((d) => ({ ...d, valor: Number(d.valor) }));
 
   const meses = ultimosSeisMeses();
   const porMes = new Map<string, PontoMes>(meses.map((m) => [m.chave, { mes: m.label, receita: 0, despesa: 0 }]));
@@ -120,6 +120,21 @@ export default async function FinanceiroPage() {
         <p style={{ fontSize: 13, color: "var(--ink-faint)", margin: "0 0 6px" }}>Últimos 6 meses.</p>
         <GraficoMeses dados={serie} comDespesa={isPro} />
       </section>
+
+      {isPro && (
+        <section className="card" style={{ padding: 24, marginTop: 16 }}>
+          <h2 style={{ fontSize: "1.05rem", fontWeight: 700 }}>Margem por serviço liquidado</h2>
+          <p style={{ fontSize: 13, color: "var(--ink-faint)" }}>Receita líquida menos despesas vinculadas ao atendimento. Despesas gerais permanecem apenas no resultado do período.</p>
+          <div style={{ display: "grid", gap: 8 }}>
+            {pagos.slice(0, 10).map((order) => {
+              const custo = despesas.filter((d) => d.job_id === order.job_id).reduce((sum, d) => sum + d.valor, 0);
+              const receita = order.preco_servico - (order.comissao_servico ?? 0);
+              return <div key={order.job_id} style={{ display: "flex", justifyContent: "space-between", gap: 12, borderBottom: "1px solid var(--line-soft)", padding: "8px 0" }}><span>Serviço {order.job_id.slice(0, 8)}</span><strong>{formatarBRL(receita - custo)}</strong></div>;
+            })}
+            {!pagos.length && <span style={{ color: "var(--ink-faint)" }}>A margem aparecerá após o primeiro pagamento liquidado.</span>}
+          </div>
+        </section>
+      )}
 
       {isPro && (
         <section className="card" style={{ padding: 24, marginTop: 16 }}>

@@ -26,6 +26,13 @@ const diaLabel = (iso: string) => {
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "long" });
 };
 
+const RESPOSTAS_RAPIDAS = [
+  "Olá! Recebi seu pedido e estou analisando os detalhes.",
+  "Posso confirmar algumas informações antes de fechar a proposta?",
+  "Minha proposta já está disponível. Se quiser, explico cada item por aqui.",
+  "Combinado. Vou confirmar o horário e os materiais necessários.",
+];
+
 /* Thread no formato de DM: avatar da outra pessoa colado na bolha, do lado
    esquerdo; as minhas mensagens vão para a direita, sem avatar (é redundante
    saber quem sou eu). O avatar só reaparece quando o autor muda ou quando passa
@@ -192,6 +199,22 @@ export function Thread({
       </div>
 
       {erro && <p style={{ color: "#b3261e", fontSize: 13.5, margin: 0 }}>{erro}</p>}
+
+      <div aria-label="Respostas rápidas" style={{ display: "flex", gap: 7, overflowX: "auto", paddingBottom: 2 }}>
+        {RESPOSTAS_RAPIDAS.map((resposta) => (
+          <button
+            key={resposta}
+            type="button"
+            onClick={() => setTexto(resposta)}
+            style={{ flex: "0 0 auto", border: "1px solid var(--line)", borderRadius: 100, background: "var(--surface)", color: "var(--ink-soft)", padding: "7px 11px", font: "inherit", fontSize: 12.5, cursor: "pointer" }}
+          >
+            {resposta.length > 45 ? `${resposta.slice(0, 45)}…` : resposta}
+          </button>
+        ))}
+      </div>
+      <p style={{ margin: "-7px 2px 0", color: "var(--ink-faint)", fontSize: 11.5 }}>
+        A resposta escolhida vai para o campo abaixo: revise antes de enviar.
+      </p>
 
       <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
         <textarea

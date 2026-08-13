@@ -121,6 +121,12 @@ export default async function ServicoPage({ params }: { params: Promise<{ id: st
     .order("created_at", { ascending: false })
     .limit(30);
 
+  const { data: execucao } = await supabase
+    .from("service_executions")
+    .select("status, materials, measurements, notes, warranty_until, maintenance_due, finalized_at")
+    .eq("job_id", job.id)
+    .maybeSingle();
+
   /* Entrega do equipamento (dropship). Vem da view `entregas_cliente`, que não
      expõe o custo da distribuidora — mesma razão de `orders_cliente`.
      Ver 20260812260000_distribuidoras.sql. */
@@ -241,9 +247,23 @@ export default async function ServicoPage({ params }: { params: Promise<{ id: st
           </div>
         )}
 
+        {execucao?.status === "finalized" && (
+          <div className="card" style={{ padding: 22 }}>
+            <SecTitle>Relatório técnico</SecTitle>
+            <Linha k="Finalizado em" v={execucao.finalized_at ? new Date(execucao.finalized_at).toLocaleString("pt-BR") : "Finalizado"} />
+            {execucao.notes && <Linha k="Observações" v={execucao.notes} />}
+            {Array.isArray(execucao.materials) && <Linha k="Materiais registrados" v={execucao.materials.length} />}
+            {execucao.warranty_until && <Linha k="Garantia até" v={new Date(`${execucao.warranty_until}T12:00:00`).toLocaleDateString("pt-BR")} />}
+            {execucao.maintenance_due && <Linha k="Manutenção recomendada" v={new Date(`${execucao.maintenance_due}T12:00:00`).toLocaleDateString("pt-BR")} />}
+          </div>
+        )}
+
         {isPro && ["aguardando_profissional", "aceito", "em_execucao"].includes(job.status) && (
           <div className="card" style={{ padding: 22 }}>
             <SecTitle>Ação</SecTitle>
+            <Link href={`/servico/${job.id}/executar`} className="btn btn-primary" style={{ display: "inline-flex", marginBottom: 14 }}>
+              {execucao ? "Continuar execução" : "Abrir modo execução"}
+            </Link>
             <JobActions jobId={job.id} status={job.status} />
           </div>
         )}

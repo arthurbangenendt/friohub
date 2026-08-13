@@ -2,14 +2,16 @@ import Link from "next/link";
 import { formatarBRL } from "@/lib/pricing";
 import { ArrowRight } from "@/components/icons";
 import { ATIVOS, FECHADOS, Cabecalho, Kpi, ListaJobs, wrap, type Filtro, type JobRow, type OrderRow } from "./shared";
+import { CentralAcoesCliente, type AcaoCentral } from "./CentralAcoes";
 
 export function PainelCliente({
-  nome, jobs, orderPorJob, filtro,
+  nome, jobs, orderPorJob, filtro, acoes,
 }: {
   nome: string;
   jobs: JobRow[];
   orderPorJob: Map<string, OrderRow>;
   filtro: Filtro;
+  acoes: AcaoCentral[];
 }) {
   const ativos = jobs.filter((j) => ATIVOS.includes(j.status));
   const concluidos = jobs.filter((j) => FECHADOS.includes(j.status));
@@ -19,7 +21,9 @@ export function PainelCliente({
     <div style={wrap}>
       <Cabecalho eyebrow="Painel" titulo={`Olá, ${nome}`} />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px,1fr))", gap: 12, marginTop: 28 }}>
+      <CentralAcoesCliente acoes={acoes} />
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px,1fr))", gap: 12, marginTop: 22 }}>
         <Kpi label="Em andamento" valor={String(ativos.length)} />
         <Kpi label="Concluídos" valor={String(concluidos.length)} />
         <Kpi label="Total contratado" valor={formatarBRL(totalContratado)} />

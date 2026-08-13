@@ -27,7 +27,7 @@ Atualizado em 13/08/2026.
 | Baseline de migrations remotas | Concluído | 30 migrations alinhadas por `supabase migration list --linked` antes das fases locais |
 | Tipos TypeScript do Supabase | Concluído | `src/types/database.generated.ts` integrado aos três clientes |
 | Matriz de papéis e permissões | Concluído | `docs/SECURITY_PERMISSION_MATRIX.md` |
-| Contratos pgTAP | Concluído localmente | 213/213 testes passaram em `supabase/tests/database/` |
+| Contratos pgTAP | Concluído localmente | 263/263 testes passaram em `supabase/tests/database/` |
 | CI de aplicação e banco | Implementado, execução no GitHub pendente | `.github/workflows/quality.yml` |
 | Lint do schema remoto | Concluído | zero erros retornados por `supabase db lint --linked` |
 | Reset local reproduzível | Validado até a Fase 4 | Fase 5 aplicada incrementalmente; repetir reset integral quando a sessão paralela liberar o banco |

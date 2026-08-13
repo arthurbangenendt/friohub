@@ -10,6 +10,7 @@ import { PropostaForm } from "./PropostaForm";
 import { Propostas, type PropostaView } from "./Propostas";
 import { CancelarPedido } from "./CancelarPedido";
 import { AbrirChatPedido } from "./AbrirChatPedido";
+import { ComparisonLink } from "./ComparisonLink";
 
 const URGENCIA: Record<string, string> = {
   sem_pressa: "Sem pressa",
@@ -208,9 +209,10 @@ export default async function PedidoPage({ params }: { params: Promise<{ id: str
         {/* Lado do cliente */}
         {souCliente && (
           <div>
-            <h2 style={{ fontSize: "1.15rem", fontWeight: 700, margin: "8px 0 14px" }}>
-              Propostas recebidas ({propostas.filter((p) => p.status !== "retirada").length})
-            </h2>
+            <div id="propostas" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", margin: "8px 0 14px" }}>
+              <h2 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0 }}>Propostas recebidas ({propostas.filter((p) => p.status !== "retirada").length})</h2>
+              {propostas.filter((p) => p.status !== "retirada").length >= 2 && <ComparisonLink href={`/painel/orcamentos/${pedido.id}/comparar`} count={propostas.filter((p) => p.status !== "retirada").length} />}
+            </div>
             <Propostas
               propostas={propostas.filter((p) => p.status !== "retirada")}
               podeAceitar={aberto}

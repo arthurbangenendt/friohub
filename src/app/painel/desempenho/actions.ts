@@ -1,0 +1,2 @@
+"use server";import{revalidatePath}from"next/cache";import{createClient}from"@/lib/supabase/server";
+export async function salvarMeta(formData:FormData){const supabase=await createClient();const{data:{user}}=await supabase.auth.getUser();if(!user)return;const value=Number(formData.get("target"));const month=String(formData.get("month")??"");if(!month||value<=0)return;await supabase.from("professional_goals").upsert({professional_id:user.id,month:`${month}-01`,revenue_target:value},{onConflict:"professional_id,month"});revalidatePath("/painel/desempenho");}
