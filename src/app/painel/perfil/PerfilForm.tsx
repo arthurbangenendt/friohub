@@ -24,9 +24,9 @@ const CATEGORIAS: { id: string; titulo: string; ajuda: string }[] = [
 
 type SkillState = Record<string, { checked: boolean; years: number }>;
 
-export function PerfilForm({ uid, inicial, catalogo }: { uid: string; inicial: PerfilInput; catalogo: TagCatalogo[] }) {
+export function PerfilForm({ inicial, catalogo }: { inicial: PerfilInput; catalogo: TagCatalogo[] }) {
   const router = useRouter();
-  // Perfil ainda não montado: a primeira conclusão leva à vitrine pública.
+  // Perfil ainda não montado: a primeira conclusão leva à escolha de plano.
   const primeiraVez = inicial.skills.length === 0;
   const [tipo, setTipo] = useState<"autonomo" | "empresa">(inicial.tipo);
   const [razaoSocial, setRazaoSocial] = useState(inicial.razaoSocial);
@@ -69,9 +69,11 @@ export function PerfilForm({ uid, inicial, catalogo }: { uid: string; inicial: P
       if (!r.ok) { setErro(r.error ?? "Erro ao salvar."); return; }
       setSalvo(true);
       router.refresh();
-      /* Na primeira vez, mostramos o resultado: o profissional cai na própria
-         vitrine e entende o que o cliente vai ver antes de contratá-lo. */
-      if (primeiraVez) router.push(`/profissional/${uid}`);
+      /* Fim do cadastro de parceiro: com o perfil técnico salvo, ele já sabe o
+         que está comprando e cai na escolha de plano. A vitrine — que antes era
+         o destino aqui — continua a um clique, como link na tela de planos:
+         ver o próprio perfil é recompensa, escolher plano é o próximo passo. */
+      if (primeiraVez) router.push(`/planos?novo=1`);
     });
   }
 

@@ -83,7 +83,7 @@ export default async function PerfilPage() {
       </div>
 
       <div className="card" style={{ padding: 26, marginTop: 16 }}>
-        <PerfilForm uid={user.id} inicial={inicial} catalogo={catalogo ?? []} />
+        <PerfilForm inicial={inicial} catalogo={catalogo ?? []} />
       </div>
 
       <div className="card" style={{ padding: 26, marginTop: 16 }}>
