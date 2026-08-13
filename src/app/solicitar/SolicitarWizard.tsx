@@ -6,7 +6,9 @@ import { calcularBtu, formatarBtu } from "@/lib/btu";
 import { precoInstalacao, formatarBRL } from "@/lib/pricing";
 import { buscarCep, detectarLocalizacao, formatarCep } from "@/lib/cep";
 import { CIDADE, ESTADO } from "@/lib/regiao";
-import { criarSolicitacao } from "./actions";
+import { criarPedidoOrcamento } from "@/app/painel/orcamentos/actions";
+import { MAX_DESTINATARIOS } from "@/app/painel/orcamentos/config";
+import { FotosPedido } from "./FotosPedido";
 import { aceitaCatalogo, type JobType } from "./tipos";
 import type { ProdutoDTO, ProfissionalDTO } from "./page";
 import { Wind, Wrench, Droplet, Move, Tool, Check as CheckIcon, Star, Building, User, MapPin, Search } from "@/components/icons";
@@ -44,6 +46,12 @@ const PROBLEMAS: Partial<Record<JobType, string[]>> = {
   remanejamento: ["Mudar de parede", "Mudar de cômodo", "Mudança de endereço", "Reforma no ambiente"],
 };
 const URGENCIAS = ["Sem pressa", "Nos próximos dias", "Urgente (hoje / amanhã)"];
+// Rótulo exibido → valor aceito pelo CHECK de `quote_requests.urgencia`.
+const URGENCIA_ID: Record<string, "sem_pressa" | "proximos_dias" | "urgente" | undefined> = {
+  "Sem pressa": "sem_pressa",
+  "Nos próximos dias": "proximos_dias",
+  "Urgente (hoje / amanhã)": "urgente",
+};
 
 const TIPOS_IMOVEL = ["Casa", "Apartamento", "Escritório", "Loja", "Galpão"];
 const AMBIENTES = ["Sala", "Quarto", "Cozinha", "Escritório", "Loja", "Outro"];
@@ -55,25 +63,44 @@ const PERIODOS = ["Durante o dia", "À noite", "O dia inteiro"];
 type StepId = "servico" | "ambiente" | "detalhes" | "equipamento" | "catalogo" | "profissional" | "endereco" | "confirmar";
 const STEP_LABEL: Record<StepId, string> = {
   servico: "Serviço", ambiente: "Ambiente", detalhes: "Detalhes", equipamento: "Aparelho",
-  catalogo: "Escolher aparelho", profissional: "Profissional", endereco: "Endereço", confirmar: "Confirmar",
+  catalogo: "Escolher aparelho", endereco: "Região", profissional: "Profissionais",
+  confirmar: "Enviar",
 };
 
+/* Este wizard é TRIAGEM, e só isso: descobrir o aparelho certo e quais
+ * profissionais atendem a região. Nada aqui pode repetir pergunta nem cobrar
+ * esforço técnico do cliente.
+ *
+ * O questionário técnico (metragem de linha frigorígena, tipo de parede, acesso,
+ * elétrica) NÃO vive aqui — ele aparece só quando o cliente decide fechar com um
+ * profissional, na tela de aceite da proposta. Ver `Propostas.tsx`.
+ *
+ * Consequência assumida: sem essas respostas no pedido, o profissional tende a
+ * responder propondo VISITA TÉCNICA em vez de preço fechado. É por isso que a
+ * proposta tem os dois formatos.
+ */
 function montarSteps(jobType: JobType | null, jaTemEquipamento: boolean | null): StepId[] {
   if (!jobType) return ["servico"];
-  const fim: StepId[] = ["profissional", "endereco", "confirmar"];
+  const fim: StepId[] = ["endereco", "profissional", "confirmar"];
   if (aceitaCatalogo(jobType)) {
     // O catálogo só entra quando o cliente diz que ainda não tem o aparelho.
-    return ["servico", "ambiente", "equipamento", ...(jaTemEquipamento === false ? ["catalogo" as StepId] : []), ...fim];
+    return [
+      "servico", "ambiente", "equipamento",
+      ...(jaTemEquipamento === false ? ["catalogo" as StepId] : []),
+      ...fim,
+    ];
   }
   return ["servico", "detalhes", ...fim];
 }
 
 export function SolicitarWizard({
-  produtos, profissionais, cepInicial = "",
+  produtos, profissionais, cepInicial = "", userId,
 }: {
   produtos: ProdutoDTO[];
   profissionais: ProfissionalDTO[];
   cepInicial?: string;
+  /** Dono do upload: as policies do bucket exigem a pasta {uid}/. */
+  userId: string;
 }) {
   const [jobType, setJobType] = useState<JobType | null>(null);
   const [idx, setIdx] = useState(0);
@@ -98,12 +125,16 @@ export function SolicitarWizard({
 
   const [produtoId, setProdutoId] = useState<string | null>(null);
   const [filtroDistribuidora, setFiltroDistribuidora] = useState("todas");
-  const [profissionalId, setProfissionalId] = useState<string | null>(null);
+  /* Multi-cotação: o cliente descreve uma vez e envia para vários. É o padrão do
+     mercado, e é o que faz a rede responder — quem demora, perde o serviço. */
+  const [profissionaisIds, setProfissionaisIds] = useState<string[]>([]);
+  const [fotos, setFotos] = useState<string[]>([]);
+  const [quantidade, setQuantidade] = useState(1);
 
   // endereço — o CEP pode chegar já preenchido pelo hero da home
   const [cep, setCep] = useState(() => formatarCep(cepInicial));
-  const [rua, setRua] = useState("");
-  const [numero, setNumero] = useState("");
+  /* Rua e número não são mais coletados no pedido de orçamento — só o CEP e o
+     bairro. O endereço completo é informado na hora de aceitar uma proposta. */
   const [bairro, setBairro] = useState("");
   const [cidadeCep, setCidadeCep] = useState("");
   const [ufCep, setUfCep] = useState("");
@@ -123,6 +154,7 @@ export function SolicitarWizard({
   const [pending, startTransition] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
   const [sucessoId, setSucessoId] = useState<string | null>(null);
+  const [enviados, setEnviados] = useState(0);
 
   const comCatalogo = jobType ? aceitaCatalogo(jobType) : false;
   const specialty = jobType ? SPECIALTY_OF[jobType] : null;
@@ -149,7 +181,7 @@ export function SolicitarWizard({
     buscarCep(dig).then((info) => {
       if (!vivo) return;
       if (info) {
-        setRua(info.logradouro); setBairro(info.bairro);
+        setBairro(info.bairro);
         setCidadeCep(info.cidade); setUfCep(info.uf); setCepStatus("ok");
       } else setCepStatus("nao");
     });
@@ -205,14 +237,25 @@ export function SolicitarWizard({
   }, [profissionais, specialty, proBusca, proSort]);
 
   const produtoSel = produtos.find((p) => p.id === produtoId) ?? null;
-  const proSel = prosOrdenados.find((p) => p.id === profissionalId) ?? profissionais.find((p) => p.id === profissionalId) ?? null;
-  const precoServico = comCatalogo ? precoInstalacao(btu.btuRecomendado) : 0;
+  const prosSel = profissionais.filter((p) => profissionaisIds.includes(p.id));
+  /* Estimativa de mão de obra, exibida apenas como referência. O preço real vem
+     da proposta de cada profissional — instalação varia demais com metragem de
+     linha, parede e acesso para ter tabela fixa. */
+  const estimativaInstalacao = comCatalogo ? precoInstalacao(btu.btuRecomendado) : 0;
   const foraDaArea = cepStatus === "ok" && ufCep && ufCep !== ESTADO;
 
   function goTriagem(t: JobType) {
-    setJobType(t); setProdutoId(null); setProfissionalId(null);
+    setJobType(t); setProdutoId(null); setProfissionaisIds([]);
     setProblemas([]); setUrgencia(""); setServicoOutro(""); setJaTemEquipamento(null);
+    setFotos([]); setQuantidade(1);
     setIdx(1);
+  }
+  function toggleProfissional(id: string) {
+    setProfissionaisIds((cur) =>
+      cur.includes(id)
+        ? cur.filter((x) => x !== id)
+        : cur.length >= MAX_DESTINATARIOS ? cur : [...cur, id],
+    );
   }
   function avancar() { setIdx((i) => Math.min(i + 1, steps.length - 1)); }
   function voltar() {
@@ -230,7 +273,7 @@ export function SolicitarWizard({
       setCepStatus("buscando");
       const info = await buscarCep(dig);
       if (info) {
-        setRua(info.logradouro); setBairro(info.bairro);
+        setBairro(info.bairro);
         setCidadeCep(info.cidade); setUfCep(info.uf); setCepStatus("ok");
       } else setCepStatus("nao");
     } else setCepStatus("idle");
@@ -246,28 +289,42 @@ export function SolicitarWizard({
       descricao.trim(),
     ].filter(Boolean).join(" · ");
   }
-  function montarEndereco(): string {
-    return [rua, numero].filter(Boolean).join(", ") + (bairro ? ` - ${bairro}` : "");
+
+  /* Chaves que `aceitar_quote` promove de `detalhes` para colunas de `jobs`.
+     Os nomes precisam bater com a função no banco — ver perguntas-orcamento.ts. */
+  function detalhesCompletos(): Record<string, string> {
+    const base: Record<string, string> = {};
+    if (comCatalogo) {
+      base.area_m2 = String(areaM2);
+      base.ambiente = ambiente;
+      base.num_pessoas = String(numPessoas);
+      base.insolacao_alta = String(insolacaoAlta);
+      base.andar_ou_telhado = String(andarOuTelhado);
+    }
+    return base;
   }
 
   function confirmar() {
-    if (!jobType || !profissionalId) return;
+    if (!jobType || profissionaisIds.length === 0) return;
     setErro(null);
     startTransition(async () => {
-      const res = await criarSolicitacao({
-        jobType, cep, endereco: montarEndereco(),
-        ambiente: comCatalogo ? ambiente : undefined,
-        areaM2: comCatalogo ? areaM2 : undefined,
-        numPessoas: comCatalogo ? numPessoas : undefined,
-        insolacaoAlta: comCatalogo ? insolacaoAlta : undefined,
-        andarOuTelhado: comCatalogo ? andarOuTelhado : undefined,
-        btuRecomendado: comCatalogo ? btu.btuRecomendado : undefined,
-        produtoId: comCatalogo ? produtoId : null,
-        profissionalId,
+      const res = await criarPedidoOrcamento({
+        jobType,
+        cep,
+        bairro: bairro || undefined,
+        quantidade,
+        urgencia: URGENCIA_ID[urgencia],
         descricao: montarDescricao() || undefined,
+        detalhes: detalhesCompletos(),
+        produtoId: comCatalogo ? produtoId : null,
+        btuRecomendado: comCatalogo ? btu.btuRecomendado : null,
+        profissionaisIds,
+        fotos,
       });
-      if (res.ok) setSucessoId(res.jobId);
-      else setErro(res.error);
+      if (res.ok) {
+        setSucessoId(res.pedidoId);
+        setEnviados(res.enviados);
+      } else setErro(res.error);
     });
   }
 
@@ -277,11 +334,18 @@ export function SolicitarWizard({
       <Shell geo={geo}>
         <div style={{ textAlign: "center", padding: "40px 0" }}>
           <div style={{ display: "inline-grid", placeItems: "center", width: 64, height: 64, borderRadius: "50%", background: "var(--cool-wash)", color: "var(--cool-deep)" }}><CheckIcon size={32} /></div>
-          <h1 style={{ fontSize: "1.8rem", fontWeight: 800, letterSpacing: "-0.02em", margin: "16px 0 8px" }}>Solicitação enviada!</h1>
-          <p style={{ color: "var(--ink-soft)", maxWidth: 420, margin: "0 auto 24px" }}>
-            {proSel?.nome} recebeu seu pedido e vai confirmar em breve. Você acompanha tudo pelo painel.
+          <h1 style={{ fontSize: "1.8rem", fontWeight: 800, letterSpacing: "-0.02em", margin: "16px 0 8px" }}>Pedido enviado!</h1>
+          <p style={{ color: "var(--ink-soft)", maxWidth: 440, margin: "0 auto 8px" }}>
+            {enviados === 1
+              ? "Um profissional recebeu seu pedido"
+              : `${enviados} profissionais receberam seu pedido`}{" "}
+            e vão responder com propostas. Você compara preço, prazo e garantia antes de escolher —
+            sem compromisso.
           </p>
-          <Link href="/painel" style={btnPrimary}>Ir para o painel</Link>
+          <p style={{ color: "var(--ink-faint)", fontSize: 13.5, maxWidth: 440, margin: "0 auto 24px" }}>
+            Enquanto isso, dá para conversar com eles pelo chat para tirar dúvidas.
+          </p>
+          <Link href={`/painel/orcamentos/${sucessoId}`} style={btnPrimary}>Ver meu pedido</Link>
         </div>
       </Shell>
     );
@@ -486,8 +550,8 @@ export function SolicitarWizard({
       {/* ---------- PROFISSIONAL ---------- */}
       {stepAtual === "profissional" && (
         <>
-          <H titulo="Escolha o profissional"
-            sub={specialty ? `Avaliados em ${SPECIALTY_LABEL[specialty]} · ${CIDADE}` : `Profissionais verificados em ${CIDADE}`} />
+          <H titulo="Para quem enviar o pedido"
+            sub={`Escolha até ${MAX_DESTINATARIOS}. Cada um responde com a própria proposta e você compara antes de decidir.`} />
           <div style={{ display: "flex", gap: 10, marginBottom: 18, flexWrap: "wrap" }}>
             <div style={{ position: "relative", flex: 1, minWidth: 200 }}>
               <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--ink-faint)", display: "flex" }}><Search size={17} /></span>
@@ -505,12 +569,15 @@ export function SolicitarWizard({
           ) : (
             <div className="pro-grade">
               {prosOrdenados.map((p) => {
-                const sel = p.id === profissionalId;
+                const sel = profissionaisIds.includes(p.id);
+                const cheio = !sel && profissionaisIds.length >= MAX_DESTINATARIOS;
                 return (
-                  <div key={p.id} onClick={() => setProfissionalId(p.id)} role="button" tabIndex={0}
+                  <div key={p.id} onClick={() => toggleProfissional(p.id)} role="button" tabIndex={0}
                     aria-pressed={sel}
-                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setProfissionalId(p.id); } }}
-                    className="pro-card" data-sel={String(sel)}>
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleProfissional(p.id); } }}
+                    className="pro-card" data-sel={String(sel)}
+                    style={cheio ? { opacity: 0.45, cursor: "not-allowed" } : undefined}
+                    title={cheio ? `Você já escolheu ${MAX_DESTINATARIOS} profissionais` : undefined}>
 
                     {/* Retrato: avatar do profissional; sem foto, bloco colorido com iniciais */}
                     <div className="pro-capa">
@@ -559,59 +626,92 @@ export function SolicitarWizard({
               })}
             </div>
           )}
-          <Nav onBack={voltar} onNext={avancar} nextLabel="Continuar" disabled={!profissionalId} />
+          {profissionaisIds.length > 0 && (
+            <p style={{ fontSize: 13.5, color: "var(--ink-soft)", marginTop: 16 }}>
+              {profissionaisIds.length} de {MAX_DESTINATARIOS} selecionados.
+            </p>
+          )}
+          <Nav onBack={voltar} onNext={avancar} nextLabel="Continuar" disabled={profissionaisIds.length === 0} />
         </>
       )}
 
-      {/* ---------- ENDEREÇO ---------- */}
+      {/* ---------- REGIÃO ----------
+          Só CEP e bairro: para orçar, é o que o profissional precisa. Rua e
+          número só são informados quando o cliente aceita uma proposta — antes
+          disso não há motivo para expor o endereço a cinco desconhecidos. */}
       {stepAtual === "endereco" && (
         <>
-          <H titulo="Onde é o serviço?" sub="Digite o CEP que a gente preenche o resto." />
-          <div style={grid2}>
-            <Campo label="CEP">
-              <input value={cep} onChange={(e) => aoDigitarCep(e.target.value)} inputMode="numeric" placeholder="00000-000" style={input} />
-              {cepStatus === "buscando" && <span style={hint}>Buscando endereço…</span>}
-              {cepStatus === "nao" && <span style={{ ...hint, color: "var(--warm)" }}>CEP não encontrado. Preencha manualmente.</span>}
-              {cepStatus === "ok" && <span style={{ ...hint, color: "var(--good)" }}>{cidadeCep} — {ufCep}</span>}
-            </Campo>
-            <Campo label="Número"><input value={numero} onChange={(e) => setNumero(e.target.value)} placeholder="123" style={input} /></Campo>
-          </div>
-          <Campo label="Rua"><input value={rua} onChange={(e) => setRua(e.target.value)} placeholder="Rua / avenida" style={input} /></Campo>
+          <H titulo="Onde é o serviço?" sub="O endereço completo só é informado quando você aceitar uma proposta." />
+          <Campo label="CEP">
+            <input value={cep} onChange={(e) => aoDigitarCep(e.target.value)} inputMode="numeric" placeholder="00000-000" style={input} />
+            {cepStatus === "buscando" && <span style={hint}>Buscando endereço…</span>}
+            {cepStatus === "nao" && <span style={{ ...hint, color: "var(--warm)" }}>CEP não encontrado. Informe o bairro abaixo.</span>}
+            {cepStatus === "ok" && <span style={{ ...hint, color: "var(--good)" }}>{cidadeCep} — {ufCep}</span>}
+          </Campo>
           <Campo label="Bairro"><input value={bairro} onChange={(e) => setBairro(e.target.value)} placeholder="Bairro" style={input} /></Campo>
           {foraDaArea && <Aviso>Este CEP fica em {ufCep}. No momento atendemos {CIDADE} — {ESTADO}. Você pode continuar, mas talvez não haja profissionais na região.</Aviso>}
-          <Nav onBack={voltar} onNext={avancar} nextLabel="Revisar" disabled={cep.replace(/\D/g, "").length !== 8 || !numero} />
+          <Nav onBack={voltar} onNext={avancar} nextLabel="Revisar" disabled={cep.replace(/\D/g, "").length !== 8} />
         </>
       )}
 
       {/* ---------- CONFIRMAR ---------- */}
       {stepAtual === "confirmar" && (
         <>
-          <H titulo="Confirme sua solicitação" sub="Revise antes de enviar." />
-          <div style={resumo}>
+          <H titulo="Confirme o pedido de orçamento" sub="Revise antes de enviar. Você não se compromete com nada agora." />
+
+          {/* Só o que ainda falta e é barato de responder. Detalhe técnico do
+              local fica para a hora de fechar com alguém. */}
+          <Campo label="Quantos aparelhos">
+            <input value={quantidade} onChange={(e) => setQuantidade(Math.max(1, Number(e.target.value) || 1))}
+              type="number" min={1} max={100} style={input} />
+          </Campo>
+
+          {comCatalogo && (
+            <div style={{ marginBottom: 18 }}>
+              <span style={labelTxt}>Urgência</span>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+                {URGENCIAS.map((u) => (
+                  <button key={u} type="button" onClick={() => setUrgencia(u)} style={{ ...chip, ...(urgencia === u ? chipOn : {}) }}>{u}</button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <FotosPedido userId={userId} fotos={fotos} onChange={setFotos} />
+
+          <div style={{ ...resumo, marginTop: 20 }}>
             <LinhaResumo k="Serviço" v={JOBS.find((j) => j.tipo === jobType)!.titulo} />
             {jobType === "outros" && servicoOutro && <LinhaResumo k="Descrição" v={servicoOutro} />}
-            <LinhaResumo k="Profissional" v={proSel?.nome ?? "-"} />
+            <LinhaResumo k="Enviar para" v={prosSel.map((p) => p.nome).join(", ") || "-"} />
+            {quantidade > 1 && <LinhaResumo k="Quantidade" v={`${quantidade} aparelhos`} />}
             {comCatalogo && <LinhaResumo k="Ambiente" v={`${tipoImovel} · ${ambiente} · ${areaM2} m² · ${formatarBtu(btu.btuRecomendado)}`} />}
             {comCatalogo && jaTemEquipamento === true && <LinhaResumo k="Aparelho" v="Cliente já possui" />}
             {produtoSel && <LinhaResumo k="Aparelho" v={`${produtoSel.modelo}${produtoSel.distribuidora ? ` · ${produtoSel.distribuidora}` : ""}`} />}
             {!comCatalogo && problemas.length > 0 && <LinhaResumo k="Problemas" v={problemas.join(", ")} />}
             {urgencia && <LinhaResumo k="Urgência" v={urgencia} />}
-            <LinhaResumo k="Endereço" v={`${montarEndereco()} · ${cep}`} />
+            <LinhaResumo k="Região" v={`${bairro ? `${bairro} · ` : ""}${cep}`} />
+            {fotos.length > 0 && <LinhaResumo k="Fotos" v={`${fotos.length} enviada${fotos.length > 1 ? "s" : ""}`} />}
             {descricao && <LinhaResumo k="Detalhes" v={descricao} />}
 
             <div style={{ borderTop: "1px solid var(--line)", margin: "8px 0", paddingTop: 10 }} />
-            {produtoSel && <LinhaResumo k="Aparelho" v={formatarBRL(produtoSel.precoVenda)} />}
-            {comCatalogo && <LinhaResumo k="Instalação" v={formatarBRL(precoServico)} />}
+            {/* O aparelho tem preço de catálogo; a mão de obra vem da proposta de
+                cada profissional. Mostrar "total" aqui seria inventar número. */}
+            {produtoSel && <LinhaResumo k="Aparelho (catálogo)" v={formatarBRL(produtoSel.precoVenda)} />}
+            {comCatalogo && (
+              <LinhaResumo k="Instalação (estimativa)" v={`a partir de ${formatarBRL(estimativaInstalacao)}`} />
+            )}
             <LinhaResumo
-              k={<strong>Total{produtoSel ? "" : " (a combinar)"}</strong>}
-              v={<strong>{produtoSel ? formatarBRL(produtoSel.precoVenda + precoServico) : "Orçamento com o profissional"}</strong>}
+              k={<strong>Mão de obra</strong>}
+              v={<strong>definida na proposta de cada profissional</strong>}
             />
           </div>
           {erro && <Aviso erro>{erro}</Aviso>}
           <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
             <button onClick={voltar} style={btnGhost} disabled={pending}>Voltar</button>
             <button onClick={confirmar} style={{ ...btnPrimary, flex: 1, opacity: pending ? 0.7 : 1 }} disabled={pending}>
-              {pending ? "Enviando..." : "Enviar solicitação"}
+              {pending
+                ? "Enviando..."
+                : `Pedir orçamento a ${profissionaisIds.length} profissiona${profissionaisIds.length === 1 ? "l" : "is"}`}
             </button>
           </div>
         </>

@@ -36,10 +36,14 @@ export function ClienteForm({ nomeInicial, telefoneInicial }: { nomeInicial: str
         <span style={rotulo}>Telefone / WhatsApp</span>
         <input value={telefone} onChange={(e) => setTelefone(formatarTelefone(e.target.value))}
           inputMode="numeric" style={input} placeholder="(11) 90000-0000" />
+        {/* O texto anterior prometia que "o profissional do seu serviço vê seu telefone",
+            o que nunca foi verdade: `profile_private` só é legível pelo próprio dono.
+            A conversa acontece no chat, e o telefone só sai daqui se as duas partes
+            concordarem em trocar contato. */}
         <span style={{ fontSize: 12.5, color: telInvalido ? "#b3261e" : "var(--ink-faint)" }}>
           {telInvalido
             ? "Telefone incompleto."
-            : "Só o profissional do seu serviço vê seu telefone. Não aparece em nenhuma página pública."}
+            : "Seu telefone fica privado — não aparece em página pública nem para o profissional. A conversa acontece pelo chat, e o número só é compartilhado se vocês dois autorizarem."}
         </span>
       </label>
 

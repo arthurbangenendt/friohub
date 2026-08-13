@@ -39,6 +39,13 @@ export default function TermosPage() {
         públicas e organizadas por especialidade. É proibido publicar avaliação falsa
         ou ofensiva.
       </Secao>
+      <Secao t="6.1. Chat da plataforma">
+        A comunicação entre cliente e profissional acontece pelo chat da FrioHub. O
+        telefone de cada parte é privado e só é compartilhado com autorização das duas.
+        É proibido usar o chat para assédio, ofensa, spam ou oferta de serviço alheio à
+        plataforma. As mensagens ficam registradas e podem ser consultadas pela FrioHub
+        em caso de suporte ou disputa sobre um serviço.
+      </Secao>
       <Secao t="7. Cancelamento">
         Cliente e profissional podem cancelar uma solicitação antes do início da
         execução. Cancelamentos recorrentes e injustificados podem levar à suspensão

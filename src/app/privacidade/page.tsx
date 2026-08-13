@@ -11,7 +11,8 @@ export default function PrivacidadePage() {
         solicita um serviço. Dados do ambiente (área, número de pessoas, insolação)
         para calcular a capacidade recomendada. Para parceiros, também dados
         profissionais: especialidades, equipamentos que domina, região de atendimento
-        e fotos de portfólio que você mesmo envia.
+        e fotos de portfólio que você mesmo envia. Também guardamos as{" "}
+        <strong>mensagens trocadas no chat</strong> da plataforma.
       </Secao>
       <Secao t="2. Para que usamos">
         Para conectar você ao profissional ou ao cliente certo, executar a solicitação
@@ -20,15 +21,28 @@ export default function PrivacidadePage() {
       </Secao>
       <Secao t="3. O que é público e o que não é">
         São públicos: nome do profissional, foto de portfólio, especialidades,
-        avaliações e nota. <strong>Não são públicos</strong>: CPF ou CNPJ, telefone e
-        endereço — esses ficam em armazenamento restrito, acessível apenas a você e à
-        administração da plataforma. O perfil de cliente não é exibido publicamente.
+        avaliações e nota. <strong>Não são públicos</strong>: CPF ou CNPJ, telefone,
+        endereço e mensagens — esses ficam em armazenamento restrito, acessível apenas
+        a você e à administração da plataforma. O perfil de cliente não é exibido
+        publicamente.
       </Secao>
       <Secao t="4. Com quem compartilhamos">
         Com o profissional escolhido, os dados necessários para executar o serviço
         (nome, endereço e descrição do problema). Com distribuidoras parceiras, os
         dados necessários para entrega do equipamento. Com processadores de pagamento,
         os dados necessários para a transação. Não vendemos dados pessoais.
+      </Secao>
+      <Secao t="4.1. Chat e troca de telefone">
+        A conversa entre cliente e profissional acontece dentro da plataforma. O seu
+        <strong> telefone não é entregue à outra parte automaticamente</strong>: ele só
+        é revelado depois que a conversa se torna frequente — ou que um serviço é
+        fechado — e <strong>apenas se as duas pessoas autorizarem</strong>. Você pode
+        conversar sem nunca compartilhar o número.
+        <br />
+        <br />
+        As mensagens ficam registradas e podem ser lidas pela administração da
+        plataforma em caso de suporte ou disputa sobre um serviço. Elas não são
+        públicas, não aparecem em nenhum perfil e não são usadas para publicidade.
       </Secao>
       <Secao t="5. Por quanto tempo guardamos">
         Enquanto sua conta existir e pelo prazo exigido pela legislação fiscal e civil

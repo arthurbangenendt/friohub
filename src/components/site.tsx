@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { REGIAO_LABEL } from "@/lib/regiao";
 import { Logo } from "./icons";
 
 /** Quando `overHero`, o header flutua transparente sobre a seção inicial e só
@@ -44,6 +45,7 @@ export function SiteHeader({ overHero = false, logado = false }: { overHero?: bo
           <Link href="/#servicos" style={{ ...navLink, color: solidLook ? "var(--ink-soft)" : "rgba(255,255,255,.82)" }}>Serviços</Link>
           {/* Aponta para a landing de parceiros, não mais para uma âncora da home. */}
           <Link href="/parceiros" style={{ ...navLink, color: solidLook ? "var(--ink-soft)" : "rgba(255,255,255,.82)" }}>Para profissionais</Link>
+          <Link href="/distribuidoras" style={{ ...navLink, color: solidLook ? "var(--ink-soft)" : "rgba(255,255,255,.82)" }}>Para distribuidoras</Link>
         </nav>
 
         {/* Oferecer "Entrar" a quem já entrou é ruído. Logado vê o caminho de volta. */}
@@ -74,28 +76,60 @@ export function SiteFooter() {
             FrioHub
           </div>
           <p style={{ color: "var(--ink-faint)", fontSize: 14, marginTop: 12 }}>
-            Ar-condicionado instalado e cuidado por profissionais avaliados da sua região.
+            Instalação, manutenção, limpeza, remanejamento e conserto de ar-condicionado, com
+            profissionais avaliados da sua região.
           </p>
         </div>
+        {/* Itens do rodapé são links de verdade: antes eram <li> de texto puro que
+            pareciam navegação e não levavam a lugar nenhum. */}
         <div style={{ display: "flex", gap: 56, flexWrap: "wrap" }}>
-          <FooterCol titulo="Serviços" itens={["Instalação", "Manutenção", "Limpeza", "Remanejamento", "Conserto"]} />
-          <FooterCol titulo="FrioHub" itens={["Como funciona", "Para profissionais", "Entrar", "Criar conta"]} />
+          <FooterCol
+            titulo="Serviços"
+            itens={[
+              { label: "Instalação", href: "/#servicos" },
+              { label: "Manutenção", href: "/#servicos" },
+              { label: "Limpeza", href: "/#servicos" },
+              { label: "Remanejamento", href: "/#servicos" },
+              { label: "Conserto", href: "/#servicos" },
+            ]}
+          />
+          <FooterCol
+            titulo="FrioHub"
+            itens={[
+              { label: "Como funciona", href: "/#como-funciona" },
+              { label: "Para profissionais", href: "/parceiros" },
+              { label: "Para distribuidoras", href: "/distribuidoras" },
+              { label: "Entrar", href: "/login" },
+              { label: "Criar conta", href: "/signup" },
+            ]}
+          />
+          <FooterCol
+            titulo="Legal"
+            itens={[
+              { label: "Termos de uso", href: "/termos" },
+              { label: "Privacidade", href: "/privacidade" },
+            ]}
+          />
         </div>
       </div>
       <div className="container" style={{ padding: "18px 24px", borderTop: "1px solid var(--line)", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-        <span style={{ fontSize: 13, color: "var(--ink-faint)" }}>© {new Date().getFullYear()} FrioHub. Atendendo Fortaleza — CE.</span>
+        <span style={{ fontSize: 13, color: "var(--ink-faint)" }}>© {new Date().getFullYear()} FrioHub. Atendendo {REGIAO_LABEL}.</span>
         <span style={{ fontSize: 13, color: "var(--ink-faint)" }}>Feito para quem cuida do conforto.</span>
       </div>
     </footer>
   );
 }
 
-function FooterCol({ titulo, itens }: { titulo: string; itens: string[] }) {
+function FooterCol({ titulo, itens }: { titulo: string; itens: { label: string; href: string }[] }) {
   return (
     <div>
       <div style={{ fontSize: 12.5, fontWeight: 650, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--ink-faint)", marginBottom: 14 }}>{titulo}</div>
       <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 10 }}>
-        {itens.map((i) => <li key={i} style={{ fontSize: 14, color: "var(--ink-soft)" }}>{i}</li>)}
+        {itens.map((i) => (
+          <li key={`${titulo}-${i.label}`}>
+            <Link href={i.href} style={{ fontSize: 14, color: "var(--ink-soft)" }}>{i.label}</Link>
+          </li>
+        ))}
       </ul>
     </div>
   );

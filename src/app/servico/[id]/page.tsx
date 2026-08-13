@@ -7,6 +7,7 @@ import { rotuloJob } from "../../solicitar/tipos";
 import { JobActions } from "./JobActions";
 import { ReviewForm } from "./ReviewForm";
 import { AvaliarCliente } from "./AvaliarCliente";
+import { AbrirChat } from "./AbrirChat";
 import { TAG_LABEL } from "./tags-cliente";
 import { Star } from "@/components/icons";
 
@@ -24,6 +25,17 @@ const STATUS: Record<string, { label: string; cor: string; bg: string }> = {
 function one<T>(v: T | T[] | null | undefined): T | null {
   return Array.isArray(v) ? v[0] ?? null : v ?? null;
 }
+
+// Estados do repasse traduzidos para quem comprou — "faturado" e "a_repassar"
+// são vocabulário da distribuidora, não do cliente.
+const ENTREGA_LABEL: Record<string, string> = {
+  a_repassar: "Pedido enviado à distribuidora",
+  confirmado: "Confirmado pela distribuidora",
+  faturado: "Nota fiscal emitida",
+  enviado: "A caminho",
+  entregue: "Entregue",
+  cancelado: "Cancelado",
+};
 
 type OrderView = {
   preco_produto: number;
@@ -87,6 +99,15 @@ export default async function ServicoPage({ params }: { params: Promise<{ id: st
      nem comissão. Ver migration 20260812130000_orders_cliente_view. */
   const order = await carregarOrder(supabase, job.id, isPro);
 
+  /* Entrega do equipamento (dropship). Vem da view `entregas_cliente`, que não
+     expõe o custo da distribuidora — mesma razão de `orders_cliente`.
+     Ver 20260812260000_distribuidoras.sql. */
+  const { data: entrega } = await supabase
+    .from("entregas_cliente")
+    .select("status, codigo_rastreio, prazo_previsto, distribuidora")
+    .eq("job_id", job.id)
+    .maybeSingle();
+
   /* Reputação do cliente: a RLS de `client_reviews` só entrega para profissional
      e admin, então esta consulta volta vazia para o próprio cliente. */
   const { data: repCliente } = isPro
@@ -110,9 +131,19 @@ export default async function ServicoPage({ params }: { params: Promise<{ id: st
         <h1 style={{ fontSize: "1.7rem", fontWeight: 800 }}>{rotuloJob(job.job_type)}</h1>
         <span style={{ fontSize: 13, fontFamily: mono, padding: "6px 12px", borderRadius: 100, background: st.bg, color: st.cor, whiteSpace: "nowrap" }}>{st.label}</span>
       </div>
-      <p style={{ color: "var(--ink-faint)", fontSize: 14, marginBottom: 28 }}>
-        {isPro ? `Cliente: ${cliNome}` : `Profissional: ${proNome}`}
-      </p>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap", marginBottom: 28 }}>
+        <p style={{ color: "var(--ink-faint)", fontSize: 14, margin: 0 }}>
+          {isPro ? `Cliente: ${cliNome}` : `Profissional: ${proNome}`}
+        </p>
+        {/* Falar com a outra parte é a ação mais frequente nesta tela — antes não
+            existia caminho nenhum, nem telefone nem chat. */}
+        {job.profissional_id && (
+          <AbrirChat
+            professionalId={job.profissional_id}
+            rotulo={isPro ? `Conversar com ${cliNome.split(" ")[0]}` : `Conversar com ${proNome.split(" ")[0]}`}
+          />
+        )}
+      </div>
 
       <div style={{ display: "grid", gap: 16 }}>
         {/* detalhes */}
@@ -144,6 +175,19 @@ export default async function ServicoPage({ params }: { params: Promise<{ id: st
                 <Linha k="Pagamento" v={order.payment_status === "pago" ? "Pago" : "Pendente"} />
               </>
             )}
+          </div>
+        )}
+
+        {/* entrega do equipamento */}
+        {entrega && (
+          <div className="card" style={{ padding: 22 }}>
+            <SecTitle>Entrega do aparelho</SecTitle>
+            <Linha k="Status" v={ENTREGA_LABEL[entrega.status as string] ?? (entrega.status as string)} />
+            <Linha k="Distribuidora" v={entrega.distribuidora as string} />
+            {entrega.prazo_previsto && (
+              <Linha k="Previsão" v={new Date(`${entrega.prazo_previsto}T12:00:00`).toLocaleDateString("pt-BR")} />
+            )}
+            {entrega.codigo_rastreio && <Linha k="Rastreio" v={entrega.codigo_rastreio as string} />}
           </div>
         )}
 

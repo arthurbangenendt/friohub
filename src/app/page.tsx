@@ -2,15 +2,19 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { CSSProperties } from "react";
 import { createClient } from "@/lib/supabase/server";
-import { CIDADE } from "@/lib/regiao";
+import { CIDADE, REGIAO_LABEL } from "@/lib/regiao";
 import { Avatar } from "./painel/Avatar";
 import { EXIGIR_VERIFICACAO } from "@/lib/config";
 import { SiteHeader, SiteFooter } from "@/components/site";
 import { Wind, Wrench, Droplet, Move, Tool, ArrowRight, Star, Shield, Bolt, Check } from "@/components/icons";
 import { Hero } from "@/components/ui/hero";
 
+/* Espelha os tipos de serviço de `solicitar/tipos.ts` — o que o cliente lê aqui
+   precisa ser o que ele encontra no wizard. `outros` fica de fora de propósito:
+   é o balde genérico, não um serviço para vitrine. */
 const SERVICOS = [
-  { Icon: Wind, titulo: "Instalação", desc: "Aparelho novo da distribuidora, instalado por quem entende." },
+  { Icon: Wind, titulo: "Instalação", desc: "Aparelho novo do nosso catálogo, instalado por quem entende." },
+  { Icon: Move, titulo: "Troca de equipamento", desc: "Substituição do aparelho antigo, com retirada." },
   { Icon: Wrench, titulo: "Manutenção", desc: "Revisão, recarga de gás e reparos preventivos." },
   { Icon: Droplet, titulo: "Limpeza", desc: "Higienização completa para um ar mais saudável." },
   { Icon: Move, titulo: "Remanejamento", desc: "Mudou de casa ou de parede? A gente reposiciona." },
@@ -18,8 +22,8 @@ const SERVICOS = [
 ];
 
 const PASSOS = [
-  { n: "01", titulo: "Diga o que precisa", desc: "Instalação, manutenção, limpeza — em menos de um minuto, com o CEP da sua casa." },
-  { n: "02", titulo: "Receba a recomendação", desc: "Nossa calculadora indica a capacidade ideal em BTU e mostra os aparelhos certos." },
+  { n: "01", titulo: "Diga o que precisa", desc: "Instalação, manutenção, limpeza, remanejamento, conserto ou troca de aparelho — em menos de um minuto, com o CEP da sua casa." },
+  { n: "02", titulo: "Receba a recomendação", desc: "Para aparelho novo, a calculadora indica a capacidade ideal em BTU e mostra os modelos certos. Para os demais serviços, você descreve o problema." },
   { n: "03", titulo: "Escolha o profissional", desc: "Compare por avaliação, especialidade e experiência. Você decide com quem fechar." },
 ];
 
@@ -145,7 +149,7 @@ export default async function Home() {
         <div className="container">
           <SectionHead eyebrow="Por que o FrioHub" titulo="Confiança em cada etapa" />
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 22, marginTop: 44 }}>
-            <Valor Icon={Shield} titulo="Profissionais verificados" desc="Cada instalador e empresa passa por checagem antes de atender você." />
+            <Valor Icon={Shield} titulo="Profissionais verificados" desc="Autônomos e empresas passam por checagem da nossa equipe, e o selo aparece no perfil." />
             <Valor Icon={Star} titulo="Avaliação por especialidade" desc="A nota em instalação é separada da nota em manutenção. Transparência real." />
             <Valor Icon={Bolt} titulo="Preço direto da distribuidora" desc="O aparelho vem do nosso catálogo, sem intermediário encarecendo." />
             <Valor Icon={Check} titulo="Você no controle" desc="Compara, escolhe o profissional e acompanha tudo pelo painel." />
@@ -159,9 +163,9 @@ export default async function Home() {
           <SectionHead eyebrow="Dúvidas" titulo="Perguntas frequentes" />
           <div style={{ marginTop: 36, display: "flex", flexDirection: "column", gap: 4 }}>
             <Faq q="Quanto custa para pedir um orçamento?" a="Nada. Descrever o serviço e comparar profissionais é gratuito. Você só paga o serviço que contratar." />
-            <Faq q="Como sei que o profissional é confiável?" a="Todo profissional é verificado antes de atender, e você vê a avaliação real dele por tipo de serviço, além do número de trabalhos concluídos." />
-            <Faq q="O aparelho já vem com instalação?" a="Sim. Na instalação de um ar novo, você compra o aparelho do nosso catálogo e a instalação entra junto, com preço claro antes de fechar." />
-            <Faq q="Vocês atendem minha região?" a="No momento estamos em São Paulo. Digite seu CEP para ver os profissionais que atendem o seu endereço." />
+            <Faq q="Como sei que o profissional é confiável?" a="Você vê a avaliação real dele por tipo de serviço — a nota em instalação é separada da nota em manutenção —, o número de trabalhos concluídos e o portfólio. Perfis que passaram pela checagem da nossa equipe exibem o selo de verificado." />
+            <Faq q="Preciso comprar o aparelho com vocês?" a="Só se quiser. Manutenção, limpeza, remanejamento e conserto são contratados sem comprar nada. Na instalação de um ar novo, você pode comprar o aparelho do nosso catálogo e a instalação entra junto, com preço claro antes de fechar — ou usar um aparelho que já tem." />
+            <Faq q="Vocês atendem minha região?" a={`No momento estamos em ${REGIAO_LABEL}. Digite seu CEP para ver os profissionais que atendem o seu endereço.`} />
           </div>
         </div>
       </section>
@@ -172,14 +176,16 @@ export default async function Home() {
           <div style={{ maxWidth: 520 }}>
             <p className="eyebrow" style={{ color: "#7fd0e0", marginBottom: 14 }}>Para profissionais</p>
             <h2 style={{ fontSize: "clamp(1.8rem, 4vw, 2.5rem)", fontWeight: 800, lineHeight: 1.08, marginBottom: 14 }}>
-              Você instala ou faz manutenção? Receba clientes da sua região.
+              Trabalha com climatização? Receba clientes da sua região.
             </h2>
             <p style={{ fontSize: "1.1rem", color: "#b8d3da", lineHeight: 1.55 }}>
-              Monte seu perfil, mostre seu portfólio e apareça para quem está procurando agora.
-              Entrar é gratuito enquanto estamos crescendo em São Paulo.
+              Instalação, manutenção, limpeza, remanejamento ou conserto — autônomo ou empresa. Monte
+              seu perfil, mostre seu portfólio e apareça para quem está procurando agora. Entrar é
+              gratuito enquanto estamos crescendo em {CIDADE}.
             </p>
           </div>
-          <Link href="/signup" className="btn btn-onbrand btn-lg">Cadastrar como profissional <ArrowRight size={18} /></Link>
+          {/* Sem o ?role o formulário abre como cliente — /parceiros já fazia certo. */}
+          <Link href="/signup?role=profissional" className="btn btn-onbrand btn-lg">Cadastrar como profissional <ArrowRight size={18} /></Link>
         </div>
       </section>
 

@@ -3,6 +3,7 @@
 import { MeshGradient } from "@paper-design/shaders-react";
 import { motion, type Variants } from "framer-motion";
 import { ThermalField } from "@/components/ui/thermal-field";
+import { CIDADE } from "@/lib/regiao";
 import { MapPin, Search, Shield, Star, Bolt } from "@/components/icons";
 
 const fadeUp: Variants = {
@@ -53,19 +54,22 @@ export function Hero() {
 
       <div className="container" style={{ position: "relative", zIndex: 2, padding: "96px 24px 72px" }}>
         <div style={{ maxWidth: 620 }}>
+          {/* A praça sai de lib/regiao — escrever a cidade à mão aqui foi o que deixou
+              "Fortaleza" no ar depois que a operação mudou para São Paulo. */}
           <motion.span className="hero-chip" custom={0} initial="hidden" animate="show" variants={fadeUp}>
-            Ar-condicionado · Fortaleza
+            Ar-condicionado · {CIDADE}
           </motion.span>
 
           <motion.h1 className="hero-title" custom={1} initial="hidden" animate="show" variants={fadeUp}>
-            Ar-condicionado instalado,
+            Instalar, limpar ou consertar o seu ar
             <br />
             <span className="hero-title-accent">sem dor de cabeça.</span>
           </motion.h1>
 
           <motion.p className="hero-subtitle" custom={2} initial="hidden" animate="show" variants={fadeUp}>
-            Compare aparelhos das melhores marcas e escolha o instalador certo para a sua casa —
-            tudo em um lugar, com preço transparente e profissionais avaliados.
+            Instalação, manutenção, limpeza, remanejamento ou conserto — escolha o profissional certo
+            para a sua casa. Se o aparelho for novo, você também compara as marcas aqui, com preço
+            transparente.
           </motion.p>
 
           <motion.form

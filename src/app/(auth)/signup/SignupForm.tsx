@@ -11,7 +11,9 @@ const SENHA_MINIMA = 8;
 /* Validação em duas frentes: aqui, para o feedback ser imediato enquanto a
    pessoa digita; e de novo no server action, porque nada impede um POST direto.
    Ver validação equivalente em (auth)/actions.ts. */
-export function SignupForm({ roleInicial }: { roleInicial: "cliente" | "profissional" }) {
+export type PapelCadastro = "cliente" | "profissional" | "distribuidora";
+
+export function SignupForm({ roleInicial }: { roleInicial: PapelCadastro }) {
   const [role, setRole] = useState(roleInicial);
   const [nome, setNome] = useState("");
   const [telefone, setTelefone] = useState("");
@@ -41,11 +43,16 @@ export function SignupForm({ roleInicial }: { roleInicial: "cliente" | "profissi
 
       <div style={{ marginBottom: 18 }}>
         <span style={{ ...labelStyle, display: "block", marginBottom: 8 }}>Eu sou</span>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        {/* Três lados do marketplace, três papéis. A distribuidora entrou aqui
+            junto com o módulo dela — antes o cadastro dela virava cliente em
+            silêncio, porque o papel nem existia no allowlist. */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
           <RoleOption ativo={role === "cliente"} onClick={() => setRole("cliente")}
-            titulo="Cliente" desc="Quero instalar ou dar manutenção" />
+            titulo="Cliente" desc="Quero instalar, limpar ou consertar" />
           <RoleOption ativo={role === "profissional"} onClick={() => setRole("profissional")}
             titulo="Profissional" desc="Instalo / faço manutenção" />
+          <RoleOption ativo={role === "distribuidora"} onClick={() => setRole("distribuidora")}
+            titulo="Distribuidora" desc="Vendo equipamentos" />
         </div>
       </div>
 
@@ -65,7 +72,8 @@ export function SignupForm({ roleInicial }: { roleInicial: "cliente" | "profissi
       </Campo>
 
       <Campo label="CPF ou CNPJ" erro={erroDoc}
-        dica={role === "profissional" ? "Empresa: informe o CNPJ. Autônomo: CPF." : undefined}>
+        dica={role === "distribuidora" ? "Informe o CNPJ da distribuidora."
+          : role === "profissional" ? "Empresa: informe o CNPJ. Autônomo: CPF." : undefined}>
         <input name="documento" value={documento} onChange={(e) => setDocumento(formatarDocumento(e.target.value))}
           onBlur={() => marcar("documento")} inputMode="numeric"
           placeholder="000.000.000-00" required style={input} />

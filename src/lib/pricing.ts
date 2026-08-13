@@ -7,7 +7,12 @@ export function precoInstalacao(btu: number): number {
   return 750;
 }
 
-// Comissão da plataforma sobre a mão de obra (receita nº 2).
+/* Comissão da plataforma sobre a mão de obra (receita nº 2).
+ *
+ * ATENÇÃO: este valor é só para EXIBIR o percentual na tela. O valor cobrado é
+ * calculado no banco, por `criar_order`, a partir de `platform_config
+ * .comissao_servico_pct` — ver 20260812220000_trava_jobs_reviews. Mudar a taxa
+ * exige mudar nos dois lugares, e o que vale é o do banco. */
 export const TAXA_COMISSAO = 0.15;
 
 export function formatarBRL(v: number): string {

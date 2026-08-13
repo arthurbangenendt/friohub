@@ -35,11 +35,20 @@ export async function signup(formData: FormData) {
   const telefone = String(formData.get("telefone") ?? "");
   const documento = String(formData.get("documento") ?? "");
   const aceite = formData.get("aceite");
-  const role = String(formData.get("role") ?? "cliente");
-  const destino = role === "profissional" ? "/painel/perfil" : "/painel";
+  /* Papéis que o cadastro público pode criar. 'admin' nunca sai daqui — o
+     allowlist é repetido em `handle_new_user`, que é a barreira real. */
+  const PAPEIS_PUBLICOS = ["cliente", "profissional", "distribuidora"] as const;
+  const bruto = String(formData.get("role") ?? "cliente");
+  const role = (PAPEIS_PUBLICOS as readonly string[]).includes(bruto) ? bruto : "cliente";
+
+  // Cada papel cai no lugar onde ainda falta trabalho para ele ser encontrável.
+  const destino =
+    role === "profissional" ? "/painel/perfil"
+    : role === "distribuidora" ? "/painel/distribuidora/perfil"
+    : "/painel";
 
   const falhar = (msg: string) =>
-    redirect(`/signup?error=${encodeURIComponent(msg)}${role === "profissional" ? "&role=profissional" : ""}`);
+    redirect(`/signup?error=${encodeURIComponent(msg)}${role !== "cliente" ? `&role=${role}` : ""}`);
 
   if (nome.length < 3) falhar("Informe seu nome completo.");
   if (password.length < SENHA_MINIMA) falhar(`A senha precisa de pelo menos ${SENHA_MINIMA} caracteres.`);
@@ -54,7 +63,7 @@ export async function signup(formData: FormData) {
     options: {
       data: {
         nome,
-        role: role === "profissional" ? "profissional" : "cliente",
+        role,
         telefone: apenasDigitos(telefone),
         cpf_cnpj: apenasDigitos(documento),
         termos_versao: TERMOS_VERSAO,

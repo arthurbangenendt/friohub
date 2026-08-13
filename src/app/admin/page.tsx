@@ -47,6 +47,19 @@ export default async function AdminPage() {
   const pendentes = lista.filter((p) => p.status === "pendente" || p.status === "em_analise");
   const outros = lista.filter((p) => p.status === "verificado" || p.status === "rejeitado");
 
+  /* Distribuidoras usam o mesmo trio de colunas de confiança e a mesma dupla de
+     ações — ver `definirVerificacao` em admin/actions.ts. */
+  const { data: dists } = await supabase
+    .from("distributors")
+    .select("id, razao_social, cnpj, cidade, estado, verification_status, ativo, prazo_entrega_dias")
+    .order("verification_status");
+
+  const distribuidoras = (dists ?? []) as {
+    id: string; razao_social: string; cnpj: string | null; cidade: string; estado: string;
+    verification_status: string; ativo: boolean; prazo_entrega_dias: number;
+  }[];
+  const distPendentes = distribuidoras.filter((d) => d.verification_status === "pendente" || d.verification_status === "em_analise");
+
   return (
     <main className="container-tight" style={{ padding: "40px 24px 80px" }}>
       <Link href="/painel" style={{ fontFamily: mono, fontSize: 13, color: "var(--ink-faint)" }}>← Painel</Link>
@@ -66,7 +79,43 @@ export default async function AdminPage() {
           ? <Vazio texto="Ninguém revisado ainda." />
           : outros.map((p) => <Card key={p.id} p={p} />)}
       </Secao>
+
+      <h2 style={{ fontSize: "1.4rem", fontWeight: 800, margin: "44px 0 6px" }}>Distribuidoras</h2>
+      <p style={{ color: "var(--ink-soft)", marginBottom: 24, fontSize: 14.5 }}>
+        Aprovar deixa a distribuidora verificada <strong>e ativa</strong> — os produtos dela entram no
+        catálogo na mesma hora.
+      </p>
+
+      <Secao titulo={`Aguardando análise (${distPendentes.length})`}>
+        {distribuidoras.length === 0
+          ? <Vazio texto="Nenhuma distribuidora cadastrada." />
+          : distribuidoras.map((d) => <CardDist key={d.id} d={d} />)}
+      </Secao>
     </main>
+  );
+}
+
+function CardDist({ d }: {
+  d: { id: string; razao_social: string; cnpj: string | null; cidade: string; estado: string; verification_status: string; ativo: boolean; prazo_entrega_dias: number };
+}) {
+  const st = STATUS_LABEL[d.verification_status] ?? STATUS_LABEL.pendente;
+  return (
+    <div className="card" style={{ padding: 18, display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
+      <div style={{ flex: 1, minWidth: 220 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <strong style={{ fontSize: 15.5 }}>{d.razao_social}</strong>
+          <span style={{ fontSize: 11.5, fontFamily: mono, padding: "3px 9px", borderRadius: 100, background: st.bg, color: st.cor }}>{st.label}</span>
+          {d.verification_status === "verificado" && !d.ativo && (
+            <span style={{ fontSize: 11.5, fontFamily: mono, color: "var(--warm)" }}>inativa</span>
+          )}
+        </div>
+        <div style={{ fontSize: 13, color: "var(--ink-faint)", marginTop: 4 }}>
+          {d.cidade} — {d.estado} · entrega em {d.prazo_entrega_dias} dia(s)
+          {d.cnpj ? ` · CNPJ ${d.cnpj}` : " · sem CNPJ informado"}
+        </div>
+      </div>
+      <AdminActions id={d.id} status={d.verification_status} tipo="distribuidora" />
+    </div>
   );
 }
 

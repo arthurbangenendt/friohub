@@ -3,14 +3,13 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { logout } from "../(auth)/actions";
 import { Logo } from "@/components/icons";
-import { PainelNav, type ItemNav } from "./PainelNav";
+import { PainelNav } from "./PainelNav";
 import { Avatar } from "./Avatar";
+import { comoPapel, HREF_PERFIL, NAV_POR_PAPEL, ROTULO_PAPEL } from "./navegacao";
 
-/* Shell da área logada. Cliente e parceiro veem navegações diferentes — a
-   distinção sai de `profiles.role`, não de heurística na tela.
-
-   Só entram aqui itens cuja rota já existe: link morto na navegação principal
-   é pior do que funcionalidade ausente. */
+/* Shell da área logada. Cada papel vê uma navegação diferente — a distinção sai
+   de `profiles.role`, não de heurística na tela. O mapa papel → itens vive em
+   `navegacao.ts`; ver lá a regra sobre não listar rota inexistente. */
 export default async function PainelLayout({ children }: LayoutProps<"/painel">) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -23,26 +22,18 @@ export default async function PainelLayout({ children }: LayoutProps<"/painel">)
     .single();
 
   const nome = profile?.nome ?? user.email ?? "Você";
-  const role = profile?.role ?? "cliente";
-  const isPro = role === "profissional";
+  const papel = comoPapel(profile?.role);
+  const itens = NAV_POR_PAPEL[papel];
+  const hrefPerfil = HREF_PERFIL[papel];
 
-  const itens: ItemNav[] = isPro
-    ? [
-        { href: "/painel", label: "Visão geral", icone: "visao" },
-        { href: "/painel/financeiro", label: "Financeiro", icone: "financeiro" },
-        { href: "/painel/avaliacoes", label: "Avaliações", icone: "avaliacoes" },
-        { href: "/painel/ferramentas", label: "Ferramentas", icone: "ferramentas" },
-        { href: "/painel/perfil", label: "Meu perfil", icone: "perfil" },
-      ]
-    : [
-        { href: "/painel", label: "Meus pedidos", icone: "servicos" },
-        { href: "/painel/financeiro", label: "Financeiro", icone: "financeiro" },
-        { href: "/painel/perfil-cliente", label: "Meu perfil", icone: "perfil" },
-      ];
-
-  if (role === "admin") itens.push({ href: "/admin", label: "Admin", icone: "admin" });
-
-  const hrefPerfil = isPro ? "/painel/perfil" : "/painel/perfil-cliente";
+  /* Contagem de não lidas para a bolinha do menu. `head: true` traz só o total,
+     sem as linhas — o layout roda em toda navegação do painel. A RLS de
+     `messages` já limita às conversas de quem está logado. */
+  const { count: naoLidas } = await supabase
+    .from("messages")
+    .select("id", { count: "exact", head: true })
+    .is("read_at", null)
+    .neq("sender_id", user.id);
 
   return (
     <div className="painel-shell">
@@ -60,12 +51,12 @@ export default async function PainelLayout({ children }: LayoutProps<"/painel">)
           <span style={{ minWidth: 0 }} data-nome>
             <span style={{ display: "block", fontSize: 13.5, fontWeight: 650, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nome}</span>
             <span style={{ display: "block", fontSize: 11.5, color: "var(--ink-faint)" }}>
-              {isPro ? "Parceiro" : role === "admin" ? "Administrador" : "Cliente"}
+              {ROTULO_PAPEL[papel]}
             </span>
           </span>
         </Link>
 
-        <PainelNav itens={itens} />
+        <PainelNav itens={itens} naoLidas={naoLidas ?? 0} />
 
         <form action={logout} className="painel-sair-wrap">
           <button type="submit" className="painel-sair">Sair</button>

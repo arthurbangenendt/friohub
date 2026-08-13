@@ -59,10 +59,14 @@ export default async function SolicitarPage(props: PageProps<"/solicitar">) {
   if (EXIGIR_VERIFICACAO) qPros = qPros.eq("verification_status", "verificado");
 
   const [{ data: produtos }, { data: pros }, { data: destaques }] = await Promise.all([
+    /* O nome da distribuidora vem da tabela `distributors`, não mais do texto
+       `supplier`. A RLS de `products` já filtra por distribuidora verificada e
+       ativa e por estoque disponível — ver 20260812260000_distribuidoras.sql. */
     supabase
       .from("products")
-      .select("id, marca, modelo, btu, categoria, preco_venda, image_url, supplier")
+      .select("id, marca, modelo, btu, categoria, preco_venda, image_url, distribuidora:distributors ( razao_social )")
       .eq("ativo", true)
+      .eq("estoque_disponivel", true)
       .order("btu")
       .order("preco_venda"),
     qPros,
@@ -80,16 +84,19 @@ export default async function SolicitarPage(props: PageProps<"/solicitar">) {
     destaquePorPro.set(d.professional_id, arr);
   }
 
-  const produtosDTO: ProdutoDTO[] = (produtos ?? []).map((p) => ({
-    id: p.id,
-    marca: p.marca,
-    modelo: p.modelo,
-    btu: p.btu,
-    categoria: p.categoria,
-    precoVenda: Number(p.preco_venda),
-    imageUrl: p.image_url,
-    distribuidora: p.supplier,
-  }));
+  const produtosDTO: ProdutoDTO[] = (produtos ?? []).map((p) => {
+    const dist = Array.isArray(p.distribuidora) ? p.distribuidora[0] : p.distribuidora;
+    return {
+      id: p.id,
+      marca: p.marca,
+      modelo: p.modelo,
+      btu: p.btu,
+      categoria: p.categoria,
+      precoVenda: Number(p.preco_venda),
+      imageUrl: p.image_url,
+      distribuidora: (dist as { razao_social: string } | null)?.razao_social ?? null,
+    };
+  });
 
   const prosDTO: ProfissionalDTO[] = (pros ?? []).map((p) => {
     // profiles pode vir como objeto ou array dependendo da inferência do PostgREST
@@ -117,5 +124,5 @@ export default async function SolicitarPage(props: PageProps<"/solicitar">) {
     };
   });
 
-  return <SolicitarWizard produtos={produtosDTO} profissionais={prosDTO} cepInicial={cepInicial} />;
+  return <SolicitarWizard produtos={produtosDTO} profissionais={prosDTO} cepInicial={cepInicial} userId={user.id} />;
 }

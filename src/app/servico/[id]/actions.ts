@@ -71,8 +71,10 @@ export async function avaliarJob(input: { jobId: string; rating: number; comment
   });
   if (rErr) return { ok: false as const, error: rErr.message };
 
-  // marca o job como avaliado (a nota da skill é recalculada por trigger no banco)
-  await supabase.from("jobs").update({ status: "avaliado" }).eq("id", job.id);
+  /* O job vira 'avaliado' por trigger no banco (`marca_job_avaliado`), junto com o
+     recálculo da nota da skill. Era um update daqui, feito como cliente — a trava
+     de transição de 20260812220000 passou a preservar esse status em silêncio, e
+     a regra vive melhor onde ela de fato é: como consequência da review existir. */
   revalidatePath(`/servico/${job.id}`);
   revalidatePath("/painel");
   return { ok: true as const };

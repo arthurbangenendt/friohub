@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { SiteHeader, SiteFooter } from "@/components/site";
 import { Avatar } from "@/app/painel/Avatar";
 import { Star, Shield, MapPin, Building, User, ArrowRight } from "@/components/icons";
+import { BotaoMensagem } from "./BotaoMensagem";
 
 const SPEC_LABEL: Record<string, string> = {
   instalacao: "Instalação", manutencao: "Manutenção", remanejamento: "Remanejamento", limpeza: "Limpeza", conserto: "Conserto",
@@ -141,9 +142,14 @@ export default async function ProfissionalPage({ params }: { params: Promise<{ i
             </div>
           </div>
 
-          <Link href="/solicitar" className="btn btn-primary" style={{ flexShrink: 0 }}>
-            Solicitar serviço <ArrowRight size={18} />
-          </Link>
+          <div style={{ display: "flex", gap: 10, flexShrink: 0, flexWrap: "wrap", alignItems: "flex-start" }}>
+            {/* Conversar antes de contratar: quem está logado e não é o próprio
+                dono do perfil pode abrir o chat direto daqui. */}
+            {usuario && usuario.id !== pro.id && <BotaoMensagem professionalId={pro.id} />}
+            <Link href="/solicitar" className="btn btn-primary">
+              Solicitar serviço <ArrowRight size={18} />
+            </Link>
+          </div>
         </div>
 
         {pro.bio && <p style={{ color: "var(--ink-soft)", fontSize: 16, lineHeight: 1.6, maxWidth: 680, marginTop: 20 }}>{pro.bio}</p>}
