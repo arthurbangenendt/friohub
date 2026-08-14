@@ -29,7 +29,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="pt-BR"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
+      {/* Extensões de navegador (ColorZilla, gerenciadores de senha) injetam
+          atributos no body antes da hidratação e disparam mismatch. O className
+          aqui é literal fixo, então suprimir o aviso deste elemento — e só dele,
+          um nível — não esconde nenhum descompasso real nosso. */}
+      <body className="min-h-full flex flex-col" suppressHydrationWarning>
         {/* Só aparece ao receber foco pelo teclado. Primeiro elemento tabulável
             da página de propósito: é o atalho para pular a navegação. */}
         <a href="#conteudo" className="skip-link">Pular para o conteúdo</a>
