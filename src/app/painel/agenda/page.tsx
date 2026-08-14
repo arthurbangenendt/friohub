@@ -9,12 +9,16 @@ import { MapPin, Chat, ArrowRight, Bolt, User, Doc } from "@/components/icons";
 import {
   LIMITE_DIA,
   diaCurto,
+  diasDaSemana,
   duracao,
   hojeISO,
   hora,
   rotuloRelativo,
+  rotuloSemana,
   somarDias,
 } from "./tempo";
+import { Semana, type ItemSemana } from "./Semana";
+import { Roteiro, type Parada } from "./Roteiro";
 
 /* Agenda do dia do profissional.
  *
@@ -85,7 +89,15 @@ export default async function AgendaPage(props: PageProps<"/painel/agenda">) {
 
   const hoje = hojeISO();
   const pedido = typeof sp.d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(sp.d) ? sp.d : hoje;
+  const visao = sp.v === "semana" ? "semana" : "dia";
   const { inicio, fim } = LIMITE_DIA(pedido);
+
+  /* A visão de semana é uma tela diferente o bastante para ter o próprio
+     carregamento de dados: reaproveitar a consulta do dia obrigaria a puxar
+     sete dias de detalhe para exibir só horário, tipo e cliente. */
+  if (visao === "semana") {
+    return <VisaoSemana proId={user.id} dia={pedido} hoje={hoje} />;
+  }
 
   /* Um único round-trip para o dia. `jobs!inner` com filtro em
      `jobs.profissional_id` garante no banco que só vêm agendamentos de serviço
@@ -139,9 +151,26 @@ export default async function AgendaPage(props: PageProps<"/painel/agenda">) {
   const previsto = agenda.reduce((s, a) => s + (valorPorJob.get(a.job_id) ?? 0), 0);
   const primeiro = agenda[0];
 
+  /* Paradas do roteiro: só o que tem endereço e já está confirmado. Um horário
+     ainda "aguardando confirmação" não entra na rota — mandar o técnico para um
+     endereço que o cliente não confirmou é pior do que não sugerir rota. */
+  const paradas: Parada[] = agenda
+    .filter((a) => a.status === "confirmed" && a.jobs)
+    .map((a) => ({
+      jobId: a.job_id,
+      starts_at: a.starts_at,
+      endereco: a.jobs!.endereco,
+      cidade: a.jobs!.cidade,
+      cep: a.jobs!.cep,
+      cliente: nomePorId.get(a.jobs!.cliente_id) ?? null,
+    }));
+
   return (
     <div style={wrap}>
-      <Cabecalho eyebrow="Agenda" titulo={rotuloRelativo(pedido)} />
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+        <Cabecalho eyebrow="Agenda" titulo={rotuloRelativo(pedido)} />
+        <AlternadorVisao visao="dia" dia={pedido} />
+      </div>
 
       {/* ---------------- régua de dias ---------------- */}
       <div
@@ -193,6 +222,8 @@ export default async function AgendaPage(props: PageProps<"/painel/agenda">) {
         />
         <Kpi label="Previsto no dia" valor={formatarBRL(previsto)} icone={<ArrowRight size={17} />} />
       </div>
+
+      <Roteiro paradas={paradas} />
 
       {/* ---------------- lista ---------------- */}
       {agenda.length === 0 ? (
@@ -335,6 +366,116 @@ export default async function AgendaPage(props: PageProps<"/painel/agenda">) {
       <p style={{ marginTop: 26, fontSize: 13, color: "var(--ink-faint)", lineHeight: 1.6 }}>
         Horários no fuso de {"São Paulo"}. Para propor, confirmar ou cancelar uma visita, abra o
         serviço — é lá que a mudança fica registrada para o cliente também.
+      </p>
+    </div>
+  );
+}
+
+/* Alternador dia/semana. Preserva o dia escolhido nas duas direções: quem está
+   olhando quinta e troca para semana quer a semana daquela quinta, não a
+   semana corrente. */
+function AlternadorVisao({ visao, dia }: { visao: "dia" | "semana"; dia: string }) {
+  const opcoes = [
+    { id: "dia" as const, label: "Dia", href: `/painel/agenda?d=${dia}` },
+    { id: "semana" as const, label: "Semana", href: `/painel/agenda?d=${dia}&v=semana` },
+  ];
+  return (
+    <div style={{ display: "flex", gap: 4, padding: 4, borderRadius: 11, background: "var(--surface-2)" }}>
+      {opcoes.map((o) => {
+        const on = o.id === visao;
+        return (
+          <Link
+            key={o.id}
+            href={o.href}
+            aria-current={on ? "page" : undefined}
+            style={{
+              fontSize: 13, fontWeight: 650, padding: "7px 14px", borderRadius: 8,
+              background: on ? "var(--surface)" : "transparent",
+              color: on ? "var(--ink)" : "var(--ink-soft)",
+              boxShadow: on ? "var(--shadow-sm)" : undefined,
+            }}
+          >
+            {o.label}
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
+
+/* Visão de semana.
+ *
+ * Carrega os sete dias de uma vez com a projeção mínima que a grade precisa —
+ * horário, tipo de serviço e nome do cliente. Endereço, valor e observações
+ * ficam de fora: são o detalhe que a visão diária mostra, e trazê-los aqui
+ * multiplicaria por sete o peso de uma tela cujo propósito é responder "onde
+ * tenho espaço nesta semana?". */
+async function VisaoSemana({ proId, dia, hoje }: { proId: string; dia: string; hoje: string }) {
+  const supabase = await createClient();
+  const dias = diasDaSemana(dia);
+  const { inicio } = LIMITE_DIA(dias[0]);
+  const { fim } = LIMITE_DIA(dias[6]);
+
+  const { data } = await supabase
+    .from("job_appointments")
+    .select("id, starts_at, status, job_id, jobs!inner(job_type, cliente_id)")
+    .eq("jobs.profissional_id", proId)
+    .neq("status", "cancelled")
+    .gte("starts_at", inicio)
+    .lte("starts_at", fim)
+    .order("starts_at");
+
+  type Linha = { id: string; starts_at: string; status: string; job_id: string; jobs: { job_type: string; cliente_id: string } | null };
+  const linhas = (data ?? []) as unknown as Linha[];
+
+  const clienteIds = [...new Set(linhas.map((l) => l.jobs?.cliente_id).filter(Boolean))] as string[];
+  const { data: clientes } = clienteIds.length
+    ? await supabase.from("profiles").select("id, nome").in("id", clienteIds)
+    : { data: [] };
+  const nomePorId = new Map((clientes ?? []).map((c) => [c.id, c.nome]));
+
+  const emSaoPaulo = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" });
+  const itens: ItemSemana[] = linhas.map((l) => ({
+    id: l.id,
+    job_id: l.job_id,
+    starts_at: l.starts_at,
+    status: l.status,
+    job_type: l.jobs?.job_type ?? null,
+    cliente: l.jobs ? nomePorId.get(l.jobs.cliente_id) ?? null : null,
+    // O dia da coluna é o dia CIVIL de São Paulo, não o dia UTC do instante.
+    dia: emSaoPaulo.format(new Date(l.starts_at)),
+  }));
+
+  const semanaAtual = dias.includes(hoje);
+
+  return (
+    <div style={wrap}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+        <Cabecalho eyebrow="Agenda" titulo={semanaAtual ? "Esta semana" : rotuloSemana(dia)} />
+        <AlternadorVisao visao="semana" dia={dia} />
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 18, flexWrap: "wrap" }}>
+        <Link href={`/painel/agenda?d=${somarDias(dias[0], -7)}&v=semana`} className="btn btn-ghost" style={{ height: 36, padding: "0 12px", fontSize: 13.5 }}>
+          Semana anterior
+        </Link>
+        <span style={{ fontSize: 13.5, color: "var(--ink-soft)" }}>{rotuloSemana(dia)}</span>
+        <Link href={`/painel/agenda?d=${somarDias(dias[0], 7)}&v=semana`} className="btn btn-ghost" style={{ height: 36, padding: "0 12px", fontSize: 13.5 }}>
+          Próxima semana
+        </Link>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginTop: 22 }}>
+        <Kpi label="Serviços na semana" valor={String(itens.length)} icone={<Doc size={17} />} />
+        <Kpi label="Dias com trabalho" valor={String(new Set(itens.map((i) => i.dia)).size)} icone={<Bolt size={17} />} />
+        <Kpi label="Dias livres" valor={String(7 - new Set(itens.map((i) => i.dia)).size)} icone={<User size={17} />} />
+      </div>
+
+      <Semana dias={dias} itens={itens} />
+
+      <p style={{ marginTop: 26, fontSize: 13, color: "var(--ink-faint)", lineHeight: 1.6 }}>
+        Clique num dia para ver endereços, valores e o roteiro. Para propor,
+        confirmar ou cancelar uma visita, abra o serviço.
       </p>
     </div>
   );

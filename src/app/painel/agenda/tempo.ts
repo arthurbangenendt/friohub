@@ -61,6 +61,39 @@ export function rotuloRelativo(dia: string): string {
   return diaPorExtenso(dia);
 }
 
+/** Segunda-feira da semana que contém `dia`.
+ *
+ *  A semana de trabalho brasileira começa na segunda, não no domingo — o
+ *  `getUTCDay()` do JavaScript devolve 0 para domingo, então o ajuste
+ *  transforma domingo em 7 para ele cair no fim da semana, e não no começo. */
+export function inicioDaSemana(dia: string): string {
+  const d = new Date(`${dia}T12:00:00${DESLOCAMENTO}`);
+  const diaDaSemana = d.getUTCDay() === 0 ? 7 : d.getUTCDay();
+  return somarDias(dia, 1 - diaDaSemana);
+}
+
+/** Os sete dias da semana que contém `dia`, de segunda a domingo. */
+export function diasDaSemana(dia: string): string[] {
+  const seg = inicioDaSemana(dia);
+  return Array.from({ length: 7 }, (_, i) => somarDias(seg, i));
+}
+
+/** "6 a 12 de out" / "29 de set a 5 de out" — encurta quando o mês é o mesmo. */
+export function rotuloSemana(dia: string): string {
+  const dias = diasDaSemana(dia);
+  const fmt = (d: string, comMes: boolean) =>
+    new Intl.DateTimeFormat("pt-BR", {
+      timeZone: FUSO, day: "numeric", ...(comMes ? { month: "short" } : {}),
+    }).format(new Date(`${d}T12:00:00${DESLOCAMENTO}`));
+  const mesmoMes = dias[0].slice(0, 7) === dias[6].slice(0, 7);
+  return `${fmt(dias[0], !mesmoMes)} a ${fmt(dias[6], true)}`;
+}
+
+export const diaDaSemanaCurto = (dia: string) =>
+  new Intl.DateTimeFormat("pt-BR", { timeZone: FUSO, weekday: "short" })
+    .format(new Date(`${dia}T12:00:00${DESLOCAMENTO}`))
+    .replace(".", "");
+
 /** Duração legível a partir de dois instantes. */
 export function duracao(inicio: string, fim: string): string {
   const min = Math.round((new Date(fim).getTime() - new Date(inicio).getTime()) / 60000);

@@ -1,27 +1,18 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatarBRL, TAXA_COMISSAO } from "@/lib/pricing";
 import { Kpi, FECHADOS, wrap } from "../shared";
 import { GraficoMeses, type PontoMes } from "./GraficoMeses";
 import { DespesasEditor, type Despesa } from "./DespesasEditor";
+import { PERIODOS, chaveMes, comoPeriodo, janela, rotuloPeriodo } from "./periodo";
+import { Doc } from "@/components/icons";
 
-const MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+export default async function FinanceiroPage({ searchParams }: PageProps<"/painel/financeiro">) {
+  const sp = await searchParams;
+  const periodo = comoPeriodo(sp.p);
+  const { inicio, fim, meses } = janela(periodo);
 
-/** Últimos 6 meses, do mais antigo ao mais recente, como chaves "AAAA-MM". */
-function ultimosSeisMeses(): { chave: string; label: string }[] {
-  const hoje = new Date();
-  return Array.from({ length: 6 }, (_, i) => {
-    const d = new Date(hoje.getFullYear(), hoje.getMonth() - (5 - i), 1);
-    return {
-      chave: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
-      label: MESES[d.getMonth()],
-    };
-  });
-}
-
-const chaveMes = (iso: string) => iso.slice(0, 7);
-
-export default async function FinanceiroPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
@@ -29,31 +20,36 @@ export default async function FinanceiroPage() {
   const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
   const isPro = profile?.role === "profissional";
 
-  const { data: jobs } = await supabase
-    .from("jobs")
-    .select("id, status, created_at, job_type")
-    .order("created_at", { ascending: false })
-    .limit(300);
-
-  const { data: ordersData } = isPro
-    ? await supabase.from("orders").select("job_id, preco_servico, comissao_servico, total, payment_status, created_at")
-    : await supabase.from("orders_cliente").select("job_id, preco_servico, total, payment_status, created_at");
+  /* Filtrar no banco, e não em memória: antes a tela puxava todas as `orders`
+     do usuário e 300 jobs para depois descartar quase tudo no JavaScript.
+     `orders` não tem `profissional_id` — o vínculo é por `job_id` —, então o
+     recorte por usuário continua sendo responsabilidade da RLS. */
+  const [{ data: jobs }, { data: ordersData }, { data: despesasData }] = await Promise.all([
+    supabase
+      .from("jobs")
+      .select("id, status, created_at, job_type")
+      .gte("created_at", inicio)
+      .lt("created_at", fim)
+      .order("created_at", { ascending: false }),
+    isPro
+      ? supabase.from("orders").select("job_id, preco_servico, comissao_servico, total, payment_status, created_at").gte("created_at", inicio).lt("created_at", fim)
+      : supabase.from("orders_cliente").select("job_id, preco_servico, total, payment_status, created_at").gte("created_at", inicio).lt("created_at", fim),
+    // Despesas só existem para o profissional — é custo operacional dele.
+    isPro
+      ? supabase.from("expenses").select("id, job_id, categoria, descricao, valor, data").gte("data", inicio.slice(0, 10)).lt("data", fim.slice(0, 10)).order("data", { ascending: false })
+      : Promise.resolve({ data: [] }),
+  ]);
 
   type OrderRow = { job_id: string; preco_servico: number; comissao_servico?: number; total: number; payment_status: string; created_at: string };
   const orders = (ordersData ?? []) as OrderRow[];
-  const orderPorJob = new Map(orders.map((o) => [o.job_id, o]));
-
-  // Despesas só existem para o profissional — é custo operacional dele.
-  const { data: despesasData } = isPro
-    ? await supabase.from("expenses").select("id, job_id, categoria, descricao, valor, data").order("data", { ascending: false }).limit(100)
-    : { data: [] };
   const despesas = ((despesasData ?? []) as (Despesa & { job_id?: string | null })[]).map((d) => ({ ...d, valor: Number(d.valor) }));
 
-  const meses = ultimosSeisMeses();
   const porMes = new Map<string, PontoMes>(meses.map((m) => [m.chave, { mes: m.label, receita: 0, despesa: 0 }]));
 
   const concluidos = (jobs ?? []).filter((j) => FECHADOS.includes(j.status));
   const pagos = orders.filter((o) => o.payment_status === "pago");
+  const pendentes = orders.filter((o) => o.payment_status === "pendente");
+
   for (const o of pagos) {
     const ponto = porMes.get(chaveMes(o.created_at));
     if (!ponto) continue;
@@ -66,27 +62,66 @@ export default async function FinanceiroPage() {
   const serie = [...porMes.values()];
 
   // Receita só existe quando o gateway liquidou o pagamento. Status do serviço
-  // não é evidência financeira e não entra mais nesses KPIs.
+  // não é evidência financeira e não entra nesses KPIs.
   const bruto = pagos.reduce((s, o) => s + o.preco_servico, 0);
   const comissao = pagos.reduce((s, o) => s + (o.comissao_servico ?? 0), 0);
   const liquido = bruto - comissao;
   const totalDespesas = despesas.reduce((s, d) => s + d.valor, 0);
   const totalCliente = orders.reduce((s, o) => s + o.total, 0);
   const totalPagoCliente = pagos.reduce((s, o) => s + o.total, 0);
-  const aReceber = concluidos.reduce((s, j) => {
-    const o = orderPorJob.get(j.id);
-    if (!o || o.payment_status === "pago") return s;
-    return s + (o.preco_servico - (o.comissao_servico ?? 0));
-  }, 0);
+
+  /* Duas coisas diferentes que a tela antiga tratava como uma: o que já foi
+     entregue e ainda não caiu (cobrável agora) e o que nem foi entregue
+     (previsão). Somar os dois num número só faz o profissional achar que tem
+     dinheiro para receber que ainda depende dele executar o serviço. */
+  const liquidoDe = (o: OrderRow) => o.preco_servico - (o.comissao_servico ?? 0);
+  const jobsConcluidos = new Set(concluidos.map((j) => j.id));
+  const aReceber = pendentes.filter((o) => jobsConcluidos.has(o.job_id)).reduce((s, o) => s + liquidoDe(o), 0);
+  const emAndamento = pendentes.filter((o) => !jobsConcluidos.has(o.job_id)).reduce((s, o) => s + liquidoDe(o), 0);
 
   return (
     <div style={wrap}>
       <h1 style={{ fontSize: "1.9rem", fontWeight: 800, letterSpacing: "-0.025em", margin: "0 0 6px" }}>Financeiro</h1>
-      <p style={{ color: "var(--ink-soft)", margin: "0 0 28px" }}>
+      <p style={{ color: "var(--ink-soft)", margin: "0 0 20px" }}>
         {isPro
           ? "O que entrou, o que saiu e o que ainda está para receber."
           : "Quanto você já contratou pela plataforma."}
       </p>
+
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 22 }}>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {PERIODOS.map((p) => {
+            const on = p.id === periodo;
+            return (
+              <Link
+                key={p.id}
+                href={p.id === "semestre" ? "/painel/financeiro" : `/painel/financeiro?p=${p.id}`}
+                aria-current={on ? "page" : undefined}
+                style={{
+                  fontSize: 13, fontWeight: 600, padding: "6px 13px", borderRadius: 100,
+                  border: "1px solid var(--line)",
+                  background: on ? "var(--cool)" : "var(--surface)",
+                  color: on ? "#fff" : "var(--ink-soft)",
+                }}
+              >
+                {p.label}
+              </Link>
+            );
+          })}
+        </div>
+
+        {/* Link comum, não fetch: o navegador cuida do download e o arquivo sai
+            com o período que está na tela. */}
+        {isPro && (
+          <a
+            href={`/painel/financeiro/exportar?p=${periodo}`}
+            className="btn btn-ghost"
+            style={{ height: 36, padding: "0 13px", fontSize: 13.5 }}
+          >
+            <Doc size={15} /> Exportar CSV
+          </a>
+        )}
+      </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px,1fr))", gap: 12 }}>
         {isPro ? (
@@ -105,11 +140,24 @@ export default async function FinanceiroPage() {
         )}
       </div>
 
-      {isPro && aReceber > 0 && (
-        <div style={{ marginTop: 16, padding: "14px 18px", borderRadius: 12, background: "var(--warm-wash)", color: "var(--warm)", fontSize: 13.5, lineHeight: 1.6 }}>
-          <strong style={{ color: "var(--ink)" }}>{formatarBRL(aReceber)} a receber.</strong>{" "}
-          São serviços concluídos cuja liquidação ainda não foi registrada. Status do serviço não
-          é usado como comprovante de pagamento.
+      {isPro && (aReceber > 0 || emAndamento > 0) && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px,1fr))", gap: 12, marginTop: 14 }}>
+          {aReceber > 0 && (
+            <div style={{ padding: "14px 18px", borderRadius: 12, background: "var(--warning-wash)", borderLeft: "3px solid var(--warning)", fontSize: 13.5, lineHeight: 1.55 }}>
+              <strong style={{ display: "block", fontSize: 16, color: "var(--ink)" }}>{formatarBRL(aReceber)}</strong>
+              <span style={{ color: "var(--ink-soft)" }}>
+                Serviço concluído, pagamento não liquidado. É o que você pode cobrar agora.
+              </span>
+            </div>
+          )}
+          {emAndamento > 0 && (
+            <div style={{ padding: "14px 18px", borderRadius: 12, background: "var(--surface-2)", borderLeft: "3px solid var(--cool)", fontSize: 13.5, lineHeight: 1.55 }}>
+              <strong style={{ display: "block", fontSize: 16, color: "var(--ink)" }}>{formatarBRL(emAndamento)}</strong>
+              <span style={{ color: "var(--ink-soft)" }}>
+                Em serviços ainda em andamento. É previsão, não valor a cobrar.
+              </span>
+            </div>
+          )}
         </div>
       )}
 
@@ -117,21 +165,28 @@ export default async function FinanceiroPage() {
         <h2 style={{ fontSize: "1.05rem", fontWeight: 700, margin: "0 0 4px" }}>
           {isPro ? "Pagamentos liquidados e despesas" : "Pagamentos liquidados por mês de contratação"}
         </h2>
-        <p style={{ fontSize: 13, color: "var(--ink-faint)", margin: "0 0 6px" }}>Últimos 6 meses.</p>
+        <p style={{ fontSize: 13, color: "var(--ink-soft)", margin: "0 0 6px" }}>{rotuloPeriodo(periodo)}.</p>
         <GraficoMeses dados={serie} comDespesa={isPro} />
       </section>
 
       {isPro && (
         <section className="card" style={{ padding: 24, marginTop: 16 }}>
           <h2 style={{ fontSize: "1.05rem", fontWeight: 700 }}>Margem por serviço liquidado</h2>
-          <p style={{ fontSize: 13, color: "var(--ink-faint)" }}>Receita líquida menos despesas vinculadas ao atendimento. Despesas gerais permanecem apenas no resultado do período.</p>
+          <p style={{ fontSize: 13, color: "var(--ink-soft)" }}>
+            Receita líquida menos despesas vinculadas ao atendimento. Despesas gerais permanecem apenas no resultado do período.
+          </p>
           <div style={{ display: "grid", gap: 8 }}>
             {pagos.slice(0, 10).map((order) => {
               const custo = despesas.filter((d) => d.job_id === order.job_id).reduce((sum, d) => sum + d.valor, 0);
               const receita = order.preco_servico - (order.comissao_servico ?? 0);
-              return <div key={order.job_id} style={{ display: "flex", justifyContent: "space-between", gap: 12, borderBottom: "1px solid var(--line-soft)", padding: "8px 0" }}><span>Serviço {order.job_id.slice(0, 8)}</span><strong>{formatarBRL(receita - custo)}</strong></div>;
+              return (
+                <Link key={order.job_id} href={`/servico/${order.job_id}`} style={{ display: "flex", justifyContent: "space-between", gap: 12, borderBottom: "1px solid var(--line-soft)", padding: "8px 0" }}>
+                  <span>Serviço {order.job_id.slice(0, 8)}</span>
+                  <strong>{formatarBRL(receita - custo)}</strong>
+                </Link>
+              );
             })}
-            {!pagos.length && <span style={{ color: "var(--ink-faint)" }}>A margem aparecerá após o primeiro pagamento liquidado.</span>}
+            {!pagos.length && <span style={{ color: "var(--ink-soft)" }}>A margem aparecerá após o primeiro pagamento liquidado neste período.</span>}
           </div>
         </section>
       )}
@@ -139,7 +194,7 @@ export default async function FinanceiroPage() {
       {isPro && (
         <section className="card" style={{ padding: 24, marginTop: 16 }}>
           <h2 style={{ fontSize: "1.05rem", fontWeight: 700, margin: "0 0 4px" }}>Despesas</h2>
-          <p style={{ fontSize: 13, color: "var(--ink-faint)", margin: "0 0 16px" }}>
+          <p style={{ fontSize: 13, color: "var(--ink-soft)", margin: "0 0 16px" }}>
             Deslocamento, gás, peça, ajudante. É o que separa faturamento de lucro.
           </p>
           <DespesasEditor inicial={despesas} />

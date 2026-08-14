@@ -12,21 +12,13 @@ import { TAG_LABEL } from "./tags-cliente";
 import { Star } from "@/components/icons";
 import { Agendamento, type AgendamentoView } from "./Agendamento";
 import { featureHabilitada } from "@/lib/feature-flags";
+import { STATUS_JOB, resolverMapa } from "@/lib/status";
+import { one } from "@/lib/relacional";
+import { Rastreio, type EtapaId } from "./Rastreio";
+import { Evidencias } from "./Evidencias";
 
 const mono = "var(--font-geist-mono), ui-monospace, monospace";
-const STATUS: Record<string, { label: string; cor: string; bg: string }> = {
-  aberto: { label: "Aberto", cor: "var(--ink-faint)", bg: "var(--surface-2)" },
-  aguardando_profissional: { label: "Aguardando profissional", cor: "var(--warm)", bg: "var(--warm-wash)" },
-  aceito: { label: "Aceito", cor: "var(--cool-deep)", bg: "var(--cool-wash)" },
-  em_execucao: { label: "Em execução", cor: "var(--cool-deep)", bg: "var(--cool-wash)" },
-  concluido: { label: "Concluído", cor: "var(--good)", bg: "var(--cool-wash)" },
-  avaliado: { label: "Avaliado", cor: "var(--good)", bg: "var(--cool-wash)" },
-  cancelado: { label: "Cancelado", cor: "#b3261e", bg: "#fdeceb" },
-};
-
-function one<T>(v: T | T[] | null | undefined): T | null {
-  return Array.isArray(v) ? v[0] ?? null : v ?? null;
-}
+const STATUS = resolverMapa(STATUS_JOB);
 
 // Estados do repasse traduzidos para quem comprou — "faturado" e "a_repassar"
 // são vocabulário da distribuidora, não do cliente.
@@ -125,9 +117,23 @@ export default async function ServicoPage({ params }: { params: Promise<{ id: st
 
   const { data: execucao } = await supabase
     .from("service_executions")
-    .select("status, materials, measurements, notes, warranty_until, maintenance_due, finalized_at")
+    .select("status, materials, measurements, notes, warranty_until, maintenance_due, finalized_at, evidence_paths")
     .eq("job_id", job.id)
     .maybeSingle();
+
+  /* Data de cada etapa do rastreio, tirada do histórico. `job_events` vem em
+     ordem decrescente, então o primeiro encontrado por status é o mais recente;
+     percorrer ao contrário guarda a PRIMEIRA vez que o serviço entrou naquele
+     estado, que é o que "concluído em" significa para o cliente. */
+  const quandoPorEtapa: Partial<Record<EtapaId, string>> = {};
+  for (const ev of [...(eventosServico ?? [])].reverse()) {
+    const alvo = ev.to_status;
+    if (alvo === "aceito" && !quandoPorEtapa.aceito) quandoPorEtapa.aceito = ev.created_at;
+    if (alvo === "em_execucao" && !quandoPorEtapa.em_execucao) quandoPorEtapa.em_execucao = ev.created_at;
+    if (alvo === "concluido" && !quandoPorEtapa.concluido) quandoPorEtapa.concluido = ev.created_at;
+    if (alvo === "avaliado" && !quandoPorEtapa.avaliado) quandoPorEtapa.avaliado = ev.created_at;
+  }
+  if (agendamento?.status === "confirmed") quandoPorEtapa.agendado = agendamento.starts_at;
   const execucaoHabilitada = isPro && (podeIniciarExecucao || Boolean(execucao));
 
   /* Entrega do equipamento (dropship). Vem da view `entregas_cliente`, que não
@@ -231,6 +237,21 @@ export default async function ServicoPage({ params }: { params: Promise<{ id: st
           </div>
         )}
 
+        {/* O rastreio vem ANTES do histórico: responde "onde estou e o que
+            falta", que é a pergunta que o cliente faz primeiro. O histórico
+            continua logo abaixo, para quem quiser o detalhe cronológico. */}
+        {job.status !== "aberto" && job.status !== "aguardando_profissional" && (
+          <div className="card" style={{ padding: 22 }}>
+            <SecTitle>Acompanhamento</SecTitle>
+            <Rastreio
+              status={job.status}
+              temAgendamento={Boolean(agendamento)}
+              agendamentoConfirmado={agendamento?.status === "confirmed"}
+              quandoPorEtapa={quandoPorEtapa}
+            />
+          </div>
+        )}
+
         {eventosServico && eventosServico.length > 0 && (
           <div className="card" style={{ padding: 22 }}>
             <SecTitle>Histórico do serviço</SecTitle>
@@ -258,6 +279,7 @@ export default async function ServicoPage({ params }: { params: Promise<{ id: st
             {Array.isArray(execucao.materials) && <Linha k="Materiais registrados" v={execucao.materials.length} />}
             {execucao.warranty_until && <Linha k="Garantia até" v={new Date(`${execucao.warranty_until}T12:00:00`).toLocaleDateString("pt-BR")} />}
             {execucao.maintenance_due && <Linha k="Manutenção recomendada" v={new Date(`${execucao.maintenance_due}T12:00:00`).toLocaleDateString("pt-BR")} />}
+            <Evidencias caminhos={execucao.evidence_paths ?? []} />
           </div>
         )}
 
