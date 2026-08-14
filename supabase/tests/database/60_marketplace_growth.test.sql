@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
-select plan(30);
+select plan(36);
 
 select has_function(
   'public', 'profissional_atende_cep', array['uuid', 'text'],
@@ -14,8 +14,13 @@ select has_function(
 );
 select has_function(
   'public', 'buscar_profissionais_marketplace',
-  array['text', 'text', 'text', 'text', 'boolean', 'integer', 'integer'],
-  'profissionais possuem busca paginada por CEP'
+  array['text', 'text', 'text', 'text', 'boolean', 'integer', 'integer', 'double precision', 'double precision'],
+  'profissionais possuem busca paginada por CEP e coordenadas'
+);
+select has_function(
+  'public', 'profissional_atende_local',
+  array['uuid', 'text', 'double precision', 'double precision'],
+  'regra territorial por raio existe no banco'
 );
 select has_function(
   'public', 'obter_funil_marketplace', array['integer', 'text'],
@@ -23,21 +28,29 @@ select has_function(
 );
 select is(
   (select prosecdef from pg_proc where oid =
-    'public.buscar_profissionais_marketplace(text,text,text,text,boolean,integer,integer)'::regprocedure),
+    'public.buscar_profissionais_marketplace(text,text,text,text,boolean,integer,integer,double precision,double precision)'::regprocedure),
   true,
   'agregados de resposta são calculados de modo consistente sob RLS'
 );
 select ok(
   not has_function_privilege(
     'anon',
-    'public.buscar_profissionais_marketplace(text,text,text,text,boolean,integer,integer)',
+    'public.buscar_profissionais_marketplace(text,text,text,text,boolean,integer,integer,double precision,double precision)',
     'execute'
   ) and has_function_privilege(
     'authenticated',
-    'public.buscar_profissionais_marketplace(text,text,text,text,boolean,integer,integer)',
+    'public.buscar_profissionais_marketplace(text,text,text,text,boolean,integer,integer,double precision,double precision)',
     'execute'
   ),
   'matching exige autenticação'
+);
+select ok(
+  not has_function_privilege(
+    'authenticated',
+    'public.profissional_atende_local(uuid,text,double precision,double precision)',
+    'execute'
+  ),
+  'função que lê a base privada não fica exposta como RPC'
 );
 select ok(
   has_function_privilege(
@@ -103,6 +116,13 @@ values
   ('60000000-0000-0000-0000-000000000003', '020', 'São Paulo'),
   ('60000000-0000-0000-0000-000000000003', 'abc', 'São Paulo');
 
+insert into public.professional_service_radius (
+  professional_id, latitude, longitude, radius_km, location_label, accuracy_m
+) values (
+  '60000000-0000-0000-0000-000000000002',
+  -23.550520, -46.633308, 15, 'São Paulo, SP', 50
+);
+
 -- Alterar área corretamente reabre a verificação; o fixture simula a aprovação
 -- administrativa posterior para testar o filtro de profissionais verificados.
 update public.professionals
@@ -123,6 +143,24 @@ select ok(
 select ok(
   not public.profissional_atende_cep('60000000-0000-0000-0000-000000000003', '00000-000'),
   'prefixo não numérico nunca entra no matching'
+);
+select ok(
+  public.profissional_atende_local(
+    '60000000-0000-0000-0000-000000000002', '99999-999', -23.551000, -46.634000
+  ),
+  'raio aceita cliente próximo mesmo com CEP fora do cadastro legado'
+);
+select ok(
+  not public.profissional_atende_local(
+    '60000000-0000-0000-0000-000000000002', '01001-000', -23.800000, -46.900000
+  ),
+  'raio rejeita cliente distante mesmo quando o prefixo antigo coincidiria'
+);
+select ok(
+  public.profissional_atende_local(
+    '60000000-0000-0000-0000-000000000003', '02001-000', -23.551000, -46.634000
+  ),
+  'profissional sem raio mantém compatibilidade pelo CEP legado'
 );
 
 select set_config('request.jwt.claim.sub', '60000000-0000-0000-0000-000000000001', true);
@@ -155,6 +193,14 @@ select is(
   0,
   'busca por nome é aplicada no banco'
 );
+select is(
+  (select professional_id from public.buscar_profissionais_marketplace(
+    '99999-999', 'limpeza', null, 'relevancia', true, 12, 0,
+    -23.551000, -46.634000
+  )),
+  '60000000-0000-0000-0000-000000000002'::uuid,
+  'marketplace usa distância real sem revelar a base do profissional'
+);
 
 select throws_ok(
   $$select public.criar_pedido_orcamento(
@@ -162,7 +208,7 @@ select throws_ok(
     null, null, array['60000000-0000-0000-0000-000000000003'::uuid], '{}'::text[]
   )$$,
   'P0001',
-  'Um ou mais profissionais não atendem este CEP ou serviço.',
+  'Um ou mais profissionais não atendem esta localização ou serviço.',
   'RPC rejeita destinatário fora da área mesmo sem passar pela interface'
 );
 
@@ -171,10 +217,11 @@ insert into phase4_ids default values;
 
 select lives_ok(
   $$update phase4_ids set request1 = public.criar_pedido_orcamento(
-    'limpeza', '01001-000', 'São Paulo', 'Sé', 1, 'sem_pressa', null, '{}'::jsonb,
-    null, null, array['60000000-0000-0000-0000-000000000002'::uuid], '{}'::text[]
+    'limpeza', '99999-999', 'São Paulo', 'Sé', 1, 'sem_pressa', null, '{}'::jsonb,
+    null, null, array['60000000-0000-0000-0000-000000000002'::uuid], '{}'::text[],
+    -23.551000, -46.634000
   )$$,
-  'pedido válido para a área é criado'
+  'pedido válido pelo raio é criado'
 );
 select is(
   (select count(*)::integer from public.quote_request_targets

@@ -28,6 +28,7 @@ export type ProfissionalDTO = {
   destaqueEm: string[];
   responseRate: number;
   activeJobs: number;
+  coverageMode?: "raio" | "cep";
 };
 
 export type PaginaMarketplace<T> = {

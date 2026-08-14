@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { CIDADE } from "@/lib/regiao";
 import type { JobType } from "@/app/solicitar/tipos";
 import { MAX_DESTINATARIOS } from "./config";
 
@@ -17,6 +16,7 @@ import { MAX_DESTINATARIOS } from "./config";
 export type NovoPedido = {
   jobType: JobType;
   cep: string;
+  cidade: string;
   bairro?: string;
   quantidade: number;
   urgencia?: "sem_pressa" | "proximos_dias" | "urgente";
@@ -26,6 +26,8 @@ export type NovoPedido = {
   btuRecomendado?: number | null;
   profissionaisIds: string[];
   fotos?: string[];
+  latitude?: number | null;
+  longitude?: number | null;
 };
 
 export async function criarPedidoOrcamento(input: NovoPedido) {
@@ -43,10 +45,22 @@ export async function criarPedidoOrcamento(input: NovoPedido) {
     return { ok: false as const, error: "Uma ou mais fotos são inválidas." };
   }
 
+  const recebeuCoordenadas = input.latitude !== null && input.latitude !== undefined
+    || input.longitude !== null && input.longitude !== undefined;
+  const coordenadasValidas = Number.isFinite(input.latitude)
+    && Number.isFinite(input.longitude)
+    && Number(input.latitude) >= -90
+    && Number(input.latitude) <= 90
+    && Number(input.longitude) >= -180
+    && Number(input.longitude) <= 180;
+  if (recebeuCoordenadas && !coordenadasValidas) {
+    return { ok: false as const, error: "Não foi possível validar a localização do serviço." };
+  }
+
   const { data: pedidoId, error } = await supabase.rpc("criar_pedido_orcamento", {
     p_job_type: input.jobType,
     p_cep: input.cep,
-    p_cidade: CIDADE,
+    p_cidade: input.cidade.trim(),
     p_bairro: input.bairro ?? "",
     p_quantidade: input.quantidade,
     p_urgencia: input.urgencia ?? "",
@@ -56,12 +70,17 @@ export async function criarPedidoOrcamento(input: NovoPedido) {
     p_btu_recomendado: input.btuRecomendado ?? 0,
     p_profissionais_ids: destinatarios,
     p_fotos: fotos,
+    p_latitude: coordenadasValidas ? Number(input.latitude) : undefined,
+    p_longitude: coordenadasValidas ? Number(input.longitude) : undefined,
   });
 
   if (error || !pedidoId) {
     // Se a transação falhar, os uploads ainda não vinculados são removidos.
     if (fotos.length) await supabase.storage.from("orcamentos").remove(fotos);
-    return { ok: false as const, error: error?.message ?? "Não foi possível criar o pedido." };
+    const mensagem = error?.message === "Um ou mais profissionais não atendem esta localização ou serviço."
+      ? "A área de atendimento de um profissional mudou. Volte e escolha novamente quem atende o local do serviço."
+      : error?.message;
+    return { ok: false as const, error: mensagem ?? "Não foi possível criar o pedido." };
   }
 
   revalidatePath("/painel/orcamentos");

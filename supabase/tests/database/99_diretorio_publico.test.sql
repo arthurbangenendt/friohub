@@ -30,7 +30,7 @@ select hasnt_column('public', 'diretorio_profissionais', 'subscription_plan_id',
 select ok(
   not has_function_privilege(
     'anon',
-    'public.buscar_profissionais_marketplace(text,text,text,text,boolean,integer,integer)',
+    'public.buscar_profissionais_marketplace(text,text,text,text,boolean,integer,integer,double precision,double precision)',
     'EXECUTE'
   ),
   'busca por CEP com ranking segue exclusiva de usuário autenticado'

@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition, type CSSProperties } from "react";
 import Link from "next/link";
 import { calcularBtu, formatarBtu } from "@/lib/btu";
 import { precoInstalacao, formatarBRL } from "@/lib/pricing";
-import { buscarCep, detectarLocalizacao, formatarCep } from "@/lib/cep";
+import { buscarCep, detectarLocalizacaoDetalhada, formatarCep } from "@/lib/cep";
 import { CIDADE, ESTADO } from "@/lib/regiao";
 import { criarPedidoOrcamento } from "@/app/painel/orcamentos/actions";
 import { MAX_DESTINATARIOS } from "@/app/painel/orcamentos/config";
@@ -66,6 +66,50 @@ async function carregarPagina<T>(params: URLSearchParams, signal?: AbortSignal) 
   }
   return body;
 }
+
+type CoordenadasServico = { latitude: number; longitude: number };
+
+async function carregarProfissionaisPagina(
+  input: {
+    page: number;
+    cep: string;
+    specialty: string | null;
+    sort: string;
+    q: string;
+    coordenadas: CoordenadasServico | null;
+  },
+  signal?: AbortSignal,
+) {
+  const response = await fetch("/api/marketplace/catalogo", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      page: input.page,
+      cep: input.cep,
+      specialty: input.specialty,
+      sort: input.sort,
+      q: input.q,
+      latitude: input.coordenadas?.latitude,
+      longitude: input.coordenadas?.longitude,
+    }),
+    signal,
+  });
+  const body = await response.json() as PaginaMarketplace<ProfissionalDTO> | { error?: string };
+  if (!response.ok || !("items" in body)) {
+    throw new Error("error" in body && body.error ? body.error : "Não foi possível carregar os profissionais.");
+  }
+  return body;
+}
+
+type GeoState = {
+  status: "pedindo" | "coordenadas" | "ok" | "negado" | "erro" | "indisponivel" | "idle";
+  cidade?: string;
+  uf?: string;
+  cep?: string;
+  latitude?: number;
+  longitude?: number;
+  accuracy?: number | null;
+};
 
 /* Passos são declarados por id, não por número. Com sete tipos de serviço e
    ramificações diferentes, indexar passo por `step === 3 && equip` é onde o bug
@@ -148,6 +192,7 @@ export function SolicitarWizard({
   const [profissionaisTotal, setProfissionaisTotal] = useState(profissionais.length);
   const [profissionaisPagina, setProfissionaisPagina] = useState(1);
   const [profissionaisSelecionados, setProfissionaisSelecionados] = useState<ProfissionalDTO[]>([]);
+  const [chaveSelecao, setChaveSelecao] = useState("");
   const [profissionaisCarregando, setProfissionaisCarregando] = useState(false);
   const [fotos, setFotos] = useState<FotoPendente[]>([]);
   const [quantidade, setQuantidade] = useState(1);
@@ -166,7 +211,9 @@ export function SolicitarWizard({
   const [descricao, setDescricao] = useState(() => equipmentInitial ? `Atendimento para ${[equipmentInitial.brand, equipmentInitial.model].filter(Boolean).join(" ") || "equipamento"} em ${equipmentInitial.label}.` : "");
 
   // geolocalização
-  const [geo, setGeo] = useState<{ status: string; cidade?: string; uf?: string }>({ status: "pedindo" });
+  const [geo, setGeo] = useState<GeoState>({ status: "pedindo" });
+  const [cepConfirmadoGps, setCepConfirmadoGps] = useState<string | null>(null);
+  const cepRequestId = useRef(0);
 
   // busca de profissional
   const [proBusca, setProBusca] = useState("");
@@ -184,12 +231,43 @@ export function SolicitarWizard({
   const steps = useMemo(() => montarSteps(jobType, jaTemEquipamento), [jobType, jaTemEquipamento]);
   const stepAtual = steps[Math.min(idx, steps.length - 1)];
 
+  const cepDigitos = cep.replace(/\D/g, "");
+  const geoCepDigitos = (geo.cep ?? "").replace(/\D/g, "");
+  const geoTemCoordenadas = geo.status === "ok"
+    && Number.isFinite(geo.latitude)
+    && Number.isFinite(geo.longitude);
+  // Só vinculamos GPS e CEP quando o reverse-geocode confirma que ambos
+  // representam o mesmo local. Isso evita validar a casa atual quando o serviço
+  // será executado em outro endereço.
+  const coordenadasServico = useMemo<CoordenadasServico | null>(() => (
+    geoTemCoordenadas
+      && cepDigitos.length === 8
+      && (
+        (geoCepDigitos.length === 8 && geoCepDigitos === cepDigitos)
+        || cepConfirmadoGps === cepDigitos
+      )
+      ? { latitude: Number(geo.latitude), longitude: Number(geo.longitude) }
+      : null
+  ), [geoTemCoordenadas, geo.latitude, geo.longitude, geoCepDigitos, cepDigitos, cepConfirmadoGps]);
+  const chaveCobertura = `${cepDigitos}:${specialty ?? "todos"}:${coordenadasServico?.latitude.toFixed(5) ?? "cep"}:${coordenadasServico?.longitude.toFixed(5) ?? "cep"}`;
+
   // pede a localização assim que o cliente entra no fluxo
   useEffect(() => {
     let vivo = true;
-    detectarLocalizacao().then((r) => {
+    detectarLocalizacaoDetalhada((coordenadas) => {
       if (!vivo) return;
-      if (r.status === "ok") setGeo({ status: "ok", cidade: r.cidade, uf: r.uf });
+      setGeo({ status: "coordenadas", ...coordenadas });
+    }).then((r) => {
+      if (!vivo) return;
+      if (r.status === "ok") setGeo({
+        status: "ok",
+        cidade: r.cidade,
+        uf: r.uf,
+        cep: r.cep,
+        latitude: r.latitude,
+        longitude: r.longitude,
+        accuracy: r.accuracy,
+      });
       else setGeo({ status: r.status });
     });
     return () => { vivo = false; };
@@ -199,9 +277,10 @@ export function SolicitarWizard({
   useEffect(() => {
     const dig = cepInicial.replace(/\D/g, "");
     if (dig.length !== 8) return;
+    const requestId = ++cepRequestId.current;
     let vivo = true;
     buscarCep(dig).then((info) => {
-      if (!vivo) return;
+      if (!vivo || requestId !== cepRequestId.current) return;
       if (info) {
         setBairro(info.bairro);
         setCidadeCep(info.cidade); setUfCep(info.uf); setCepStatus("ok");
@@ -248,22 +327,20 @@ export function SolicitarWizard({
 
   useEffect(() => {
     if (stepAtual !== "profissional") return;
-    const cepDigitos = cep.replace(/\D/g, "");
     if (cepDigitos.length !== 8 || cepStatus !== "ok") return;
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {
       setProfissionaisCarregando(true);
       setBuscaErro(null);
       try {
-        const params = new URLSearchParams({
-          kind: "profissionais",
-          page: "1",
+        const pagina = await carregarProfissionaisPagina({
+          page: 1,
           cep: cepDigitos,
-          specialty: specialty ?? "",
+          specialty,
           sort: proSort,
           q: proBusca,
-        });
-        const pagina = await carregarPagina<ProfissionalDTO>(params, controller.signal);
+          coordenadas: coordenadasServico,
+        }, controller.signal);
         setProfissionaisLista(pagina.items);
         setProfissionaisTotal(pagina.total);
         setProfissionaisPagina(1);
@@ -279,7 +356,7 @@ export function SolicitarWizard({
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [stepAtual, cep, cepStatus, specialty, proBusca, proSort]);
+  }, [stepAtual, cepDigitos, cepStatus, specialty, proBusca, proSort, coordenadasServico]);
 
   /* A ordenação pesada acontece no banco antes da paginação. A UI apenas marca
      os itens com capacidade exata, sem reordenar páginas isoladamente. */
@@ -302,8 +379,10 @@ export function SolicitarWizard({
   }, [profissionaisLista, specialty]);
 
   const produtoSel = produtoSelecionado;
-  const profissionaisIds = profissionaisSelecionados.map((p) => p.id);
-  const prosSel = profissionaisSelecionados;
+  // Se a cobertura mudar enquanto o cliente está no fluxo, a seleção antiga
+  // deixa de ser válida imediatamente, sem depender de um efeito posterior.
+  const prosSel = chaveSelecao === chaveCobertura ? profissionaisSelecionados : [];
+  const profissionaisIds = prosSel.map((p) => p.id);
   /* Estimativa de mão de obra, exibida apenas como referência. O preço real vem
      da proposta de cada profissional — instalação varia demais com metragem de
      linha, parede e acesso para ter tabela fixa. */
@@ -317,11 +396,13 @@ export function SolicitarWizard({
     setIdx(1);
   }
   function toggleProfissional(profissional: ProfissionalDTO) {
-    setProfissionaisSelecionados((cur) =>
-      cur.some((item) => item.id === profissional.id)
-        ? cur.filter((item) => item.id !== profissional.id)
-        : cur.length >= MAX_DESTINATARIOS ? cur : [...cur, profissional],
-    );
+    setChaveSelecao(chaveCobertura);
+    setProfissionaisSelecionados((cur) => {
+      const atuais = chaveSelecao === chaveCobertura ? cur : [];
+      return atuais.some((item) => item.id === profissional.id)
+        ? atuais.filter((item) => item.id !== profissional.id)
+        : atuais.length >= MAX_DESTINATARIOS ? atuais : [...atuais, profissional];
+    });
   }
 
   async function carregarMaisProdutos() {
@@ -348,15 +429,14 @@ export function SolicitarWizard({
     setBuscaErro(null);
     try {
       const proxima = profissionaisPagina + 1;
-      const params = new URLSearchParams({
-        kind: "profissionais",
-        page: String(proxima),
-        cep: cep.replace(/\D/g, ""),
-        specialty: specialty ?? "",
+      const pagina = await carregarProfissionaisPagina({
+        page: proxima,
+        cep: cepDigitos,
+        specialty,
         sort: proSort,
         q: proBusca,
+        coordenadas: coordenadasServico,
       });
-      const pagina = await carregarPagina<ProfissionalDTO>(params);
       setProfissionaisLista((atuais) => [...atuais, ...pagina.items.filter((p) => !atuais.some((a) => a.id === p.id))]);
       setProfissionaisPagina(proxima);
       setProfissionaisTotal(pagina.total);
@@ -375,17 +455,33 @@ export function SolicitarWizard({
     setProblemas((cur) => cur.includes(p) ? cur.filter((x) => x !== p) : [...cur, p]);
   }
   async function aoDigitarCep(v: string) {
+    const requestId = ++cepRequestId.current;
     const f = formatarCep(v);
     setCep(f);
+    setCepConfirmadoGps(null);
+    setProfissionaisSelecionados([]);
     const dig = f.replace(/\D/g, "");
     if (dig.length === 8) {
       setCepStatus("buscando");
       const info = await buscarCep(dig);
+      if (requestId !== cepRequestId.current) return;
       if (info) {
         setBairro(info.bairro);
         setCidadeCep(info.cidade); setUfCep(info.uf); setCepStatus("ok");
       } else setCepStatus("nao");
-    } else setCepStatus("idle");
+    } else {
+      setCidadeCep("");
+      setUfCep("");
+      setCepStatus("idle");
+    }
+  }
+
+  function usarLocalizacaoAtual() {
+    if (geoCepDigitos.length === 8) void aoDigitarCep(geoCepDigitos);
+  }
+
+  function confirmarCepDaLocalizacaoAtual() {
+    if (geoTemCoordenadas && cepDigitos.length === 8) setCepConfirmadoGps(cepDigitos);
   }
 
   function montarDescricao(): string {
@@ -421,6 +517,7 @@ export function SolicitarWizard({
       const res = await criarPedidoOrcamento({
         jobType,
         cep,
+        cidade: cidadeCep,
         bairro: bairro || undefined,
         quantidade,
         urgencia: URGENCIA_ID[urgencia],
@@ -430,6 +527,8 @@ export function SolicitarWizard({
         btuRecomendado: comCatalogo ? btu.btuRecomendado : null,
         profissionaisIds,
         fotos: fotos.map((foto) => foto.path),
+        latitude: coordenadasServico?.latitude,
+        longitude: coordenadasServico?.longitude,
       });
       if (res.ok) {
         captureAnalytics("request_created", { job_type: jobType, target_count: res.enviados, reused_equipment: Boolean(equipmentInitial), experience_version: ANALYTICS_VERSION });
@@ -693,9 +792,9 @@ export function SolicitarWizard({
 
           {buscaErro && <Aviso>{buscaErro}</Aviso>}
           {profissionaisCarregando && prosOrdenados.length === 0 ? (
-            <Aviso>Buscando profissionais que atendem este CEP…</Aviso>
+            <Aviso>Buscando profissionais que atendem o local do serviço…</Aviso>
           ) : prosOrdenados.length === 0 ? (
-            <Aviso>Nenhum profissional atende este CEP{specialty ? ` para “${SPECIALTY_LABEL[specialty]}”` : ""}{proBusca ? " com esse nome" : ""}.</Aviso>
+            <Aviso>Nenhum profissional atende este local{specialty ? ` para “${SPECIALTY_LABEL[specialty]}”` : ""}{proBusca ? " com esse nome" : ""}.</Aviso>
           ) : (
             <div className="pro-grade">
               {prosOrdenados.map((p) => {
@@ -730,7 +829,7 @@ export function SolicitarWizard({
                         {p.tipo === "empresa" ? <Building size={14} /> : <User size={14} />}
                         {p.tipo === "empresa" ? "Empresa" : "Autônomo"}
                         <span>·</span>
-                        <MapPin size={13} /> {CIDADE}
+                        <MapPin size={13} /> {p.coverageMode === "raio" ? "Dentro do raio de atendimento" : `${cidadeCep || CIDADE} · cobertura por CEP`}
                       </span>
 
                       <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 13 }}>
@@ -789,8 +888,29 @@ export function SolicitarWizard({
             {cepStatus === "ok" && <span style={{ ...hint, color: "var(--good)" }}>{cidadeCep} — {ufCep}</span>}
           </Campo>
           <Campo label="Bairro"><input value={bairro} onChange={(e) => setBairro(e.target.value)} placeholder="Bairro" style={input} /></Campo>
+          {coordenadasServico && (
+            <div style={{ ...avisoBox, background: "var(--cool-wash)", color: "var(--cool-deep)" }}>
+              <strong>Localização confirmada.</strong> A lista será filtrada pela distância real até a base privada de cada técnico.
+            </div>
+          )}
+          {geo.status === "ok" && geoCepDigitos.length === 8 && geoCepDigitos !== cepDigitos && (
+            <div style={{ ...avisoBox, background: "var(--surface-2)", color: "var(--ink-soft)" }}>
+              <div>Sua localização atual parece estar no CEP {formatarCep(geoCepDigitos)}. O CEP informado será usado sem GPS.</div>
+              <button type="button" onClick={usarLocalizacaoAtual} style={{ ...btnGhost, height: 38, marginTop: 10 }}>
+                Usar minha localização atual
+              </button>
+            </div>
+          )}
+          {geoTemCoordenadas && geoCepDigitos.length !== 8 && cepDigitos.length === 8 && !coordenadasServico && (
+            <div style={{ ...avisoBox, background: "var(--surface-2)", color: "var(--ink-soft)" }}>
+              <div>Encontramos sua posição, mas não foi possível identificar o CEP automaticamente.</div>
+              <button type="button" onClick={confirmarCepDaLocalizacaoAtual} style={{ ...btnGhost, height: 38, marginTop: 10 }}>
+                Este CEP é onde estou agora
+              </button>
+            </div>
+          )}
           {foraDaArea && <Aviso>Este CEP fica em {ufCep}. No momento atendemos {CIDADE} — {ESTADO}. Você pode continuar, mas talvez não haja profissionais na região.</Aviso>}
-          <Nav onBack={voltar} onNext={avancar} nextLabel="Revisar" disabled={cep.replace(/\D/g, "").length !== 8} />
+          <Nav onBack={voltar} onNext={avancar} nextLabel="Buscar profissionais" disabled={cepDigitos.length !== 8 || cepStatus !== "ok"} />
         </>
       )}
 
@@ -861,7 +981,7 @@ export function SolicitarWizard({
 }
 
 /* ---------- subcomponentes ---------- */
-function Shell({ children, geo }: { children: React.ReactNode; geo: { status: string; cidade?: string; uf?: string } }) {
+function Shell({ children, geo }: { children: React.ReactNode; geo: GeoState }) {
   return (
     <main style={{ maxWidth: 760, margin: "0 auto", padding: "32px 24px 80px" }}>
       <Link href="/painel" style={{ fontFamily: mono, fontSize: 13, color: "var(--ink-faint)", textDecoration: "none" }}>← Painel</Link>
@@ -910,13 +1030,14 @@ function EscolhaGrande({ titulo, desc, ativo, onClick }: { titulo: string; desc:
   );
 }
 
-function GeoBanner({ geo }: { geo: { status: string; cidade?: string; uf?: string } }) {
+function GeoBanner({ geo }: { geo: GeoState }) {
   let texto: string, cor = "var(--ink-soft)", bg = "var(--surface-2)";
   if (geo.status === "pedindo") texto = "Detectando sua localização…";
+  else if (geo.status === "coordenadas") texto = "Localização encontrada. Confirmando o CEP…";
   else if (geo.status === "ok") {
     const naArea = (geo.uf ?? "") === ESTADO;
     texto = naArea
-      ? `Você está em ${geo.cidade || CIDADE}${geo.uf ? " — " + geo.uf : ""}. Atendemos sua região.`
+      ? `Você está em ${geo.cidade || CIDADE}${geo.uf ? " — " + geo.uf : ""}. Sua posição pode validar o raio dos técnicos.`
       : `Você parece estar em ${geo.cidade || "outra região"}${geo.uf ? " — " + geo.uf : ""}. Atendemos ${CIDADE} — ${ESTADO}.`;
     cor = naArea ? "var(--cool-deep)" : "var(--warm)";
     bg = naArea ? "var(--cool-wash)" : "var(--warm-wash)";

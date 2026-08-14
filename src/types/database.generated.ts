@@ -3680,7 +3680,9 @@ export type Database = {
       buscar_profissionais_marketplace: {
         Args: {
           p_cep: string
+          p_latitude?: number
           p_limit?: number
+          p_longitude?: number
           p_offset?: number
           p_query?: string
           p_require_verified?: boolean
@@ -3691,6 +3693,7 @@ export type Database = {
           active_jobs: number
           avatar_url: string
           bio: string
+          coverage_mode: string
           coverage_prefix_length: number
           destaque_em: string[]
           foto_url: string
@@ -3766,6 +3769,8 @@ export type Database = {
           p_detalhes: Json
           p_fotos: string[]
           p_job_type: string
+          p_latitude?: number
+          p_longitude?: number
           p_produto_id: string
           p_profissionais_ids: string[]
           p_quantidade: number
@@ -3785,6 +3790,15 @@ export type Database = {
       destinatario_do_pedido: {
         Args: { p_quote_request_id: string }
         Returns: boolean
+      }
+      distancia_coordenadas_km: {
+        Args: {
+          p_latitude_destino: number
+          p_latitude_origem: number
+          p_longitude_destino: number
+          p_longitude_origem: number
+        }
+        Returns: number
       }
       distribuidora_ativa: {
         Args: { p_distributor_id: string }
@@ -3887,6 +3901,15 @@ export type Database = {
       processar_pmoc_recorrente: { Args: never; Returns: undefined }
       profissional_atende_cep: {
         Args: { p_cep: string; p_professional_id: string }
+        Returns: boolean
+      }
+      profissional_atende_local: {
+        Args: {
+          p_cep: string
+          p_latitude?: number
+          p_longitude?: number
+          p_professional_id: string
+        }
         Returns: boolean
       }
       propor_agendamento: {

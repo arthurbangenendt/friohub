@@ -101,6 +101,14 @@ export async function avaliarJob(input: { jobId: string; rating: number; comment
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false as const, error: "Não autenticado." };
+  if (!Number.isInteger(input.rating) || input.rating < 1 || input.rating > 5) {
+    return { ok: false as const, error: "Selecione uma nota de 1 a 5." };
+  }
+
+  const comment = input.comment.trim();
+  if (comment.length > 2000) {
+    return { ok: false as const, error: "O comentário deve ter no máximo 2.000 caracteres." };
+  }
 
   const { data: job } = await supabase
     .from("jobs")
@@ -110,8 +118,25 @@ export async function avaliarJob(input: { jobId: string; rating: number; comment
 
   if (!job) return { ok: false as const, error: "Serviço não encontrado." };
   if (job.cliente_id !== user.id) return { ok: false as const, error: "Apenas o cliente pode avaliar." };
-  if (job.status !== "concluido") return { ok: false as const, error: "O serviço ainda não foi concluído." };
   if (!job.profissional_id) return { ok: false as const, error: "Serviço sem profissional." };
+
+  // A avaliação é imutável e única por serviço. Tratar uma repetição como
+  // sucesso torna a ação idempotente: se a primeira resposta se perder ou a
+  // tela ainda não tiver atualizado, o cliente não recebe um erro técnico.
+  const { data: reviewExistente, error: reviewLookupErr } = await supabase
+    .from("reviews")
+    .select("id")
+    .eq("job_id", job.id)
+    .maybeSingle();
+  if (reviewLookupErr) return { ok: false as const, error: reviewLookupErr.message };
+  if (reviewExistente) {
+    revalidatePath(`/servico/${job.id}`);
+    return { ok: true as const, alreadyExisted: true as const };
+  }
+
+  if (!["concluido", "avaliado"].includes(job.status)) {
+    return { ok: false as const, error: "O serviço ainda não foi concluído." };
+  }
 
   /* Sem especialidade correspondente (job "outros"), não há em que skill creditar
      a nota. O fallback anterior mandava tudo para "instalacao", inflando a
@@ -126,9 +151,17 @@ export async function avaliarJob(input: { jobId: string; rating: number; comment
     professional_id: job.profissional_id,
     specialty,
     rating: input.rating,
-    comment: input.comment || null,
+    comment: comment || null,
   });
-  if (rErr) return { ok: false as const, error: rErr.message };
+  if (rErr) {
+    // Protege também contra dois envios simultâneos entre o SELECT acima e o
+    // INSERT. `reviews_job_id_key` é a regra legítima de uma avaliação por job.
+    if (rErr.code === "23505" && rErr.message.includes("reviews_job_id_key")) {
+      revalidatePath(`/servico/${job.id}`);
+      return { ok: true as const, alreadyExisted: true as const };
+    }
+    return { ok: false as const, error: rErr.message };
+  }
 
   /* O job vira 'avaliado' por trigger no banco (`marca_job_avaliado`), junto com o
      recálculo da nota da skill. Era um update daqui, feito como cliente — a trava
@@ -136,7 +169,10 @@ export async function avaliarJob(input: { jobId: string; rating: number; comment
      a regra vive melhor onde ela de fato é: como consequência da review existir. */
   revalidatePath(`/servico/${job.id}`);
   revalidatePath("/painel");
-  return { ok: true as const };
+  revalidatePath(`/profissional/${job.profissional_id}`);
+  revalidatePath("/profissionais");
+  revalidatePath("/painel/avaliacoes");
+  return { ok: true as const, alreadyExisted: false as const };
 }
 
 // ---------------------------------------------------------------------------

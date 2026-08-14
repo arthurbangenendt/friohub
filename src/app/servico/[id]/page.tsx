@@ -305,7 +305,7 @@ export default async function ServicoPage({ params }: { params: Promise<{ id: st
         )}
 
         {/* avaliação do cliente */}
-        {isCliente && job.status === "concluido" && (
+        {isCliente && job.status === "concluido" && !review && (
           <div className="card" style={{ padding: 22 }}>
             <SecTitle>Avalie o serviço</SecTitle>
             <p style={{ color: "var(--ink-soft)", fontSize: 14, marginBottom: 16 }}>Sua nota ajuda outros clientes e valoriza os bons profissionais.</p>
