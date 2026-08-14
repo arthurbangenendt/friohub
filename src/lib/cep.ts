@@ -40,29 +40,97 @@ export type GeoResultado =
   | { status: "erro" }
   | { status: "indisponivel" };
 
-// Pede a localização do navegador e faz reverse-geocode (BigDataCloud, sem chave).
-export async function detectarLocalizacao(): Promise<GeoResultado> {
+export type GeoDetalhadoResultado =
+  | {
+      status: "ok";
+      cidade: string;
+      uf: string;
+      cep: string;
+      latitude: number;
+      longitude: number;
+      accuracy: number | null;
+    }
+  | { status: "negado" }
+  | { status: "erro" }
+  | { status: "indisponivel" };
+
+export type GeoCoordenadas = {
+  latitude: number;
+  longitude: number;
+  accuracy: number | null;
+};
+
+// Além de cidade/UF, devolve a coordenada necessária para desenhar e persistir
+// o raio. Mesmo se o reverse-geocode falhar, a posição do navegador continua
+// válida e o profissional pode informar a cidade manualmente.
+export async function detectarLocalizacaoDetalhada(
+  aoEncontrarCoordenadas?: (coordenadas: GeoCoordenadas) => void,
+): Promise<GeoDetalhadoResultado> {
   if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
     return { status: "indisponivel" };
   }
+
   return new Promise((resolve) => {
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        try {
-          const { latitude, longitude } = pos.coords;
-          const r = await fetch(
-            `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=pt`,
-          );
-          const d = await r.json();
-          const cidade = d.city || d.locality || d.localityInfo?.administrative?.[3]?.name || "";
-          const uf = (d.principalSubdivisionCode || "").replace("BR-", "");
-          resolve({ status: "ok", cidade, uf });
-        } catch {
-          resolve({ status: "erro" });
-        }
-      },
-      () => resolve({ status: "negado" }),
-      { timeout: 10000, enableHighAccuracy: false },
-    );
+    try {
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          const { latitude, longitude, accuracy } = pos.coords;
+          const coordenadas = {
+            latitude,
+            longitude,
+            accuracy: Number.isFinite(accuracy) ? Math.round(accuracy) : null,
+          };
+          // Libera o mapa assim que o navegador responde. O nome da cidade pode
+          // chegar alguns segundos depois sem bloquear a visualização.
+          aoEncontrarCoordenadas?.(coordenadas);
+          const controller = new AbortController();
+          const reverseGeocodeTimeout = window.setTimeout(() => controller.abort(), 5000);
+          try {
+            const r = await fetch(
+              `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=pt`,
+              { signal: controller.signal },
+            );
+            if (!r.ok) throw new Error("reverse-geocode indisponível");
+            const d = await r.json();
+            const cidade = d.city || d.locality || d.localityInfo?.administrative?.[3]?.name || "";
+            const uf = (d.principalSubdivisionCode || "").replace("BR-", "");
+            resolve({
+              status: "ok",
+              cidade,
+              uf,
+              cep: String(d.postcode ?? ""),
+              latitude,
+              longitude,
+              accuracy: coordenadas.accuracy,
+            });
+          } catch {
+            resolve({
+              status: "ok",
+              cidade: "",
+              uf: "",
+              cep: "",
+              latitude,
+              longitude,
+              accuracy: coordenadas.accuracy,
+            });
+          } finally {
+            window.clearTimeout(reverseGeocodeTimeout);
+          }
+        },
+        (erro) => resolve({ status: erro.code === erro.PERMISSION_DENIED ? "negado" : "erro" }),
+        // Um raio de serviço não exige precisão de GPS. No desktop, pedir alta
+        // precisão pode deixar o navegador esperando por um sensor inexistente.
+        { timeout: 15000, enableHighAccuracy: false, maximumAge: 300000 },
+      );
+    } catch {
+      resolve({ status: "erro" });
+    }
   });
+}
+
+// Pede a localização do navegador e faz reverse-geocode (BigDataCloud, sem chave).
+export async function detectarLocalizacao(): Promise<GeoResultado> {
+  const resultado = await detectarLocalizacaoDetalhada();
+  if (resultado.status !== "ok") return resultado;
+  return { status: "ok", cidade: resultado.cidade, uf: resultado.uf };
 }

@@ -10,10 +10,16 @@ import { CATEGORIAS_DESPESA } from "./categorias";
 
 export type Despesa = {
   id: string;
+  job_id: string | null;
   categoria: string;
   descricao: string | null;
   valor: number;
   data: string;
+};
+
+export type ServicoParaDespesa = {
+  id: string;
+  label: string;
 };
 
 const LABEL = Object.fromEntries(CATEGORIAS_DESPESA.map((categoria) => [categoria.id, categoria.label]));
@@ -47,7 +53,15 @@ function resumirCategorias(lista: Despesa[]): ExpenseItem[] {
   return principais;
 }
 
-export function DespesasEditor({ inicial: lista, periodo }: { inicial: Despesa[]; periodo: string }) {
+export function DespesasEditor({
+  inicial: lista,
+  periodo,
+  servicos,
+}: {
+  inicial: Despesa[];
+  periodo: string;
+  servicos: ServicoParaDespesa[];
+}) {
   const router = useRouter();
   const formRef = useRef<HTMLDivElement>(null);
   const categoriaRef = useRef<HTMLSelectElement>(null);
@@ -55,10 +69,15 @@ export function DespesasEditor({ inicial: lista, periodo }: { inicial: Despesa[]
   const [descricao, setDescricao] = useState("");
   const [valor, setValor] = useState("");
   const [data, setData] = useState(hojeLocal);
+  const [jobId, setJobId] = useState("");
   const [pending, startTransition] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
   const [sucesso, setSucesso] = useState<string | null>(null);
   const resumo = useMemo(() => resumirCategorias(lista), [lista]);
+  const servicoPorId = useMemo(
+    () => new Map(servicos.map((servico) => [servico.id, servico.label])),
+    [servicos],
+  );
 
   const valorNum = moedaParaNumero(valor);
   const podeSalvar = valor.trim().length > 0 && valorNum > 0 && Number.isFinite(valorNum) && !pending;
@@ -72,14 +91,25 @@ export function DespesasEditor({ inicial: lista, periodo }: { inicial: Despesa[]
     setErro(null);
     setSucesso(null);
     startTransition(async () => {
-      const resposta = await registrarDespesa({ categoria, descricao, valor: valorNum, data });
+      const resposta = await registrarDespesa({
+        categoria,
+        descricao,
+        valor: valorNum,
+        data,
+        jobId: jobId || null,
+      });
       if (!resposta.ok) {
         setErro(resposta.error);
         return;
       }
       setDescricao("");
       setValor("");
-      setSucesso("Despesa registrada no resultado do período.");
+      setJobId("");
+      setSucesso(
+        jobId
+          ? "Despesa registrada e vinculada ao serviço."
+          : "Despesa geral registrada no resultado do período.",
+      );
       router.refresh();
     });
   }
@@ -135,6 +165,18 @@ export function DespesasEditor({ inicial: lista, periodo }: { inicial: Despesa[]
               Descrição <span className="font-normal text-[var(--ink-faint)]">(opcional)</span>
               <input value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="Ex.: gasolina até o cliente" maxLength={180} className={inputClass} />
             </label>
+            <label className={`${labelClass} sm:col-span-2`}>
+              Vincular a um serviço <span className="font-normal text-[var(--ink-faint)]">(opcional)</span>
+              <select value={jobId} onChange={(e) => setJobId(e.target.value)} className={inputClass}>
+                <option value="">Despesa geral — não vincular</option>
+                {servicos.map((servico) => (
+                  <option key={servico.id} value={servico.id}>{servico.label}</option>
+                ))}
+              </select>
+              <span className="font-normal leading-5 text-[var(--ink-faint)]">
+                Ao vincular, este custo será descontado de “Quanto sobrou em cada serviço”.
+              </span>
+            </label>
           </div>
 
           <button type="button" onClick={salvar} disabled={!podeSalvar} className="btn btn-primary mt-4 h-11 w-full disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">
@@ -173,6 +215,11 @@ export function DespesasEditor({ inicial: lista, periodo }: { inicial: Despesa[]
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold text-[var(--ink)]">{item.descricao || LABEL[item.categoria] || "Despesa"}</p>
                       <p className="text-xs text-[var(--ink-faint)]">{new Date(`${item.data}T12:00:00`).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })}</p>
+                      {item.job_id && (
+                        <p className="mt-0.5 truncate text-xs font-semibold text-[var(--cool)]">
+                          {servicoPorId.get(item.job_id) ?? `Serviço #${item.job_id.slice(0, 8)}`}
+                        </p>
+                      )}
                     </div>
                     <strong className="whitespace-nowrap text-sm text-[var(--ink)]">{formatarBRL(item.valor)}</strong>
                     <button type="button" onClick={() => remover(item)} disabled={pending} aria-label={`Remover despesa de ${formatarBRL(item.valor)}`} className="rounded-lg px-2 py-1 text-lg text-[var(--ink-faint)] transition hover:bg-[var(--danger-wash)] hover:text-[var(--danger)]">×</button>

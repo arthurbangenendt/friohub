@@ -14,6 +14,15 @@ export type PerfilInput = {
   skills: { specialty: string; years: number }[];
   /** Slugs de `skill_tags` — camada de detalhe (equipamentos, serviços, ambientes, credenciais). */
   tags: string[];
+  serviceRadius: {
+    latitude: number;
+    longitude: number;
+    radiusKm: number;
+    locationLabel: string;
+    accuracyM: number | null;
+    /** Usado apenas para manter compatibilidade com o matching legado por CEP. */
+    cep?: string;
+  } | null;
 };
 
 export type AlvoMidiaPerfil = "avatar" | "banner";
@@ -24,6 +33,37 @@ const SPECS = ["instalacao", "manutencao", "remanejamento", "limpeza", "conserto
 // outra operação: o profissional que salvasse sem editar ficava fora de toda
 // busca, porque o wizard filtra por CIDADE.
 const CEP_PREFIX_PADRAO = "01";
+
+function validarRaio(serviceRadius: PerfilInput["serviceRadius"]) {
+  if (!serviceRadius) return { ok: true as const, value: null };
+
+  const latitude = Number(serviceRadius.latitude);
+  const longitude = Number(serviceRadius.longitude);
+  const radiusKm = Math.round(Number(serviceRadius.radiusKm));
+  const locationLabel = serviceRadius.locationLabel.trim().slice(0, 120);
+  const accuracyM = serviceRadius.accuracyM === null
+    ? null
+    : Math.round(Number(serviceRadius.accuracyM));
+
+  if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90
+    || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+    return { ok: false as const, error: "Localização inválida. Atualize sua localização e tente novamente." };
+  }
+  if (!Number.isFinite(radiusKm) || radiusKm < 1 || radiusKm > 300) {
+    return { ok: false as const, error: "Defina um raio de atendimento entre 1 e 300 km." };
+  }
+  if (!locationLabel) {
+    return { ok: false as const, error: "Informe a cidade usada como base de atendimento." };
+  }
+  if (accuracyM !== null && (!Number.isFinite(accuracyM) || accuracyM < 0 || accuracyM > 100000)) {
+    return { ok: false as const, error: "A precisão da localização recebida é inválida." };
+  }
+
+  return {
+    ok: true as const,
+    value: { latitude, longitude, radiusKm, locationLabel, accuracyM },
+  };
+}
 
 function urlMidiaValida(url: string, userId: string, alvo: AlvoMidiaPerfil) {
   try {
@@ -91,6 +131,8 @@ export async function salvarPerfil(input: PerfilInput) {
   if (!user) return { ok: false as const, error: "Não autenticado." };
 
   const cidade = input.cidade.trim() || CIDADE;
+  const raioValidado = validarRaio(input.serviceRadius);
+  if (!raioValidado.ok) return { ok: false as const, error: raioValidado.error };
 
   const { error: pErr } = await supabase.from("professionals").upsert({
     id: user.id,
@@ -140,10 +182,38 @@ export async function salvarPerfil(input: PerfilInput) {
     if (tErr) return { ok: false as const, error: tErr.message };
   }
 
-  // 4) área de atendimento
-  const prefix = input.cepPrefix.replace(/\D/g, "").slice(0, 5) || CEP_PREFIX_PADRAO;
-  await supabase.from("service_areas").delete().eq("professional_id", user.id);
-  await supabase.from("service_areas").insert({ professional_id: user.id, cep_prefix: prefix, cidade });
+  // 4) localização privada + raio. As coordenadas nunca são gravadas nas
+  // tabelas públicas do diretório profissional.
+  if (raioValidado.value) {
+    const { error: radiusErr } = await supabase.from("professional_service_radius").upsert({
+      professional_id: user.id,
+      latitude: raioValidado.value.latitude,
+      longitude: raioValidado.value.longitude,
+      radius_km: raioValidado.value.radiusKm,
+      location_label: raioValidado.value.locationLabel,
+      accuracy_m: raioValidado.value.accuracyM,
+    });
+    if (radiusErr) {
+      const bancoDesatualizado = radiusErr.code === "PGRST205" || radiusErr.code === "42P01";
+      return {
+        ok: false as const,
+        error: bancoDesatualizado
+          ? "A atualização da área por raio ainda não foi aplicada ao banco de dados."
+          : `Não foi possível salvar a área de atendimento: ${radiusErr.message}`,
+      };
+    }
+  }
+
+  // 5) compatibilidade: as buscas atuais ainda filtram por prefixo de CEP.
+  // O CEP detectado atualiza esse filtro sem voltar a expor o campo antigo.
+  const cepDetectado = input.serviceRadius?.cep?.replace(/\D/g, "").slice(0, 5) ?? "";
+  const prefix = cepDetectado || input.cepPrefix.replace(/\D/g, "").slice(0, 5) || CEP_PREFIX_PADRAO;
+  const { error: areaDeleteErr } = await supabase.from("service_areas").delete().eq("professional_id", user.id);
+  if (areaDeleteErr) return { ok: false as const, error: areaDeleteErr.message };
+  const { error: areaInsertErr } = await supabase
+    .from("service_areas")
+    .insert({ professional_id: user.id, cep_prefix: prefix, cidade });
+  if (areaInsertErr) return { ok: false as const, error: areaInsertErr.message };
 
   revalidatePath("/painel");
   revalidatePath("/painel/perfil");

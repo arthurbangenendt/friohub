@@ -4,10 +4,11 @@ import { createClient } from "@/lib/supabase/server";
 import { formatarBRL, TAXA_COMISSAO } from "@/lib/pricing";
 import { Kpi, FECHADOS, wrap } from "../shared";
 import { GraficoMeses, type PontoMes } from "./GraficoMeses";
-import { DespesasEditor, type Despesa } from "./DespesasEditor";
+import { DespesasEditor, type Despesa, type ServicoParaDespesa } from "./DespesasEditor";
 import { PERIODOS, chaveMes, comoPeriodo, janela, rotuloPeriodo } from "./periodo";
 import { Doc } from "@/components/icons";
 import { Repasses } from "./Repasses";
+import { rotuloJob } from "../../solicitar/tipos";
 
 export default async function FinanceiroPage({ searchParams }: PageProps<"/painel/financeiro">) {
   const sp = await searchParams;
@@ -43,7 +44,12 @@ export default async function FinanceiroPage({ searchParams }: PageProps<"/paine
 
   type OrderRow = { job_id: string; preco_servico: number; comissao_servico?: number; total: number; payment_status: string; created_at: string };
   const orders = (ordersData ?? []) as OrderRow[];
-  const despesas = ((despesasData ?? []) as (Despesa & { job_id?: string | null })[]).map((d) => ({ ...d, valor: Number(d.valor) }));
+  const despesas = ((despesasData ?? []) as Despesa[]).map((d) => ({ ...d, valor: Number(d.valor) }));
+  const servicosParaDespesa: ServicoParaDespesa[] = (jobs ?? []).map((job) => ({
+    id: job.id,
+    label: `${rotuloJob(job.job_type)} · ${new Date(job.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })} · #${job.id.slice(0, 8)}`,
+  }));
+  const rotuloServico = new Map(servicosParaDespesa.map((servico) => [servico.id, servico.label]));
 
   const porMes = new Map<string, PontoMes>(meses.map((m) => [m.chave, { mes: m.label, receita: 0, despesa: 0 }]));
 
@@ -176,16 +182,16 @@ export default async function FinanceiroPage({ searchParams }: PageProps<"/paine
           <p style={{ fontSize: 13, color: "var(--ink-soft)", margin: "0 0 16px" }}>
             Compras de ferramentas entram automaticamente quando você informa o valor. Lance aqui gasolina, locação e os demais custos da operação.
           </p>
-          <DespesasEditor inicial={despesas} periodo={rotuloPeriodo(periodo)} />
+          <DespesasEditor inicial={despesas} periodo={rotuloPeriodo(periodo)} servicos={servicosParaDespesa} />
         </section>
       )}
 
       {isPro && (
         <section className="card" style={{ padding: 24, marginTop: 16 }}>
-          <h2 style={{ fontSize: "1.05rem", fontWeight: 700, margin: "0 0 4px" }}>Repasses da plataforma</h2>
+          <h2 style={{ fontSize: "1.05rem", fontWeight: 700, margin: "0 0 4px" }}>Valores recebidos pela plataforma</h2>
           <p style={{ fontSize: 13, color: "var(--ink-soft)", margin: "0 0 16px" }}>
-            O rateio congelado no momento da cobrança — é o valor efetivamente
-            destinado a você, não um cálculo refeito sobre a comissão atual.
+            Quanto cada pagamento destinou a você depois da comissão do FrioHub.
+            O valor é registrado no momento da cobrança e não recalculado depois.
           </p>
           <Repasses inicio={inicio} fim={fim} />
         </section>
@@ -193,9 +199,9 @@ export default async function FinanceiroPage({ searchParams }: PageProps<"/paine
 
       {isPro && (
         <section className="card" style={{ padding: 24, marginTop: 16 }}>
-          <h2 style={{ fontSize: "1.05rem", fontWeight: 700 }}>Margem por serviço liquidado</h2>
+          <h2 style={{ fontSize: "1.05rem", fontWeight: 700 }}>Quanto sobrou em cada serviço</h2>
           <p style={{ fontSize: 13, color: "var(--ink-soft)" }}>
-            Receita líquida menos despesas vinculadas ao atendimento. Despesas gerais permanecem apenas no resultado do período.
+            Valor recebido depois da comissão, menos as despesas vinculadas ao atendimento. Despesas gerais afetam apenas o resultado do período.
           </p>
           <div style={{ display: "grid", gap: 8 }}>
             {pagos.slice(0, 10).map((order) => {
@@ -203,7 +209,7 @@ export default async function FinanceiroPage({ searchParams }: PageProps<"/paine
               const receita = order.preco_servico - (order.comissao_servico ?? 0);
               return (
                 <Link key={order.job_id} href={`/servico/${order.job_id}`} style={{ display: "flex", justifyContent: "space-between", gap: 12, borderBottom: "1px solid var(--line-soft)", padding: "8px 0" }}>
-                  <span>Serviço {order.job_id.slice(0, 8)}</span>
+                  <span>{rotuloServico.get(order.job_id) ?? `Serviço #${order.job_id.slice(0, 8)}`}</span>
                   <strong>{formatarBRL(receita - custo)}</strong>
                 </Link>
               );

@@ -25,6 +25,14 @@ export default async function PerfilPage() {
     .eq("id", user.id)
     .maybeSingle();
 
+  // Esta tabela é privada por RLS: só o próprio profissional recebe as
+  // coordenadas usadas para editar o raio. Ela não entra na vitrine pública.
+  const { data: serviceRadius } = await supabase
+    .from("professional_service_radius")
+    .select("latitude, longitude, radius_km, location_label, accuracy_m")
+    .eq("professional_id", user.id)
+    .maybeSingle();
+
   // Catálogo das skills detalhadas que o profissional pode marcar.
   const { data: catalogo } = await supabase
     .from("skill_tags")
@@ -53,6 +61,13 @@ export default async function PerfilPage() {
       specialty: s.specialty, years: s.years_experience,
     })),
     tags: (pro?.professional_tags ?? []).map((t: { tag_slug: string }) => t.tag_slug),
+    serviceRadius: serviceRadius ? {
+      latitude: serviceRadius.latitude,
+      longitude: serviceRadius.longitude,
+      radiusKm: serviceRadius.radius_km,
+      locationLabel: serviceRadius.location_label,
+      accuracyM: serviceRadius.accuracy_m,
+    } : null,
   };
 
   const verificado = pro?.verification_status === "verificado";

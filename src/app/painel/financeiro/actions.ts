@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { CATEGORIA_IDS } from "./categorias";
 
 
-export async function registrarDespesa(input: { categoria: string; descricao: string; valor: number; data: string }) {
+export async function registrarDespesa(input: { categoria: string; descricao: string; valor: number; data: string; jobId: string | null }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false as const, error: "Não autenticado." };
@@ -21,8 +21,27 @@ export async function registrarDespesa(input: { categoria: string; descricao: st
     return { ok: false as const, error: "A descrição deve ter no máximo 180 caracteres." };
   }
 
+  const jobId = input.jobId?.trim() || null;
+  if (jobId && !/^[0-9a-f-]{36}$/i.test(jobId)) {
+    return { ok: false as const, error: "Serviço inválido." };
+  }
+  if (jobId) {
+    /* A RLS já limita a leitura, e o filtro explícito permite ao Postgres usar
+       o índice de profissional. Esta validação também impede que um UUID de
+       outro atendimento seja associado manualmente pela Server Action. */
+    const { data: job, error: jobError } = await supabase
+      .from("jobs")
+      .select("id")
+      .eq("id", jobId)
+      .eq("profissional_id", user.id)
+      .maybeSingle();
+    if (jobError) return { ok: false as const, error: "Não foi possível validar o serviço." };
+    if (!job) return { ok: false as const, error: "Este serviço não pertence ao seu perfil." };
+  }
+
   const { error } = await supabase.from("expenses").insert({
     professional_id: user.id,
+    job_id: jobId,
     categoria: input.categoria,
     descricao: input.descricao.trim() || null,
     valor: input.valor,

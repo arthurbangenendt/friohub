@@ -2246,6 +2246,51 @@ export type Database = {
           },
         ]
       }
+      professional_service_radius: {
+        Row: {
+          accuracy_m: number | null
+          latitude: number
+          location_label: string
+          longitude: number
+          professional_id: string
+          radius_km: number
+          updated_at: string
+        }
+        Insert: {
+          accuracy_m?: number | null
+          latitude: number
+          location_label: string
+          longitude: number
+          professional_id: string
+          radius_km: number
+          updated_at?: string
+        }
+        Update: {
+          accuracy_m?: number | null
+          latitude?: number
+          location_label?: string
+          longitude?: number
+          professional_id?: string
+          radius_km?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "professional_service_radius_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: true
+            referencedRelation: "diretorio_profissionais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "professional_service_radius_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: true
+            referencedRelation: "professionals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       professional_skills: {
         Row: {
           created_at: string
