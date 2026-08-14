@@ -6,6 +6,7 @@ import { Logo } from "@/components/icons";
 import { PainelNav } from "./PainelNav";
 import { Avatar } from "./Avatar";
 import { comoPapel, HREF_PERFIL, NAV_POR_PAPEL, ROTULO_PAPEL } from "./navegacao";
+import { featureHabilitada } from "@/lib/feature-flags";
 
 /* Shell da área logada. Cada papel vê uma navegação diferente — a distinção sai
    de `profiles.role`, não de heurística na tela. O mapa papel → itens vive em
@@ -23,7 +24,11 @@ export default async function PainelLayout({ children }: LayoutProps<"/painel">)
 
   const nome = profile?.nome ?? user.email ?? "Você";
   const papel = comoPapel(profile?.role);
-  const itens = NAV_POR_PAPEL[papel];
+  const itensDoPapel = NAV_POR_PAPEL[papel];
+  const flags = [...new Set(itensDoPapel.flatMap((item) => item.feature ? [item.feature] : []))];
+  const resultados = await Promise.all(flags.map(async (flag) => [flag, await featureHabilitada(supabase, flag, user.id)] as const));
+  const habilitadas = new Map(resultados);
+  const itens = itensDoPapel.filter((item) => !item.feature || habilitadas.get(item.feature));
   const hrefPerfil = HREF_PERFIL[papel];
 
   /* Contagem de não lidas para a bolinha do menu. `head: true` traz só o total,

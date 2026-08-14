@@ -3429,6 +3429,16 @@ export type Database = {
         Args: { p_notes?: string; p_visit_id: string }
         Returns: undefined
       }
+      configurar_feature_flag: {
+        Args: {
+          p_enabled: boolean
+          p_flag_key: string
+          p_reason: string
+          p_region_slug: string
+          p_rollout_percentage: number
+        }
+        Returns: undefined
+      }
       consume_rate_limit: {
         Args: {
           p_max_hits: number

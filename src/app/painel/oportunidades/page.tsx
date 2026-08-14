@@ -5,6 +5,7 @@ import { formatarBRL } from "@/lib/pricing";
 import { rotuloJob } from "@/app/solicitar/tipos";
 import { Cabecalho, dataCurta, mono, wrap } from "../shared";
 import { ConcluirFollowUpForm, CriarFollowUpForm } from "./FollowUpForms";
+import { featureHabilitada } from "@/lib/feature-flags";
 
 type Etapa = "novo" | "visualizado" | "proposta" | "ganho" | "perdido";
 const ETAPA: Record<Etapa, { label: string; cor: string }> = {
@@ -16,6 +17,7 @@ const ETAPA: Record<Etapa, { label: string; cor: string }> = {
 export default async function OportunidadesPage() {
   const supabase = await createClient(); const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+  if (!await featureHabilitada(supabase, "ux_pipeline", user.id)) redirect("/painel");
   const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
   if (profile?.role !== "profissional") redirect("/painel");
   const { data: targets } = await supabase.from("quote_request_targets").select("quote_request_id, enviado_em, visto_em, recusado_em, pedido:quote_requests(id, job_type, bairro, cep, urgencia, status, expira_em)").eq("professional_id", user.id).order("enviado_em", { ascending: false }).limit(100);

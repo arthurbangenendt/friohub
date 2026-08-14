@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Bell, Bolt, Wrench, User, Shield, Star, Tool, Droplet, Chat, Doc, MapPin } from "@/components/icons";
+import type { UxFeature } from "@/lib/feature-flags";
 
-export type ItemNav = { href: string; label: string; icone: keyof typeof ICONE };
+export type ItemNav = { href: string; label: string; icone: keyof typeof ICONE; feature?: UxFeature };
 
 const ICONE = {
   visao: Bolt, servicos: Wrench, financeiro: Droplet, orcamentos: Doc,

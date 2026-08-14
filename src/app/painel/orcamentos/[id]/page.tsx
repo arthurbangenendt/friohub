@@ -11,6 +11,7 @@ import { Propostas, type PropostaView } from "./Propostas";
 import { CancelarPedido } from "./CancelarPedido";
 import { AbrirChatPedido } from "./AbrirChatPedido";
 import { ComparisonLink } from "./ComparisonLink";
+import { featureHabilitada } from "@/lib/feature-flags";
 
 const URGENCIA: Record<string, string> = {
   sem_pressa: "Sem pressa",
@@ -23,6 +24,7 @@ export default async function PedidoPage({ params }: { params: Promise<{ id: str
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+  const pipelineHabilitado = await featureHabilitada(supabase, "ux_pipeline", user.id);
 
   const { data: pedido } = await supabase
     .from("quote_requests")
@@ -211,7 +213,7 @@ export default async function PedidoPage({ params }: { params: Promise<{ id: str
           <div>
             <div id="propostas" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", margin: "8px 0 14px" }}>
               <h2 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0 }}>Propostas recebidas ({propostas.filter((p) => p.status !== "retirada").length})</h2>
-              {propostas.filter((p) => p.status !== "retirada").length >= 2 && <ComparisonLink href={`/painel/orcamentos/${pedido.id}/comparar`} count={propostas.filter((p) => p.status !== "retirada").length} />}
+              {pipelineHabilitado && propostas.filter((p) => p.status !== "retirada").length >= 2 && <ComparisonLink href={`/painel/orcamentos/${pedido.id}/comparar`} count={propostas.filter((p) => p.status !== "retirada").length} />}
             </div>
             <Propostas
               propostas={propostas.filter((p) => p.status !== "retirada")}

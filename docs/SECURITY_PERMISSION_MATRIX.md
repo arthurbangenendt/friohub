@@ -67,3 +67,13 @@ Cada permissão deve ser testada com:
 6. alteração de coluna extra pela REST API;
 7. repetição da mesma requisição;
 8. duas requisições concorrentes para decisões exclusivas.
+
+## Evidência executável
+
+- `supabase/tests/database/15_rest_api_grants.test.sql` fixa os grants mínimos da Data API.
+- `scripts/test-rest-roles.mjs` usa Auth e PostgREST locais com os cinco papéis, valida 12 cenários
+  de acesso/abuso e remove todos os usuários temporários ao final.
+- `.github/workflows/quality.yml` executa pgTAP e a suíte REST após reconstruir o Supabase do zero.
+
+Uma policy RLS sem `GRANT` correspondente bloqueia também o uso legítimo; um `GRANT` sem policy
+adequada amplia a superfície sem isolamento. Os dois contratos devem sempre evoluir juntos.

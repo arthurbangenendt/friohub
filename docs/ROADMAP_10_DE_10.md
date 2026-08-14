@@ -20,14 +20,15 @@ quando alguém usa a API diretamente, repete uma requisição ou tenta explorar 
 
 ## Status de execução
 
-Atualizado em 13/08/2026.
+Atualizado em 14/08/2026.
 
 | Item | Status | Evidência |
 |---|---|---|
 | Baseline de migrations remotas | Concluído | 30 migrations alinhadas por `supabase migration list --linked` antes das fases locais |
 | Tipos TypeScript do Supabase | Concluído | `src/types/database.generated.ts` integrado aos três clientes |
 | Matriz de papéis e permissões | Concluído | `docs/SECURITY_PERMISSION_MATRIX.md` |
-| Contratos pgTAP | Concluído localmente | 263/263 testes passaram em `supabase/tests/database/` |
+| Contratos pgTAP | Concluído localmente | 299/299 testes passaram em `supabase/tests/database/` |
+| Contratos REST por papel | Concluído localmente | 12/12 cenários passaram para anônimo, cliente, profissional, distribuidora e admin |
 | CI de aplicação e banco | Implementado, execução no GitHub pendente | `.github/workflows/quality.yml` |
 | Lint do schema remoto | Concluído | zero erros retornados por `supabase db lint --linked` |
 | Reset local reproduzível | Validado até a Fase 4 | Fase 5 aplicada incrementalmente; repetir reset integral quando a sessão paralela liberar o banco |
@@ -42,7 +43,7 @@ Os antigos testes `TODO` do P0 agora são contratos obrigatórios. As migrations
 contratos pgTAP passaram no Supabase local. A reconstrução integral foi validada até a Fase 4; as
 migrations da Fase 5 foram validadas incrementalmente para não resetar o banco compartilhado com a
 outra sessão em andamento. O
-gate de produção continua aberto até os testes REST/pgTAP passarem no CI, antes de qualquer rollout
+gate de produção continua aberto até os testes REST/pgTAP passarem no CI remoto, antes de qualquer rollout
 remoto.
 
 ## 2. Avaliação inicial
@@ -173,7 +174,7 @@ Objetivo: impedir que novas mudanças agravem o risco.
 - [x] Gerar e integrar tipos TypeScript do schema.
 - [x] Criar matriz de papéis e permissões.
 - [x] Criar baseline pgTAP de contratos e regressões P0.
-- [ ] Complementar com testes REST para cliente, profissional, distribuidora, admin e anônimo.
+- [x] Complementar com testes REST para cliente, profissional, distribuidora, admin e anônimo.
 - [x] Adicionar CI com lint, typecheck, build, migrations e testes de RLS.
 - [x] Registrar seed local vazio e proibição de copiar dados de produção.
 
@@ -194,9 +195,13 @@ Objetivo: fechar todos os bloqueadores P0.
 - [x] Adicionar audit log para ações administrativas e transições críticas.
 - [x] Corrigir exposição de CNPJ e alinhar textos jurídicos.
 
-Implementação local concluída e validada em 13/08/2026. Reset completo, lint do schema, 58 testes
-pgTAP, tipos gerados, typecheck, lint e build passaram. As caixas não indicam deploy em produção:
-ainda faltam testes REST por papel, execução do CI remoto e rollout controlado.
+Implementação local concluída e ampliada em 14/08/2026. A suíte `scripts/test-rest-roles.mjs`
+exercita a Data API com usuários temporários dos cinco papéis e remove os fixtures ao final. Ela
+identificou grants ausentes que deixavam policies corretas inalcançáveis pelo PostgREST; a migration
+`20260814114010_rest_api_role_grants.sql` criou uma allowlist por operação e coluna, mantendo CNPJ
+profissional, custo de produto e escritas críticas fora do acesso genérico. O CI agora executa os
+12 contratos REST depois dos 299 contratos pgTAP. As caixas não indicam deploy em produção:
+ainda faltam execução do CI remoto e rollout controlado.
 
 **Gate:** nenhuma exploração conhecida reproduzível e suíte negativa de RLS passando.
 
@@ -297,6 +302,7 @@ Objetivo: suportar falhas, aumento de volume e novas praças.
       vazio nem apenas no ambiente local.
 - [x] Testes de carga reproduzíveis para banco e HTTP, com limites automáticos.
 - [x] Feature flags por praça e rollout determinístico; PMOC 100%, Asaas, assinatura e patrocinado 0%.
+- [x] Rollout UX por domínio, com administração auditada e preservação de execuções em andamento.
 - [x] Cidade/UF/praça configuráveis por ambiente e tabela de regiões; abertura de nova praça ainda
       exige dados, operação e rollout próprios.
 - [ ] Monitor externo, captura de erro frontend/backend e alertas fora da infraestrutura Supabase.
@@ -398,7 +404,7 @@ Estas decisões não devem ser tomadas silenciosamente durante implementação:
 
 Concluir as decisões de produto da **Fase 4**: pesos e política de exposição do ranking, modelo de
 venda/auditoria do destaque, hipótese comercial de PMOC e critérios de reativação. Antes de
-produção, voltar aos gates abertos das Fases 0–3: testes REST por papel, CI remoto, worker de e-mail,
+produção, voltar aos gates abertos das Fases 0–3: CI remoto, worker de e-mail,
 fallback, política de disputa/repasse, KYC/KYB e integração sandbox Asaas.
 
 O advisor local também registrou dívida anterior fora da Fase 3: as views `orders_cliente`,

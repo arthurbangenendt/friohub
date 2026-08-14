@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { featureHabilitada } from "@/lib/feature-flags";
 
 export type FollowUpState = { ok: boolean; message: string };
 
@@ -14,6 +15,7 @@ async function autenticar() {
 export async function criarFollowUp(_: FollowUpState, formData: FormData): Promise<FollowUpState> {
   const { supabase, user } = await autenticar();
   if (!user) return { ok: false, message: "Sua sessão expirou." };
+  if (!await featureHabilitada(supabase, "ux_pipeline", user.id)) return { ok: false, message: "O pipeline não está disponível para sua conta." };
   const pedidoId = String(formData.get("pedidoId") ?? "");
   const data = String(formData.get("data") ?? "");
   const titulo = String(formData.get("titulo") ?? "Retornar contato").trim();
@@ -28,6 +30,7 @@ export async function criarFollowUp(_: FollowUpState, formData: FormData): Promi
 export async function concluirFollowUp(_: FollowUpState, formData: FormData): Promise<FollowUpState> {
   const { supabase, user } = await autenticar();
   if (!user) return { ok: false, message: "Sua sessão expirou." };
+  if (!await featureHabilitada(supabase, "ux_pipeline", user.id)) return { ok: false, message: "O pipeline não está disponível para sua conta." };
   const taskId = String(formData.get("taskId") ?? "");
   const outcome = String(formData.get("outcome") ?? "");
   const notes = String(formData.get("notes") ?? "");

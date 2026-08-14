@@ -12,6 +12,7 @@
     "db:reset": "SUPABASE_TELEMETRY_DISABLED=1 supabase db reset --local",
     "db:lint": "SUPABASE_TELEMETRY_DISABLED=1 supabase db lint --local --fail-on error",
     "db:test": "SUPABASE_TELEMETRY_DISABLED=1 supabase test db --local",
+    "db:test:rest": "SUPABASE_TELEMETRY_DISABLED=1 node scripts/test-rest-roles.mjs",
     "db:types": "SUPABASE_TELEMETRY_DISABLED=1 supabase gen types --local --schema public > src/types/database.generated.ts",
     "db:types:check": "sh scripts/check-generated-types.sh",
     "db:restore:verify": "sh scripts/verify-backup-restore.sh",

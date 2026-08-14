@@ -45,4 +45,5 @@ jobs:
       - run: npm run db:reset
       - run: npm run db:lint
       - run: npm run db:test
+      - run: npm run db:test:rest
       - run: npm run db:types:check

@@ -5,6 +5,7 @@ import { formatarBRL } from "@/lib/pricing";
 import { rotuloJob } from "@/app/solicitar/tipos";
 import { Check, Star } from "@/components/icons";
 import { mono, one, wrap } from "../../../shared";
+import { featureHabilitada } from "@/lib/feature-flags";
 
 type Proposta = {
   id: string; professional_id: string; tipo: string; valor_mao_obra: number; valor_materiais: number; valor_visita: number;
@@ -16,6 +17,7 @@ type Proposta = {
 export default async function CompararPropostasPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params; const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser(); if (!user) redirect("/login");
+  if (!await featureHabilitada(supabase, "ux_pipeline", user.id)) redirect(`/painel/orcamentos/${id}`);
   const { data: pedido } = await supabase.from("quote_requests").select("id, cliente_id, job_type, status").eq("id", id).maybeSingle();
   if (!pedido || pedido.cliente_id !== user.id) redirect(`/painel/orcamentos/${id}`);
   const { data } = await supabase.from("quotes").select(`id, professional_id, tipo, valor_mao_obra, valor_materiais, valor_visita, visita_abatida, inclui, nao_inclui, prazo_execucao, garantia_dias, validade_ate, observacoes, status, profissional:professionals(profiles(nome), professional_skills(rating_avg, rating_count, jobs_completed))`).eq("quote_request_id", id).in("status", ["enviada", "aceita"]).order("created_at");

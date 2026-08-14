@@ -11,6 +11,7 @@ import { AbrirChat } from "./AbrirChat";
 import { TAG_LABEL } from "./tags-cliente";
 import { Star } from "@/components/icons";
 import { Agendamento, type AgendamentoView } from "./Agendamento";
+import { featureHabilitada } from "@/lib/feature-flags";
 
 const mono = "var(--font-geist-mono), ui-monospace, monospace";
 const STATUS: Record<string, { label: string; cor: string; bg: string }> = {
@@ -98,6 +99,7 @@ export default async function ServicoPage({ params }: { params: Promise<{ id: st
   const isCliente = job.cliente_id === user.id;
   const isPro = job.profissional_id === user.id;
   if (!isCliente && !isPro) redirect("/painel");
+  const podeIniciarExecucao = isPro && await featureHabilitada(supabase, "ux_execution", user.id);
 
   const produto = one(job.produto) as { marca: string; modelo: string; btu: number; preco_venda: number } | null;
   const proNome = one(one(job.profissional)?.profiles)?.nome ?? "Profissional";
@@ -126,6 +128,7 @@ export default async function ServicoPage({ params }: { params: Promise<{ id: st
     .select("status, materials, measurements, notes, warranty_until, maintenance_due, finalized_at")
     .eq("job_id", job.id)
     .maybeSingle();
+  const execucaoHabilitada = isPro && (podeIniciarExecucao || Boolean(execucao));
 
   /* Entrega do equipamento (dropship). Vem da view `entregas_cliente`, que não
      expõe o custo da distribuidora — mesma razão de `orders_cliente`.
@@ -261,9 +264,9 @@ export default async function ServicoPage({ params }: { params: Promise<{ id: st
         {isPro && ["aguardando_profissional", "aceito", "em_execucao"].includes(job.status) && (
           <div className="card" style={{ padding: 22 }}>
             <SecTitle>Ação</SecTitle>
-            <Link href={`/servico/${job.id}/executar`} className="btn btn-primary" style={{ display: "inline-flex", marginBottom: 14 }}>
+            {execucaoHabilitada && <Link href={`/servico/${job.id}/executar`} className="btn btn-primary" style={{ display: "inline-flex", marginBottom: 14 }}>
               {execucao ? "Continuar execução" : "Abrir modo execução"}
-            </Link>
+            </Link>}
             <JobActions jobId={job.id} status={job.status} />
           </div>
         )}

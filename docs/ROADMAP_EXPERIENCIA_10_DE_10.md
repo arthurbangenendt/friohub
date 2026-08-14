@@ -503,6 +503,12 @@ Regras obrigatórias:
 - nenhuma métrica financeira fora do ledger como fonte contábil;
 - feature flag para rollout de cada domínio.
 
+Rollout implementado localmente em 13/08/2026 com flags regionais determinísticas e auditáveis para
+`ux_pipeline`, `ux_execution`, `ux_portfolio` e `ux_growth`. O piloto começa em 100% para preservar
+o comportamento atual. Menu, rotas e Server Actions respeitam a configuração; execuções já
+iniciadas podem ser concluídas mesmo após redução da flag. Procedimento e limites em
+`docs/ROLLOUT_UX.md`. Flags controlam exposição do produto e não substituem RLS ou autorização.
+
 ## 10. Sistema de design e qualidade de UI
 
 Antes de multiplicar telas:
