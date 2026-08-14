@@ -2,25 +2,49 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { SiteHeader, SiteFooter } from "@/components/site";
+import { TimelineContent } from "@/components/ui/timeline-animation";
+import { VerticalCutReveal } from "@/components/ui/vertical-cut-reveal";
 import { Avatar } from "@/app/painel/Avatar";
-import { Star, Shield, MapPin, Building, User, ArrowRight } from "@/components/icons";
+import { Star, Shield, MapPin, Building, User, ArrowRight, Chat, Check } from "@/components/icons";
+import { one } from "@/lib/relacional";
 import { BotaoMensagem } from "./BotaoMensagem";
 
 const SPEC_LABEL: Record<string, string> = {
-  instalacao: "Instalação", manutencao: "Manutenção", remanejamento: "Remanejamento", limpeza: "Limpeza", conserto: "Conserto",
+  instalacao: "Instalação",
+  manutencao: "Manutenção",
+  remanejamento: "Remanejamento",
+  limpeza: "Limpeza",
+  conserto: "Conserto",
 };
-import { one } from "@/lib/relacional";
+
+const CAT_TITULO: Record<string, string> = {
+  servico: "Serviços",
+  equipamento: "Equipamentos",
+  ambiente: "Ambientes atendidos",
+  credencial: "Credenciais declaradas",
+};
+
 function Estrelas({ nota, size = 16 }: { nota: number; size?: number }) {
   return (
-    <span style={{ display: "inline-flex", gap: 2 }}>
+    <span className="perfil-estrelas" aria-label={`${nota.toFixed(1)} de 5 estrelas`}>
       {[1, 2, 3, 4, 5].map((n) => (
-        <span key={n} style={{ color: nota >= n - 0.25 ? "var(--warm)" : "var(--ink-faint)", display: "flex" }}>
-          <Star size={size} filled={nota >= n - 0.25} />
+        <span key={n} className={nota >= n - .25 ? "perfil-estrela-on" : "perfil-estrela-off"}>
+          <Star size={size} filled={nota >= n - .25} aria-hidden="true" />
         </span>
       ))}
     </span>
   );
 }
+
+type FotoRow = {
+  id: string;
+  url: string;
+  media_type: string;
+  position: number;
+  grupo_id: string | null;
+  momento: string | null;
+  caption: string | null;
+};
 
 export default async function ProfissionalPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -39,53 +63,50 @@ export default async function ProfissionalPage({ params }: { params: Promise<{ i
   if (!pro) notFound();
 
   const { data: { user: usuario } } = await supabase.auth.getUser();
-
   const perfil = one(pro.profiles) as { nome: string; avatar_url: string | null } | null;
-  const nome = perfil?.nome ?? "Profissional";
+  const nomePessoa = perfil?.nome ?? "Profissional";
+  const nome = pro.tipo === "empresa" && pro.razao_social ? pro.razao_social : nomePessoa;
   const avatarUrl = perfil?.avatar_url ?? null;
-  const skills = ((pro.professional_skills ?? []) as { specialty: string; rating_avg: number; rating_count: number; jobs_completed: number; years_experience: number }[])
-    .sort((a, b) => b.rating_avg - a.rating_avg);
-  type FotoRow = { id: string; url: string; media_type: string; position: number; grupo_id: string | null; momento: string | null; caption: string | null };
+  const skills = ((pro.professional_skills ?? []) as {
+    specialty: string;
+    rating_avg: number;
+    rating_count: number;
+    jobs_completed: number;
+    years_experience: number;
+  }[]).sort((a, b) => b.rating_avg - a.rating_avg);
+
   const fotos = ((pro.portfolio_items ?? []) as FotoRow[])
-    .filter((i) => i.media_type === "foto")
+    .filter((item) => item.media_type === "foto")
     .sort((a, b) => a.position - b.position);
 
-  /* Agrupa em pares antes/depois. Foto sem grupo (avulsa) vira um par só com
-     "depois", para continuar aparecendo em vez de sumir da vitrine. */
   const paresPortfolio = (() => {
     const mapa = new Map<string, { antes: FotoRow | null; depois: FotoRow | null; caption: string | null }>();
-    for (const f of fotos) {
-      const chave = f.grupo_id ?? `avulsa-${f.id}`;
+    for (const foto of fotos) {
+      const chave = foto.grupo_id ?? `avulsa-${foto.id}`;
       const par = mapa.get(chave) ?? { antes: null, depois: null, caption: null };
-      if (f.momento === "antes") par.antes = f; else par.depois = f;
-      if (f.caption) par.caption = f.caption;
+      if (foto.momento === "antes") par.antes = foto;
+      else par.depois = foto;
+      if (foto.caption) par.caption = foto.caption;
       mapa.set(chave, par);
     }
     return [...mapa.entries()].map(([chave, par]) => ({ chave, ...par }));
   })();
-  const verificado = pro.verification_status === "verificado";
 
-  /* Skills detalhadas, agrupadas por categoria. É o que diferencia dois
-     profissionais com a mesma nota — quem faz VRF corporativo de quem faz
-     split residencial. */
   const tagsPorCategoria = new Map<string, string[]>();
-  for (const pt of (pro.professional_tags ?? []) as { skill_tags: unknown }[]) {
-    const t = one(pt.skill_tags) as { label: string; categoria: string; ordem: number } | null;
-    if (!t) continue;
-    const arr = tagsPorCategoria.get(t.categoria) ?? [];
-    arr.push(t.label);
-    tagsPorCategoria.set(t.categoria, arr);
+  for (const professionalTag of (pro.professional_tags ?? []) as { skill_tags: unknown }[]) {
+    const tag = one(professionalTag.skill_tags) as { label: string; categoria: string; ordem: number } | null;
+    if (!tag) continue;
+    const itens = tagsPorCategoria.get(tag.categoria) ?? [];
+    itens.push(tag.label);
+    tagsPorCategoria.set(tag.categoria, itens);
   }
-  const CAT_TITULO: Record<string, string> = {
-    servico: "Serviços que executa",
-    equipamento: "Equipamentos que domina",
-    ambiente: "Ambientes que atende",
-    credencial: "Credenciais declaradas",
-  };
 
-  const totalReviews = skills.reduce((s, k) => s + k.rating_count, 0);
-  const totalJobs = skills.reduce((s, k) => s + k.jobs_completed, 0);
-  const notaGeral = totalReviews > 0 ? skills.reduce((s, k) => s + k.rating_avg * k.rating_count, 0) / totalReviews : 0;
+  const totalReviews = skills.reduce((total, skill) => total + skill.rating_count, 0);
+  const totalJobs = skills.reduce((total, skill) => total + skill.jobs_completed, 0);
+  const notaGeral = totalReviews > 0
+    ? skills.reduce((total, skill) => total + skill.rating_avg * skill.rating_count, 0) / totalReviews
+    : 0;
+  const verificado = pro.verification_status === "verificado";
 
   const { data: reviews } = await supabase
     .from("reviews")
@@ -94,168 +115,252 @@ export default async function ProfissionalPage({ params }: { params: Promise<{ i
     .order("created_at", { ascending: false })
     .limit(8);
 
+  const temPortfolio = paresPortfolio.length > 0;
+  const temReviews = !!reviews?.length;
+
   return (
     <>
       <SiteHeader logado={!!usuario} />
-      <main className="container" style={{ padding: "40px 24px 80px", maxWidth: 900 }}>
-        <Link href="/solicitar" style={{ fontSize: 13.5, color: "var(--ink-faint)" }}>← Voltar para a busca</Link>
-
-        {/* Capa: banner do parceiro, com degradê da marca quando não há imagem */}
-        <div className="perfil-capa" style={{ marginTop: 20 }}>
-          {pro.banner_url && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={pro.banner_url} alt="" />
-          )}
+      <main id="conteudo" className="perfil-publico">
+        <div className="container perfil-voltar-wrap">
+          <Link href="/solicitar" className="perfil-voltar">← Voltar para a busca</Link>
         </div>
 
-        {/* Identificação, sobreposta à capa */}
-        <div className="perfil-topo">
-          <span className="perfil-foto">
-            <Avatar nome={nome} id={pro.id} url={avatarUrl} size={104} radius="22px" fontSize={36} />
-          </span>
-
-          <div className="perfil-id">
-            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <h1 style={{ fontSize: "1.9rem", fontWeight: 800, letterSpacing: "-0.025em" }}>{nome}</h1>
-              {verificado && <span className="perfil-selo"><Shield size={14} /> Verificado</span>}
-            </div>
-            <div className="perfil-meta">
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                {pro.tipo === "empresa" ? <Building size={15} /> : <User size={15} />}
-                {pro.tipo === "empresa" ? "Empresa" : "Autônomo"}
-              </span>
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><MapPin size={15} /> {pro.cidade} — {pro.estado}</span>
-              {(pro.anos_experiencia ?? 0) > 0 && (
-                <span style={{ color: "var(--ink-faint)" }}>
-                  {pro.anos_experiencia} {pro.anos_experiencia === 1 ? "ano" : "anos"} de experiência
-                </span>
-              )}
-              {totalReviews > 0 && (
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                  <Estrelas nota={notaGeral} size={15} /> <strong>{notaGeral.toFixed(1)}</strong>
-                  <span style={{ color: "var(--ink-faint)" }}>({totalReviews})</span>
-                </span>
-              )}
-              {totalJobs > 0 && <span style={{ color: "var(--ink-faint)" }}>{totalJobs} serviços concluídos</span>}
-            </div>
-          </div>
-
-          <div style={{ display: "flex", gap: 10, flexShrink: 0, flexWrap: "wrap", alignItems: "flex-start" }}>
-            {/* Conversar antes de contratar: quem está logado e não é o próprio
-                dono do perfil pode abrir o chat direto daqui. */}
-            {usuario && usuario.id !== pro.id && <BotaoMensagem professionalId={pro.id} />}
-            <Link href="/solicitar" className="btn btn-primary">
-              Solicitar serviço <ArrowRight size={18} />
-            </Link>
-          </div>
-        </div>
-
-        {pro.bio && <p style={{ color: "var(--ink-soft)", fontSize: 16, lineHeight: 1.6, maxWidth: 680, marginTop: 20 }}>{pro.bio}</p>}
-
-        {/* Especialidades */}
-        <Secao titulo="Especialidades e avaliações">
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 14 }}>
-            {skills.map((s) => (
-              <div key={s.specialty} className="card" style={{ padding: 18 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                  <strong style={{ fontSize: 15.5 }}>{SPEC_LABEL[s.specialty] ?? s.specialty}</strong>
-                  <span style={{ fontSize: 12.5, color: "var(--ink-faint)" }}>{s.years_experience} anos</span>
+        <section className="container perfil-hero" aria-labelledby="perfil-nome">
+          <TimelineContent>
+            <div className="perfil-capa-nova">
+              {pro.banner_url ? (
+                // A origem muda por ambiente; manter img evita uma allowlist frágil no next.config.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={pro.banner_url} alt={`Capa do perfil de ${nome}`} />
+              ) : (
+                <div className="perfil-capa-vazia" aria-hidden="true">
+                  <span />
+                  <span />
+                  <span />
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <Estrelas nota={s.rating_avg} size={15} />
-                  <strong style={{ fontSize: 14 }}>{s.rating_avg.toFixed(1)}</strong>
-                  <span style={{ fontSize: 13, color: "var(--ink-faint)" }}>({s.rating_count}) · {s.jobs_completed} serviços</span>
-                </div>
+              )}
+              <div className="perfil-capa-scrim" />
+              <div className="perfil-capa-label">
+                <span className="perfil-capa-asterisco" aria-hidden="true">✦</span>
+                Profissional FrioHub
               </div>
-            ))}
+              {verificado && (
+                <span className="perfil-selo perfil-selo-capa"><Shield size={15} /> Perfil verificado</span>
+              )}
+            </div>
+          </TimelineContent>
+
+          <div className="perfil-apresentacao">
+            <TimelineContent className="perfil-identidade" delay={.08}>
+              <span className="perfil-foto perfil-foto-nova">
+                <Avatar nome={nome} id={pro.id} url={avatarUrl} size={116} radius="26px" fontSize={40} />
+              </span>
+              <div className="perfil-identidade-texto">
+                <span className="perfil-tipo">
+                  {pro.tipo === "empresa" ? <Building size={15} /> : <User size={15} />}
+                  {pro.tipo === "empresa" ? "Empresa especializada" : "Profissional autônomo"}
+                </span>
+                <h1 id="perfil-nome" className="perfil-nome">
+                  <VerticalCutReveal>{nome}</VerticalCutReveal>
+                </h1>
+                {pro.tipo === "empresa" && nomePessoa !== nome && (
+                  <p className="perfil-responsavel">Responsável: {nomePessoa}</p>
+                )}
+                <p className="perfil-local"><MapPin size={17} /> {pro.cidade} — {pro.estado}</p>
+              </div>
+            </TimelineContent>
+
+            <TimelineContent className="perfil-acoes-topo" delay={.16}>
+              {usuario && usuario.id !== pro.id && <BotaoMensagem professionalId={pro.id} />}
+              <Link href="/solicitar" className="btn btn-primary btn-lg perfil-cta-topo">
+                Solicitar serviço <ArrowRight size={18} />
+              </Link>
+            </TimelineContent>
           </div>
-        </Secao>
 
-        {tagsPorCategoria.size > 0 && (
-          <Secao titulo="O que este profissional faz">
-            <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-              {["servico", "equipamento", "ambiente", "credencial"].map((cat) => {
-                const itens = tagsPorCategoria.get(cat);
-                if (!itens?.length) return null;
-                return (
-                  <div key={cat}>
-                    <h3 style={{ fontSize: 12.5, fontWeight: 650, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--ink-faint)", margin: "0 0 10px" }}>
-                      {CAT_TITULO[cat] ?? cat}
-                    </h3>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                      {itens.map((label) => (
-                        <span key={label} style={{ fontSize: 13.5, padding: "7px 13px", borderRadius: 100, border: "1px solid var(--line)", background: "var(--surface)", color: "var(--ink-soft)" }}>
-                          {label}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
+          <TimelineContent className="perfil-metricas" delay={.2}>
+            <div className="perfil-metrica">
+              <strong>{(pro.anos_experiencia ?? 0) > 0 ? `${pro.anos_experiencia}+` : "Novo"}</strong>
+              <span>{pro.anos_experiencia === 1 ? "ano de experiência" : "anos de experiência"}</span>
             </div>
-          </Secao>
-        )}
+            <div className="perfil-metrica">
+              <strong>{totalJobs || "—"}</strong>
+              <span>{totalJobs === 1 ? "serviço concluído" : "serviços concluídos"}</span>
+            </div>
+            <div className="perfil-metrica perfil-metrica-nota">
+              <strong>{totalReviews ? notaGeral.toFixed(1) : "—"}</strong>
+              <span>{totalReviews ? <><Estrelas nota={notaGeral} size={14} /> {totalReviews} avaliações</> : "ainda sem avaliações"}</span>
+            </div>
+          </TimelineContent>
 
-        {/* Portfólio: antes e depois lado a lado */}
-        {paresPortfolio.length > 0 && (
-          <Secao titulo="Trabalhos realizados">
-            <div className="pf-grade">
-              {paresPortfolio.map((par) => (
-                <figure key={par.chave} className="pf-par">
-                  <div className="pf-fotos">
-                    {par.antes && (
-                      <span className="pf-foto">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={par.antes.url} alt="Antes do serviço" />
-                        <span className="pf-tag">Antes</span>
-                      </span>
-                    )}
-                    {par.depois && (
-                      <span className="pf-foto">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={par.depois.url} alt="Depois do serviço" />
-                        <span className="pf-tag pf-tag-depois">Depois</span>
-                      </span>
-                    )}
-                  </div>
-                  {par.caption && <figcaption className="pf-legenda">{par.caption}</figcaption>}
-                </figure>
-              ))}
-            </div>
-          </Secao>
-        )}
+          <nav className="perfil-nav" aria-label="Navegação do perfil">
+            <a href="#sobre">Sobre</a>
+            <a href="#especialidades">Especialidades</a>
+            {temPortfolio && <a href="#portfolio">Portfólio</a>}
+            {temReviews && <a href="#avaliacoes">Avaliações</a>}
+          </nav>
+        </section>
 
-        {/* Avaliações */}
-        {reviews && reviews.length > 0 && (
-          <Secao titulo="O que os clientes dizem">
-            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              {reviews.map((r, i) => {
-                const cli = one(r.cliente)?.nome ?? "Cliente";
-                return (
-                  <div key={i} className="card" style={{ padding: 18 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: r.comment ? 8 : 0 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <Estrelas nota={r.rating} size={14} />
-                        <span style={{ fontSize: 13.5, color: "var(--ink-faint)" }}>{cli} · {SPEC_LABEL[r.specialty] ?? r.specialty}</span>
-                      </div>
-                    </div>
-                    {r.comment && <p style={{ fontSize: 15, color: "var(--ink-soft)" }}>{r.comment}</p>}
+        <div className="container perfil-conteudo-grid">
+          <div className="perfil-coluna-principal">
+            <TimelineContent>
+              <Secao id="sobre" marcador="Quem vai atender você" titulo="Experiência que inspira confiança">
+                <p className="perfil-bio">
+                  {pro.bio || `${nome} atende projetos de climatização em ${pro.cidade}, com foco em um serviço claro, cuidadoso e bem executado.`}
+                </p>
+              </Secao>
+            </TimelineContent>
+
+            {skills.length > 0 && (
+              <TimelineContent>
+                <Secao id="especialidades" marcador="Conhecimento técnico" titulo="Especialidades e experiência">
+                  <div className="perfil-skills-grade">
+                    {skills.map((skill) => (
+                      <article key={skill.specialty} className="perfil-skill-card">
+                        <div className="perfil-skill-icone"><Check size={18} /></div>
+                        <div className="perfil-skill-corpo">
+                          <div className="perfil-skill-titulo">
+                            <h3>{SPEC_LABEL[skill.specialty] ?? skill.specialty}</h3>
+                            <span>{skill.years_experience} {skill.years_experience === 1 ? "ano" : "anos"}</span>
+                          </div>
+                          {skill.rating_count > 0 ? (
+                            <div className="perfil-skill-nota">
+                              <Estrelas nota={skill.rating_avg} size={14} />
+                              <strong>{skill.rating_avg.toFixed(1)}</strong>
+                              <span>({skill.rating_count}) · {skill.jobs_completed} serviços</span>
+                            </div>
+                          ) : (
+                            <p className="perfil-skill-novo">Especialidade adicionada recentemente</p>
+                          )}
+                        </div>
+                      </article>
+                    ))}
                   </div>
-                );
-              })}
-            </div>
-          </Secao>
-        )}
+                </Secao>
+              </TimelineContent>
+            )}
+
+            {tagsPorCategoria.size > 0 && (
+              <TimelineContent>
+                <Secao marcador="Atuação detalhada" titulo="O que este profissional faz">
+                  <div className="perfil-tags-grupos">
+                    {["servico", "equipamento", "ambiente", "credencial"].map((categoria) => {
+                      const itens = tagsPorCategoria.get(categoria);
+                      if (!itens?.length) return null;
+                      return (
+                        <div className="perfil-tags-grupo" key={categoria}>
+                          <h3>{CAT_TITULO[categoria] ?? categoria}</h3>
+                          <div className="perfil-tags">
+                            {itens.map((label) => <span key={label}>{label}</span>)}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Secao>
+              </TimelineContent>
+            )}
+
+            {temPortfolio && (
+              <TimelineContent>
+                <Secao id="portfolio" marcador="Resultados reais" titulo="Trabalhos realizados">
+                  <div className="pf-grade perfil-portfolio-grade">
+                    {paresPortfolio.map((par) => (
+                      <figure key={par.chave} className="pf-par perfil-portfolio-card">
+                        <div className="pf-fotos">
+                          {par.antes && (
+                            <span className="pf-foto">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={par.antes.url} alt={`Antes${par.caption ? `: ${par.caption}` : " do serviço"}`} />
+                              <span className="pf-tag">Antes</span>
+                            </span>
+                          )}
+                          {par.depois && (
+                            <span className="pf-foto">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={par.depois.url} alt={`Depois${par.caption ? `: ${par.caption}` : " do serviço"}`} />
+                              <span className="pf-tag pf-tag-depois">Depois</span>
+                            </span>
+                          )}
+                        </div>
+                        {par.caption && <figcaption className="pf-legenda">{par.caption}</figcaption>}
+                      </figure>
+                    ))}
+                  </div>
+                </Secao>
+              </TimelineContent>
+            )}
+
+            {temReviews && (
+              <TimelineContent>
+                <Secao id="avaliacoes" marcador="Reputação na plataforma" titulo="O que os clientes dizem">
+                  <div className="perfil-reviews">
+                    {reviews.map((review, indice) => {
+                      const cliente = one(review.cliente)?.nome ?? "Cliente";
+                      return (
+                        <article key={`${review.created_at}-${indice}`} className="perfil-review-card">
+                          <div className="perfil-review-topo">
+                            <div>
+                              <strong>{cliente}</strong>
+                              <span>{SPEC_LABEL[review.specialty] ?? review.specialty}</span>
+                            </div>
+                            <Estrelas nota={review.rating} size={15} />
+                          </div>
+                          {review.comment && <blockquote>“{review.comment}”</blockquote>}
+                          <time dateTime={review.created_at}>
+                            {new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(new Date(review.created_at))}
+                          </time>
+                        </article>
+                      );
+                    })}
+                  </div>
+                </Secao>
+              </TimelineContent>
+            )}
+          </div>
+
+          <aside className="perfil-aside" aria-label="Contratar profissional">
+            <TimelineContent>
+              <div className="perfil-contato-card">
+                <span className="perfil-contato-icone"><Chat size={22} /></span>
+                <p className="perfil-contato-kicker">Pronto para começar?</p>
+                <h2>Converse sobre seu serviço</h2>
+                <p>Conte o que precisa e receba uma proposta com escopo, prazo e valor.</p>
+                <Link href="/solicitar" className="btn btn-primary btn-block">
+                  Solicitar orçamento <ArrowRight size={18} />
+                </Link>
+                {usuario && usuario.id !== pro.id && <BotaoMensagem professionalId={pro.id} />}
+                <span className="perfil-contato-seguranca"><Shield size={15} /> Seus dados ficam protegidos</span>
+              </div>
+            </TimelineContent>
+          </aside>
+        </div>
+
+        <div className="perfil-cta-mobile">
+          <Link href="/solicitar" className="btn btn-primary btn-block">Solicitar serviço <ArrowRight size={18} /></Link>
+        </div>
       </main>
       <SiteFooter />
     </>
   );
 }
 
-function Secao({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+function Secao({
+  id,
+  marcador,
+  titulo,
+  children,
+}: {
+  id?: string;
+  marcador: string;
+  titulo: string;
+  children: React.ReactNode;
+}) {
   return (
-    <section style={{ marginTop: 40 }}>
-      <h2 style={{ fontSize: "1.25rem", fontWeight: 700, marginBottom: 16 }}>{titulo}</h2>
+    <section id={id} className="perfil-secao">
+      <p className="perfil-secao-marcador"><span aria-hidden="true">✦</span>{marcador}</p>
+      <h2>{titulo}</h2>
       {children}
     </section>
   );

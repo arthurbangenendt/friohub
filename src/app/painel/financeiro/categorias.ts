@@ -10,6 +10,7 @@ export const CATEGORIAS_DESPESA = [
   { id: "deslocamento", label: "Deslocamento" },
   { id: "material", label: "Material" },
   { id: "ferramenta", label: "Ferramenta" },
+  { id: "locacao", label: "Locação de ferramenta" },
   { id: "gas", label: "Gás refrigerante" },
   { id: "terceiros", label: "Ajudante / terceiros" },
   { id: "imposto", label: "Imposto / taxa" },

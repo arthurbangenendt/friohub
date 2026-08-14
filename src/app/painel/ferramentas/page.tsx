@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { wrap } from "../shared";
 import { CalculadoraBtu } from "./CalculadoraBtu";
+import { FerramentasEditor, type Ferramenta } from "./FerramentasEditor";
 
 /* Referências de bancada. Valores usuais de mercado para consulta rápida — não
    substituem o manual do fabricante nem a norma, e a tela diz isso. */
@@ -39,12 +40,28 @@ export default async function FerramentasPage() {
   const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
   if (profile?.role !== "profissional") redirect("/painel");
 
+  const { data: ferramentasData } = await supabase
+    .from("professional_tools")
+    .select("id, name, category, brand, model, notes, quantity, purchase_price, expense_id, acquired_on")
+    .order("created_at", { ascending: false });
+  const ferramentas = ((ferramentasData ?? []) as Ferramenta[]).map((item) => ({
+    ...item,
+    purchase_price: item.purchase_price === null ? null : Number(item.purchase_price),
+  }));
+
   return (
     <div style={wrap}>
       <h1 style={{ fontSize: "1.9rem", fontWeight: 800, letterSpacing: "-0.025em", margin: "0 0 6px" }}>Ferramentas</h1>
       <p style={{ color: "var(--ink-soft)", margin: "0 0 28px" }}>
-        Consulta rápida para usar na visita técnica.
+        Organize seu inventário e acesse referências rápidas para a visita técnica.
       </p>
+
+      <FerramentasEditor inicial={ferramentas} />
+
+      <div style={{ margin: "34px 0 14px" }}>
+        <p className="eyebrow">Apoio técnico</p>
+        <h2 style={{ fontSize: "1.35rem", fontWeight: 800, marginTop: 4 }}>Referências de campo</h2>
+      </div>
 
       <section className="card" style={{ padding: 24 }}>
         <h2 style={h2}>Calculadora de carga térmica</h2>

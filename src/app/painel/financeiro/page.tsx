@@ -171,6 +171,16 @@ export default async function FinanceiroPage({ searchParams }: PageProps<"/paine
       </section>
 
       {isPro && (
+        <section style={{ marginTop: 22 }}>
+          <h2 style={{ fontSize: "1.05rem", fontWeight: 700, margin: "0 0 4px" }}>Despesas</h2>
+          <p style={{ fontSize: 13, color: "var(--ink-soft)", margin: "0 0 16px" }}>
+            Compras de ferramentas entram automaticamente quando você informa o valor. Lance aqui gasolina, locação e os demais custos da operação.
+          </p>
+          <DespesasEditor inicial={despesas} periodo={rotuloPeriodo(periodo)} />
+        </section>
+      )}
+
+      {isPro && (
         <section className="card" style={{ padding: 24, marginTop: 16 }}>
           <h2 style={{ fontSize: "1.05rem", fontWeight: 700, margin: "0 0 4px" }}>Repasses da plataforma</h2>
           <p style={{ fontSize: 13, color: "var(--ink-soft)", margin: "0 0 16px" }}>
@@ -203,15 +213,6 @@ export default async function FinanceiroPage({ searchParams }: PageProps<"/paine
         </section>
       )}
 
-      {isPro && (
-        <section className="card" style={{ padding: 24, marginTop: 16 }}>
-          <h2 style={{ fontSize: "1.05rem", fontWeight: 700, margin: "0 0 4px" }}>Despesas</h2>
-          <p style={{ fontSize: 13, color: "var(--ink-soft)", margin: "0 0 16px" }}>
-            Deslocamento, gás, peça, ajudante. É o que separa faturamento de lucro.
-          </p>
-          <DespesasEditor inicial={despesas} />
-        </section>
-      )}
     </div>
   );
 }

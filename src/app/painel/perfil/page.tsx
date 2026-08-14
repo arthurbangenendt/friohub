@@ -79,7 +79,8 @@ export default async function PerfilPage() {
       )}
       <div className="card" style={{ padding: 26, marginTop: 8 }}>
         <MidiaEditor uid={user.id} nome={profile?.nome ?? "Profissional"}
-          avatarUrl={profile?.avatar_url ?? null} bannerUrl={pro?.banner_url ?? null} mostrarBanner />
+          avatarUrl={profile?.avatar_url ?? null} bannerUrl={pro?.banner_url ?? null}
+          mostrarBanner bannerHabilitado={!!pro} />
       </div>
 
       <div className="card" style={{ padding: 26, marginTop: 16 }}>

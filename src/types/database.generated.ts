@@ -2334,6 +2334,73 @@ export type Database = {
           },
         ]
       }
+      professional_tools: {
+        Row: {
+          acquired_on: string
+          brand: string | null
+          category: string
+          created_at: string
+          expense_id: string | null
+          id: string
+          model: string | null
+          name: string
+          notes: string | null
+          professional_id: string
+          purchase_price: number | null
+          quantity: number
+        }
+        Insert: {
+          acquired_on?: string
+          brand?: string | null
+          category?: string
+          created_at?: string
+          expense_id?: string | null
+          id?: string
+          model?: string | null
+          name: string
+          notes?: string | null
+          professional_id: string
+          purchase_price?: number | null
+          quantity?: number
+        }
+        Update: {
+          acquired_on?: string
+          brand?: string | null
+          category?: string
+          created_at?: string
+          expense_id?: string | null
+          id?: string
+          model?: string | null
+          name?: string
+          notes?: string | null
+          professional_id?: string
+          purchase_price?: number | null
+          quantity?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "professional_tools_expense_id_fkey"
+            columns: ["expense_id"]
+            isOneToOne: true
+            referencedRelation: "expenses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "professional_tools_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
+            referencedRelation: "diretorio_profissionais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "professional_tools_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
+            referencedRelation: "professionals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       professionals: {
         Row: {
           anos_experiencia: number

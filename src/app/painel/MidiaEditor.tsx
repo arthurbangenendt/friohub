@@ -1,13 +1,21 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "./Avatar";
+import { removerMidiaPerfil, salvarMidiaPerfil } from "./perfil/actions";
 
 const MAX_MB = 5;
 
 type Alvo = "avatar" | "banner";
+
+const FORMATOS: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/avif": "avif",
+};
 
 /* Avatar e banner são 1:1 e substituíveis — diferente do portfólio, que
    acumula. Por isso o arquivo antigo é removido do storage depois que o novo
@@ -16,15 +24,16 @@ type Alvo = "avatar" | "banner";
    Segue o mesmo padrão de upload do PortfolioEditor (valida tipo e tamanho,
    grava em {uid}/ e usa a URL pública). */
 export function MidiaEditor({
-  uid, nome, avatarUrl, bannerUrl, mostrarBanner,
+  uid, nome, avatarUrl, bannerUrl, mostrarBanner, bannerHabilitado = true,
 }: {
   uid: string;
   nome: string;
   avatarUrl: string | null;
   bannerUrl: string | null;
   mostrarBanner: boolean;
+  bannerHabilitado?: boolean;
 }) {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const [avatar, setAvatar] = useState(avatarUrl);
   const [banner, setBanner] = useState(bannerUrl);
@@ -44,26 +53,30 @@ export function MidiaEditor({
 
   async function enviar(alvo: Alvo, file: File) {
     setErro(null);
-    if (!file.type.startsWith("image/")) { setErro("Envie apenas imagens."); return; }
+    if (alvo === "banner" && !bannerHabilitado) {
+      setErro("Salve primeiro as informações do perfil profissional.");
+      return;
+    }
+    const ext = FORMATOS[file.type];
+    if (!ext) { setErro("Use uma imagem JPG, PNG, WebP ou AVIF."); return; }
     if (file.size > MAX_MB * 1024 * 1024) { setErro(`A imagem deve ter até ${MAX_MB} MB.`); return; }
 
     setEnviando(alvo);
     try {
-      const ext = file.name.split(".").pop() || "jpg";
       const path = `${uid}/${alvo}-${crypto.randomUUID()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from("perfil").upload(path, file);
+      const { error: upErr } = await supabase.storage.from("perfil").upload(path, file, {
+        cacheControl: "31536000",
+        contentType: file.type,
+      });
       if (upErr) { setErro(upErr.message); return; }
 
       const { data: pub } = supabase.storage.from("perfil").getPublicUrl(path);
+      const salvo = await salvarMidiaPerfil(alvo, pub.publicUrl);
 
-      const { error: dbErr } = alvo === "avatar"
-        ? await supabase.from("profiles").update({ avatar_url: pub.publicUrl }).eq("id", uid)
-        : await supabase.from("professionals").update({ banner_url: pub.publicUrl }).eq("id", uid);
-
-      if (dbErr) {
+      if (!salvo.ok) {
         // Não deixa arquivo órfão no bucket quando a gravação da URL falha.
         await supabase.storage.from("perfil").remove([path]);
-        setErro(dbErr.message);
+        setErro(salvo.error);
         return;
       }
 
@@ -81,10 +94,8 @@ export function MidiaEditor({
   async function limpar(alvo: Alvo) {
     setErro(null);
     const atual = alvo === "avatar" ? avatar : banner;
-    const { error } = alvo === "avatar"
-      ? await supabase.from("profiles").update({ avatar_url: null }).eq("id", uid)
-      : await supabase.from("professionals").update({ banner_url: null }).eq("id", uid);
-    if (error) { setErro(error.message); return; }
+    const removido = await removerMidiaPerfil(alvo);
+    if (!removido.ok) { setErro(removido.error); return; }
     if (alvo === "avatar") setAvatar(null); else setBanner(null);
     await removerAntigo(atual);
     router.refresh();
@@ -105,7 +116,9 @@ export function MidiaEditor({
               <img src={banner} alt="Banner do perfil" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             )}
             <div style={{ position: "absolute", right: 10, bottom: 10, display: "flex", gap: 8 }}>
-              <button type="button" onClick={() => refBanner.current?.click()} disabled={enviando !== null} style={btnSobre}>
+              <button type="button" onClick={() => refBanner.current?.click()} disabled={enviando !== null || !bannerHabilitado}
+                aria-describedby={!bannerHabilitado ? "banner-bloqueado" : undefined}
+                style={{ ...btnSobre, opacity: bannerHabilitado ? 1 : .65, cursor: bannerHabilitado ? "pointer" : "not-allowed" }}>
                 {enviando === "banner" ? "Enviando..." : banner ? "Trocar" : "Adicionar banner"}
               </button>
               {banner && <button type="button" onClick={() => limpar("banner")} style={btnSobre}>Remover</button>}
@@ -113,7 +126,11 @@ export function MidiaEditor({
           </div>
           <input ref={refBanner} type="file" accept="image/*" style={{ display: "none" }}
             onChange={(e) => { const f = e.target.files?.[0]; if (f) enviar("banner", f); }} />
-          <span style={dica}>Aparece no topo do seu perfil público. Use uma imagem larga (1200×300 ou similar).</span>
+          <span id={!bannerHabilitado ? "banner-bloqueado" : undefined} style={dica}>
+            {bannerHabilitado
+              ? "Aparece no topo do seu perfil público. Use uma imagem larga (1200×300 ou similar)."
+              : "Salve as informações profissionais abaixo para liberar o banner."}
+          </span>
         </div>
       )}
 

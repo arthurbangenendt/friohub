@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Avatar } from "../../Avatar";
 import { mono, one, wrap } from "../../shared";
 import { marcarLida } from "../actions";
-import { Thread, type Mensagem } from "./Thread";
+import { Thread, type Mensagem, type ParticipanteAuditoria } from "./Thread";
 import { Handoff } from "./Handoff";
 
 export default async function ConversaPage({ params }: { params: Promise<{ id: string }> }) {
@@ -12,6 +12,13 @@ export default async function ConversaPage({ params }: { params: Promise<{ id: s
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  const { data: perfilLogado } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+  const admin = perfilLogado?.role === "admin";
 
   const { data: conversa } = await supabase
     .from("conversations")
@@ -26,15 +33,19 @@ export default async function ConversaPage({ params }: { params: Promise<{ id: s
 
   const souCliente = conversa.cliente_id === user.id;
   const souProfissional = conversa.professional_id === user.id;
-  if (!souCliente && !souProfissional) redirect("/painel/mensagens");
+  if (!souCliente && !souProfissional && !admin) redirect("/painel/mensagens");
 
   /* O PostgREST devolve o embed como objeto ou array conforme a inferência da
      relação — daí o `one()` em cada nível. Ver o mesmo tratamento em
      `servico/[id]/page.tsx`. */
   type PerfilEmbed = { nome: string; avatar_url: string | null };
+  const perfilCliente = one(conversa.cliente as unknown as PerfilEmbed | PerfilEmbed[] | null);
+  const perfilProfissional = one(
+    one(conversa.profissional as unknown as { profiles: PerfilEmbed | PerfilEmbed[] } | null)?.profiles,
+  );
   const perfilOutro = souCliente
-    ? one(one(conversa.profissional as unknown as { profiles: PerfilEmbed | PerfilEmbed[] } | null)?.profiles)
-    : one(conversa.cliente as unknown as PerfilEmbed | PerfilEmbed[] | null);
+    ? perfilProfissional
+    : perfilCliente;
 
   const outroId = souCliente ? conversa.professional_id : conversa.cliente_id;
   const outroNome = perfilOutro?.nome ?? (souCliente ? "Profissional" : "Cliente");
@@ -45,56 +56,92 @@ export default async function ConversaPage({ params }: { params: Promise<{ id: s
     .eq("conversation_id", id)
     .order("created_at", { ascending: true });
 
-  // Abrir a conversa é o que marca como lida — mesma semântica de qualquer app
-  // de mensagem. Roda depois de carregar, para a badge sumir na próxima visita.
-  await marcarLida(id);
+  /* O admin observa, mas não é destinatário. Marcar como lida aqui apagaria a
+     pendência real de cliente ou profissional e adulteraria a operação. */
+  if (!admin) await marcarLida(id);
 
   /* `jobJuntos` não decide o handoff — quem decide é `handoff_liberado` no banco.
      Serve só para o card dizer o motivo certo: liberar por serviço fechado e
      escrever "vocês já conversam há alguns dias" faz o produto parecer quebrado
      logo no primeiro contato. */
-  const [{ data: liberado }, { data: consentimentos }, { count: jobsJuntos }] = await Promise.all([
-    supabase.rpc("handoff_liberado", { p_conversation_id: id }),
-    supabase.from("conversation_contact_consent").select("user_id").eq("conversation_id", id),
-    supabase
-      .from("jobs")
-      .select("id", { count: "exact", head: true })
-      .eq("cliente_id", conversa.cliente_id)
-      .eq("profissional_id", conversa.professional_id)
-      .in("status", ["aceito", "em_execucao", "concluido", "avaliado"]),
-  ]);
+  const handoff = admin
+    ? { liberado: false, consentimentos: [] as { user_id: string }[], jobsJuntos: 0 }
+    : await (async () => {
+      const [{ data: liberado }, { data: consentimentos }, { count: jobsJuntos }] = await Promise.all([
+        supabase.rpc("handoff_liberado", { p_conversation_id: id }),
+        supabase.from("conversation_contact_consent").select("user_id").eq("conversation_id", id),
+        supabase
+          .from("jobs")
+          .select("id", { count: "exact", head: true })
+          .eq("cliente_id", conversa.cliente_id)
+          .eq("profissional_id", conversa.professional_id)
+          .in("status", ["aceito", "em_execucao", "concluido", "avaliado"]),
+      ]);
+      return { liberado: liberado === true, consentimentos: consentimentos ?? [], jobsJuntos: jobsJuntos ?? 0 };
+    })();
 
-  const quemAutorizou = new Set((consentimentos ?? []).map((c) => (c as { user_id: string }).user_id));
+  const quemAutorizou = new Set(handoff.consentimentos.map((c) => c.user_id));
+  const participantesAuditoria: [ParticipanteAuditoria, ParticipanteAuditoria] = [
+    {
+      id: conversa.cliente_id,
+      nome: perfilCliente?.nome ?? "Cliente",
+      avatar: perfilCliente?.avatar_url ?? null,
+      papel: "Cliente",
+    },
+    {
+      id: conversa.professional_id,
+      nome: perfilProfissional?.nome ?? "Profissional",
+      avatar: perfilProfissional?.avatar_url ?? null,
+      papel: "Profissional",
+    },
+  ];
 
   return (
-    <div style={{ ...wrap, maxWidth: 760 }}>
+    <div style={{ ...wrap, maxWidth: admin ? 900 : 760 }}>
       <Link href="/painel/mensagens" style={{ fontFamily: mono, fontSize: 13, color: "var(--ink-faint)" }}>
-        ← Mensagens
+        ← {admin ? "Todas as conversas" : "Mensagens"}
       </Link>
 
       {/* Cabeçalho no formato de DM: avatar + nome, e o perfil a um toque. */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "18px 0 22px" }}>
-        <Avatar nome={outroNome} id={outroId} url={perfilOutro?.avatar_url ?? null} size={44} />
-        <div>
-          <div style={{ fontWeight: 700, fontSize: 17 }}>{outroNome}</div>
-          {souCliente ? (
-            <Link href={`/profissional/${conversa.professional_id}`} style={{ fontSize: 12.5, color: "var(--cool-deep)", fontWeight: 600 }}>
-              Ver perfil
-            </Link>
-          ) : (
-            <span style={{ fontSize: 12.5, color: "var(--ink-faint)" }}>Cliente</span>
-          )}
+      {admin ? (
+        <div className="chat-auditoria-cabecalho">
+          <div className="chat-auditoria-titulo">
+            <span>Auditoria da conversa</span>
+            <strong>{participantesAuditoria[0].nome} ↔ {participantesAuditoria[1].nome}</strong>
+          </div>
+          <div className="chat-auditoria-participantes">
+            {participantesAuditoria.map((participante) => (
+              <div key={participante.id}>
+                <Avatar nome={participante.nome} id={participante.id} url={participante.avatar} size={40} />
+                <span><strong>{participante.nome}</strong><small>{participante.papel}</small></span>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      ) : (
+        <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "18px 0 22px" }}>
+          <Avatar nome={outroNome} id={outroId} url={perfilOutro?.avatar_url ?? null} size={44} />
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 17 }}>{outroNome}</div>
+            {souCliente ? (
+              <Link href={`/profissional/${conversa.professional_id}`} style={{ fontSize: 12.5, color: "var(--cool-deep)", fontWeight: 600 }}>
+                Ver perfil
+              </Link>
+            ) : (
+              <span style={{ fontSize: 12.5, color: "var(--ink-faint)" }}>Cliente</span>
+            )}
+          </div>
+        </div>
+      )}
 
-      {liberado === true && (
+      {handoff.liberado && (
         <div style={{ marginBottom: 18 }}>
           <Handoff
             conversaId={id}
             outroNome={outroNome}
             jaAutorizei={quemAutorizou.has(user.id)}
             ambosAutorizaram={quemAutorizou.has(user.id) && quemAutorizou.has(outroId)}
-            motivo={(jobsJuntos ?? 0) > 0 ? "servico" : "conversa"}
+            motivo={handoff.jobsJuntos > 0 ? "servico" : "conversa"}
           />
         </div>
       )}
@@ -106,6 +153,8 @@ export default async function ConversaPage({ params }: { params: Promise<{ id: s
         outroNome={outroNome}
         outroAvatar={perfilOutro?.avatar_url ?? null}
         iniciais={(msgs ?? []) as Mensagem[]}
+        somenteLeitura={admin}
+        participantesAuditoria={admin ? participantesAuditoria : undefined}
       />
     </div>
   );

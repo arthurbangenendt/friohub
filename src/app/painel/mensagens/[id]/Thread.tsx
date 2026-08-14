@@ -13,6 +13,13 @@ export type Mensagem = {
   created_at: string;
 };
 
+export type ParticipanteAuditoria = {
+  id: string;
+  nome: string;
+  avatar: string | null;
+  papel: "Cliente" | "Profissional";
+};
+
 const hora = (iso: string) =>
   new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 
@@ -39,6 +46,7 @@ const RESPOSTAS_RAPIDAS = [
    muito tempo — repetir a foto em cada linha de uma sequência polui. */
 export function Thread({
   conversaId, meuId, outroId, outroNome, outroAvatar, iniciais,
+  somenteLeitura = false, participantesAuditoria,
 }: {
   conversaId: string;
   meuId: string;
@@ -46,6 +54,8 @@ export function Thread({
   outroNome: string;
   outroAvatar: string | null;
   iniciais: Mensagem[];
+  somenteLeitura?: boolean;
+  participantesAuditoria?: [ParticipanteAuditoria, ParticipanteAuditoria];
 }) {
   const [mensagens, setMensagens] = useState<Mensagem[]>(iniciais);
   const [texto, setTexto] = useState("");
@@ -137,14 +147,19 @@ export function Thread({
       >
         {mensagens.length === 0 && (
           <p style={{ color: "var(--ink-faint)", fontSize: 14, textAlign: "center", margin: "auto" }}>
-            Nenhuma mensagem ainda. Escreva a primeira.
+            {somenteLeitura ? "Conversa aberta, mas nenhuma mensagem foi enviada." : "Nenhuma mensagem ainda. Escreva a primeira."}
           </p>
         )}
 
         {mensagens.map((m, i) => {
           const meu = m.sender_id === meuId;
+          const autorAuditoria = participantesAuditoria?.find((participante) => participante.id === m.sender_id);
+          const alinhadaDireita = somenteLeitura
+            ? autorAuditoria?.papel === "Profissional"
+            : meu;
           const anterior = mensagens[i - 1];
           const novoDia = !anterior || diaLabel(anterior.created_at) !== diaLabel(m.created_at);
+          const inicioDaSequencia = !anterior || anterior.sender_id !== m.sender_id;
           // Última de uma sequência do mesmo autor: é nela que o avatar aparece.
           const proxima = mensagens[i + 1];
           const fimDaSequencia = !proxima || proxima.sender_id !== m.sender_id;
@@ -161,36 +176,58 @@ export function Thread({
                   display: "flex",
                   gap: 8,
                   alignItems: "flex-end",
-                  justifyContent: meu ? "flex-end" : "flex-start",
+                  justifyContent: alinhadaDireita ? "flex-end" : "flex-start",
                   marginBottom: fimDaSequencia ? 8 : 2,
                 }}
               >
-                {!meu && (
+                {!alinhadaDireita && (
                   <span style={{ width: 28, flexShrink: 0 }}>
                     {fimDaSequencia && (
-                      <Avatar nome={outroNome} id={outroId} url={outroAvatar} size={28} />
+                      <Avatar
+                        nome={autorAuditoria?.nome ?? outroNome}
+                        id={autorAuditoria?.id ?? outroId}
+                        url={autorAuditoria?.avatar ?? outroAvatar}
+                        size={28}
+                      />
                     )}
                   </span>
                 )}
-                <div
-                  title={hora(m.created_at)}
-                  style={{
-                    maxWidth: "72%",
-                    padding: "9px 14px",
-                    borderRadius: 18,
-                    // Canto "colado" no lado de quem falou, como em app de mensagem.
-                    borderBottomRightRadius: meu && fimDaSequencia ? 5 : 18,
-                    borderBottomLeftRadius: !meu && fimDaSequencia ? 5 : 18,
-                    background: meu ? "var(--cool)" : "var(--surface-2)",
-                    color: meu ? "#fff" : "var(--ink)",
-                    fontSize: 14.5,
-                    lineHeight: 1.45,
-                    whiteSpace: "pre-wrap",
-                    wordBreak: "break-word",
-                  }}
-                >
-                  {m.body}
+                <div style={{ maxWidth: "72%", minWidth: 0 }}>
+                  {somenteLeitura && inicioDaSequencia && (
+                    <div style={{
+                      margin: alinhadaDireita ? "0 4px 4px 0" : "0 0 4px 4px",
+                      textAlign: alinhadaDireita ? "right" : "left",
+                      color: "var(--ink-faint)", fontSize: 11.5, fontWeight: 650,
+                    }}>
+                      {autorAuditoria?.nome ?? "Participante"} · {autorAuditoria?.papel ?? "Participante"}
+                    </div>
+                  )}
+                  <div
+                    title={hora(m.created_at)}
+                    style={{
+                      padding: "9px 14px",
+                      borderRadius: 18,
+                      // No modo auditoria, cliente fica à esquerda e profissional à direita.
+                      borderBottomRightRadius: alinhadaDireita && fimDaSequencia ? 5 : 18,
+                      borderBottomLeftRadius: !alinhadaDireita && fimDaSequencia ? 5 : 18,
+                      background: alinhadaDireita ? "var(--cool)" : "var(--surface-2)",
+                      color: alinhadaDireita ? "#fff" : "var(--ink)",
+                      fontSize: 14.5,
+                      lineHeight: 1.45,
+                      whiteSpace: "pre-wrap",
+                      wordBreak: "break-word",
+                    }}
+                  >
+                    {m.body}
+                  </div>
                 </div>
+                {somenteLeitura && alinhadaDireita && (
+                  <span style={{ width: 28, flexShrink: 0 }}>
+                    {fimDaSequencia && autorAuditoria && (
+                      <Avatar nome={autorAuditoria.nome} id={autorAuditoria.id} url={autorAuditoria.avatar} size={28} />
+                    )}
+                  </span>
+                )}
               </div>
             </div>
           );
@@ -198,52 +235,60 @@ export function Thread({
         <div ref={fimRef} />
       </div>
 
-      {erro && <p style={{ color: "var(--danger)", fontSize: 13.5, margin: 0 }}>{erro}</p>}
+      {somenteLeitura ? (
+        <div className="chat-auditoria-rodape">
+          Esta conversa é exibida para fins de suporte e auditoria. O administrador não pode enviar, editar ou apagar mensagens.
+        </div>
+      ) : (
+        <>
+          {erro && <p style={{ color: "var(--danger)", fontSize: 13.5, margin: 0 }}>{erro}</p>}
 
-      <div aria-label="Respostas rápidas" style={{ display: "flex", gap: 7, overflowX: "auto", paddingBottom: 2 }}>
-        {RESPOSTAS_RAPIDAS.map((resposta) => (
-          <button
-            key={resposta}
-            type="button"
-            onClick={() => setTexto(resposta)}
-            style={{ flex: "0 0 auto", border: "1px solid var(--line)", borderRadius: 100, background: "var(--surface)", color: "var(--ink-soft)", padding: "7px 11px", font: "inherit", fontSize: 12.5, cursor: "pointer" }}
-          >
-            {resposta.length > 45 ? `${resposta.slice(0, 45)}…` : resposta}
-          </button>
-        ))}
-      </div>
-      <p style={{ margin: "-7px 2px 0", color: "var(--ink-faint)", fontSize: 11.5 }}>
-        A resposta escolhida vai para o campo abaixo: revise antes de enviar.
-      </p>
+          <div aria-label="Respostas rápidas" style={{ display: "flex", gap: 7, overflowX: "auto", paddingBottom: 2 }}>
+            {RESPOSTAS_RAPIDAS.map((resposta) => (
+              <button
+                key={resposta}
+                type="button"
+                onClick={() => setTexto(resposta)}
+                style={{ flex: "0 0 auto", border: "1px solid var(--line)", borderRadius: 100, background: "var(--surface)", color: "var(--ink-soft)", padding: "7px 11px", font: "inherit", fontSize: 12.5, cursor: "pointer" }}
+              >
+                {resposta.length > 45 ? `${resposta.slice(0, 45)}…` : resposta}
+              </button>
+            ))}
+          </div>
+          <p style={{ margin: "-7px 2px 0", color: "var(--ink-faint)", fontSize: 11.5 }}>
+            A resposta escolhida vai para o campo abaixo: revise antes de enviar.
+          </p>
 
-      <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
-        <textarea
-          value={texto}
-          onChange={(e) => setTexto(e.target.value)}
-          onKeyDown={(e) => {
-            // Enter envia; Shift+Enter quebra linha — convenção de app de chat.
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              enviar();
-            }
-          }}
-          rows={1}
-          placeholder="Escreva uma mensagem…"
-          style={{
-            flex: 1, resize: "none", padding: "12px 16px", borderRadius: 22,
-            border: "1px solid var(--line)", background: "var(--surface)",
-            fontSize: 14.5, fontFamily: "inherit", color: "var(--ink)", maxHeight: 140,
-          }}
-        />
-        <button
-          className="btn btn-primary"
-          onClick={enviar}
-          disabled={pending || !texto.trim()}
-          style={{ height: 44, padding: "0 20px", borderRadius: 22 }}
-        >
-          Enviar
-        </button>
-      </div>
+          <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
+            <textarea
+              value={texto}
+              onChange={(e) => setTexto(e.target.value)}
+              onKeyDown={(e) => {
+                // Enter envia; Shift+Enter quebra linha — convenção de app de chat.
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  enviar();
+                }
+              }}
+              rows={1}
+              placeholder="Escreva uma mensagem…"
+              style={{
+                flex: 1, resize: "none", padding: "12px 16px", borderRadius: 22,
+                border: "1px solid var(--line)", background: "var(--surface)",
+                fontSize: 14.5, fontFamily: "inherit", color: "var(--ink)", maxHeight: 140,
+              }}
+            />
+            <button
+              className="btn btn-primary"
+              onClick={enviar}
+              disabled={pending || !texto.trim()}
+              style={{ height: 44, padding: "0 20px", borderRadius: 22 }}
+            >
+              Enviar
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

@@ -44,11 +44,18 @@ export default async function PainelLayout({ children }: LayoutProps<"/painel">)
   /* Contagem de não lidas para a bolinha do menu. `head: true` traz só o total,
      sem as linhas — o layout roda em toda navegação do painel. A RLS de
      `messages` já limita às conversas de quem está logado. */
-  const { count: naoLidas } = await supabase
-    .from("messages")
-    .select("id", { count: "exact", head: true })
-    .is("read_at", null)
-    .neq("sender_id", user.id);
+  /* Para o admin, a RLS libera todas as mensagens para auditoria. Contar
+     `read_at is null` nesse papel mostraria como se TODAS as mensagens ainda
+     não lidas do sistema fossem pendências pessoais dele. O admin acompanha o
+     fluxo, mas não é destinatário; por isso o badge fica restrito aos dois
+     participantes reais. */
+  const { count: naoLidas } = papel === "admin"
+    ? { count: 0 }
+    : await supabase
+      .from("messages")
+      .select("id", { count: "exact", head: true })
+      .is("read_at", null)
+      .neq("sender_id", user.id);
 
   /* Notificações não lidas, trazidas como lista de tipos em vez de contagem:
      com uma consulta só dá para alimentar o sino (total) e os contadores por
