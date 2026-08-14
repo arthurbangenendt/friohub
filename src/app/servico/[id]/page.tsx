@@ -16,6 +16,7 @@ import { STATUS_JOB, resolverMapa } from "@/lib/status";
 import { one } from "@/lib/relacional";
 import { Rastreio, type EtapaId } from "./Rastreio";
 import { Evidencias } from "./Evidencias";
+import { Pagamento } from "./Pagamento";
 
 const mono = "var(--font-geist-mono), ui-monospace, monospace";
 const STATUS = resolverMapa(STATUS_JOB);
@@ -39,6 +40,7 @@ const PAGAMENTO_LABEL: Record<string, string> = {
 };
 
 type OrderView = {
+  id: string;
   preco_produto: number;
   preco_servico: number;
   total: number;
@@ -57,14 +59,14 @@ async function carregarOrder(
   if (isPro) {
     const { data } = await supabase
       .from("orders")
-      .select("preco_produto, preco_servico, comissao_servico, total, payment_status")
+      .select("id, preco_produto, preco_servico, comissao_servico, total, payment_status")
       .eq("job_id", jobId)
       .maybeSingle();
     return data as OrderView | null;
   }
   const { data } = await supabase
     .from("orders_cliente")
-    .select("preco_produto, preco_servico, total, payment_status")
+    .select("id, preco_produto, preco_servico, total, payment_status")
     .eq("job_id", jobId)
     .maybeSingle();
   return data as OrderView | null;
@@ -213,6 +215,15 @@ export default async function ServicoPage({ params }: { params: Promise<{ id: st
                 <Linha k="Pagamento" v={PAGAMENTO_LABEL[order.payment_status] ?? order.payment_status} />
               </>
             )}
+          </div>
+        )}
+
+        {/* Pagamento fica em bloco próprio, e não dentro de "Valores": um é o
+            que foi combinado, o outro é o que aconteceu com o dinheiro. */}
+        {order && !isPro && (
+          <div className="card" style={{ padding: 22 }}>
+            <SecTitle>Pagamento</SecTitle>
+            <Pagamento orderId={order.id} total={order.total} />
           </div>
         )}
 

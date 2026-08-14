@@ -65,6 +65,33 @@ export const STATUS_VERIFICACAO: Record<string, Estado> = {
   rejeitado: { label: "Rejeitado", tom: "erro" },
 };
 
+/* `payment_charges.status` — o ciclo de vida da cobrança no gateway.
+ *
+ * É mais detalhado que `orders.payment_status` de propósito: o gateway
+ * distingue "confirmado" (o pagador autorizou) de "recebido" (o dinheiro
+ * liquidou), e essa diferença importa — só a segunda vira receita. Os rótulos
+ * traduzem isso sem jargão de meio de pagamento. */
+export const STATUS_COBRANCA: Record<string, Estado> = {
+  pending_creation: { label: "Aguardando emissão", tom: "espera" },
+  pending: { label: "Aguardando pagamento", tom: "espera" },
+  confirmed: { label: "Pagamento confirmado", tom: "andamento" },
+  received: { label: "Pago e liquidado", tom: "sucesso" },
+  overdue: { label: "Vencido", tom: "erro" },
+  cancelled: { label: "Cancelado", tom: "neutro" },
+  failed: { label: "Falhou", tom: "erro" },
+  partially_refunded: { label: "Reembolsado em parte", tom: "espera" },
+  refunded: { label: "Reembolsado", tom: "neutro" },
+  disputed: { label: "Em disputa", tom: "erro" },
+};
+
+/** `payment_charges.billing_type`. */
+export const MEIO_COBRANCA: Record<string, string> = {
+  UNDEFINED: "A definir",
+  PIX: "Pix",
+  BOLETO: "Boleto",
+  CREDIT_CARD: "Cartão de crédito",
+};
+
 /** `orders.payment_status`. */
 export const STATUS_PAGAMENTO: Record<string, Estado> = {
   pendente: { label: "Pendente", tom: "espera" },

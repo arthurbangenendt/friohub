@@ -7,6 +7,7 @@ import { GraficoMeses, type PontoMes } from "./GraficoMeses";
 import { DespesasEditor, type Despesa } from "./DespesasEditor";
 import { PERIODOS, chaveMes, comoPeriodo, janela, rotuloPeriodo } from "./periodo";
 import { Doc } from "@/components/icons";
+import { Repasses } from "./Repasses";
 
 export default async function FinanceiroPage({ searchParams }: PageProps<"/painel/financeiro">) {
   const sp = await searchParams;
@@ -168,6 +169,17 @@ export default async function FinanceiroPage({ searchParams }: PageProps<"/paine
         <p style={{ fontSize: 13, color: "var(--ink-soft)", margin: "0 0 6px" }}>{rotuloPeriodo(periodo)}.</p>
         <GraficoMeses dados={serie} comDespesa={isPro} />
       </section>
+
+      {isPro && (
+        <section className="card" style={{ padding: 24, marginTop: 16 }}>
+          <h2 style={{ fontSize: "1.05rem", fontWeight: 700, margin: "0 0 4px" }}>Repasses da plataforma</h2>
+          <p style={{ fontSize: 13, color: "var(--ink-soft)", margin: "0 0 16px" }}>
+            O rateio congelado no momento da cobrança — é o valor efetivamente
+            destinado a você, não um cálculo refeito sobre a comissão atual.
+          </p>
+          <Repasses inicio={inicio} fim={fim} />
+        </section>
+      )}
 
       {isPro && (
         <section className="card" style={{ padding: 24, marginTop: 16 }}>
