@@ -83,7 +83,7 @@ export function Agendamento({ jobId, userId, atual }: {
           <div style={{ display: "flex", gap: 9, flexWrap: "wrap" }}>
             <button className="btn" disabled={pending || motivo.trim().length < 3}
               onClick={() => executar(() => cancelarAgendamento({ jobId, appointmentId: atual.id, motivo }))}
-              style={{ border: "1px solid var(--line)", background: "var(--surface)", color: "#b3261e" }}>
+              style={{ border: "1px solid var(--line)", background: "var(--surface)", color: "var(--danger)" }}>
               Cancelar horário
             </button>
             {atual.status === "proposed" && (
@@ -117,7 +117,7 @@ export function Agendamento({ jobId, userId, atual }: {
         </div>
       )}
 
-      {erro && <p style={{ color: "#b3261e", fontSize: 13.5, margin: 0 }}>{erro}</p>}
+      {erro && <p style={{ color: "var(--danger)", fontSize: 13.5, margin: 0 }}>{erro}</p>}
     </div>
   );
 }

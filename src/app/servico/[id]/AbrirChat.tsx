@@ -31,7 +31,7 @@ export function AbrirChat({ professionalId, jobId, rotulo }: { professionalId: s
         style={{ gap: 8, border: "1px solid var(--line)", background: "var(--surface)" }}>
         <Chat size={17} /> {pending ? "Abrindo…" : rotulo}
       </button>
-      {erro && <p style={{ color: "#b3261e", fontSize: 12.5, margin: "8px 0 0" }}>{erro}</p>}
+      {erro && <p style={{ color: "var(--danger)", fontSize: 12.5, margin: "8px 0 0" }}>{erro}</p>}
     </div>
   );
 }

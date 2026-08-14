@@ -64,7 +64,7 @@ export function AcoesRepasse({ id, status }: { id: string; status: string }) {
           placeholder="Link da nota fiscal (opcional)" style={campo} />
       )}
 
-      {erro && <p style={{ color: "#b3261e", fontSize: 13, margin: 0 }}>{erro}</p>}
+      {erro && <p style={{ color: "var(--danger)", fontSize: 13, margin: 0 }}>{erro}</p>}
 
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         <button className="btn btn-primary" onClick={avancar} disabled={pending}

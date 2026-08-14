@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { apenasDigitos, validarDocumento, validarTelefone } from "@/lib/documento";
 import { TERMOS_VERSAO } from "./termos-versao";
+import { destinoSeguro } from "@/lib/proximo";
 
 const SENHA_MINIMA = 8;
 
@@ -12,13 +13,20 @@ export async function login(formData: FormData) {
 
   const email = String(formData.get("email") ?? "");
   const password = String(formData.get("password") ?? "");
+  /* Sempre passa por `destinoSeguro`: o campo vem de um hidden no formulário,
+     que qualquer um consegue editar. Ver a nota sobre open redirect em
+     `@/lib/proximo`. */
+  const destino = destinoSeguro(formData.get("next"));
 
   const { error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
-    redirect(`/login?error=${encodeURIComponent(error.message)}`);
+    // Preserva o destino no reenvio: errar a senha não pode custar o contexto.
+    const p = new URLSearchParams({ error: error.message });
+    if (destino !== "/painel") p.set("next", destino);
+    redirect(`/login?${p.toString()}`);
   }
-  redirect("/painel");
+  redirect(destino);
 }
 
 /* Toda validação é refeita aqui. O formulário do cliente valida para dar
@@ -41,14 +49,23 @@ export async function signup(formData: FormData) {
   const bruto = String(formData.get("role") ?? "cliente");
   const role = (PAPEIS_PUBLICOS as readonly string[]).includes(bruto) ? bruto : "cliente";
 
-  // Cada papel cai no lugar onde ainda falta trabalho para ele ser encontrável.
+  /* Cada papel cai no lugar onde ainda falta trabalho para ele ser encontrável.
+     Só o cliente respeita o `next`: profissional e distribuidora precisam
+     completar o cadastro antes de qualquer outra coisa, senão entram no
+     marketplace invisíveis. */
+  const proximo = destinoSeguro(formData.get("next"), "");
   const destino =
     role === "profissional" ? "/painel/perfil"
     : role === "distribuidora" ? "/painel/distribuidora/perfil"
-    : "/painel";
+    : proximo || "/painel";
 
-  const falhar = (msg: string) =>
-    redirect(`/signup?error=${encodeURIComponent(msg)}${role !== "cliente" ? `&role=${role}` : ""}`);
+  // Erro de validação não pode custar nem o papel escolhido nem o destino.
+  const falhar = (msg: string) => {
+    const p = new URLSearchParams({ error: msg });
+    if (role !== "cliente") p.set("role", role);
+    if (proximo) p.set("next", proximo);
+    redirect(`/signup?${p.toString()}`);
+  };
 
   if (nome.length < 3) falhar("Informe seu nome completo.");
   if (password.length < SENHA_MINIMA) falhar(`A senha precisa de pelo menos ${SENHA_MINIMA} caracteres.`);

@@ -28,7 +28,7 @@ export function BotaoMensagem({ professionalId }: { professionalId: string }) {
         style={{ flexShrink: 0, gap: 8, border: "1px solid var(--line)", background: "var(--surface)" }}>
         <Chat size={17} /> {pending ? "Abrindo…" : "Enviar mensagem"}
       </button>
-      {erro && <span style={{ color: "#b3261e", fontSize: 12.5 }}>{erro}</span>}
+      {erro && <span style={{ color: "var(--danger)", fontSize: 12.5 }}>{erro}</span>}
     </div>
   );
 }

@@ -3,18 +3,13 @@ import type { CSSProperties } from "react";
 import { formatarBRL } from "@/lib/pricing";
 import { rotuloJob } from "../solicitar/tipos";
 import { MapPin } from "@/components/icons";
+import { STATUS_JOB, resolverMapa } from "@/lib/status";
+import { one } from "@/lib/relacional";
 
 export const mono = "var(--font-geist-mono), ui-monospace, monospace";
 
-export const STATUS: Record<string, { label: string; cor: string; bg: string }> = {
-  aberto: { label: "Aberto", cor: "var(--ink-faint)", bg: "var(--surface-2)" },
-  aguardando_profissional: { label: "Aguardando profissional", cor: "var(--warm)", bg: "var(--warm-wash)" },
-  aceito: { label: "Aceito", cor: "var(--cool-deep)", bg: "var(--cool-wash)" },
-  em_execucao: { label: "Em execução", cor: "var(--cool-deep)", bg: "var(--cool-wash)" },
-  concluido: { label: "Concluído", cor: "#2E8B6F", bg: "#e4f3ee" },
-  avaliado: { label: "Avaliado", cor: "#2E8B6F", bg: "#e4f3ee" },
-  cancelado: { label: "Cancelado", cor: "#b3261e", bg: "#fdeceb" },
-};
+/** Reexportado de `@/lib/status` para não quebrar quem já importa daqui. */
+export const STATUS = resolverMapa(STATUS_JOB);
 
 // `aberto` entra em ativos: é job sem profissional designado, que ainda depende
 // de alguém agir.
@@ -49,9 +44,7 @@ export type OrderRow = {
   payment_status: string;
 };
 
-export function one<T>(v: T | T[] | null | undefined): T | null {
-  return Array.isArray(v) ? v[0] ?? null : v ?? null;
-}
+export { one };
 
 export const dataCurta = (iso: string) =>
   new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });

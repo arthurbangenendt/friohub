@@ -55,7 +55,7 @@ export function PerfilDistribuidoraForm({
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px,1fr))", gap: 12 }}>
         <label><span style={rotulo}>CNPJ</span>
           <input value={cnpj} onChange={(e) => setCnpj(formatarDocumento(e.target.value))} inputMode="numeric" style={campo} />
-          {cnpjInvalido && <span style={{ fontSize: 12.5, color: "#b3261e" }}>CNPJ inválido.</span>}
+          {cnpjInvalido && <span style={{ fontSize: 12.5, color: "var(--danger)" }}>CNPJ inválido.</span>}
         </label>
         <label><span style={rotulo}>Cidade da operação</span>
           <input value={cidade} onChange={(e) => setCidade(e.target.value)} style={campo} /></label>
@@ -87,7 +87,7 @@ export function PerfilDistribuidoraForm({
         </span>
       </div>
 
-      {erro && <p style={{ color: "#b3261e", fontSize: 14, margin: 0 }}>{erro}</p>}
+      {erro && <p style={{ color: "var(--danger)", fontSize: 14, margin: 0 }}>{erro}</p>}
       {salvo && <p style={{ color: "var(--good)", fontSize: 14, fontWeight: 600, margin: 0 }}>Perfil salvo!</p>}
 
       <div>

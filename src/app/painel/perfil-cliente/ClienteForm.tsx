@@ -40,14 +40,14 @@ export function ClienteForm({ nomeInicial, telefoneInicial }: { nomeInicial: str
             o que nunca foi verdade: `profile_private` só é legível pelo próprio dono.
             A conversa acontece no chat, e o telefone só sai daqui se as duas partes
             concordarem em trocar contato. */}
-        <span style={{ fontSize: 12.5, color: telInvalido ? "#b3261e" : "var(--ink-faint)" }}>
+        <span style={{ fontSize: 12.5, color: telInvalido ? "var(--danger)" : "var(--ink-faint)" }}>
           {telInvalido
             ? "Telefone incompleto."
             : "Seu telefone fica privado — não aparece em página pública nem para o profissional. A conversa acontece pelo chat, e o número só é compartilhado se vocês dois autorizarem."}
         </span>
       </label>
 
-      {erro && <p style={{ color: "#b3261e", fontSize: 14, margin: 0 }}>{erro}</p>}
+      {erro && <p style={{ color: "var(--danger)", fontSize: 14, margin: 0 }}>{erro}</p>}
       {salvo && <p style={{ color: "var(--good)", fontSize: 14, fontWeight: 600, margin: 0 }}>Perfil salvo!</p>}
 
       <button className="btn btn-primary" onClick={salvar} disabled={pending || telInvalido}

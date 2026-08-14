@@ -8,8 +8,25 @@ import { Logo } from "./icons";
 /** Quando `overHero`, o header flutua transparente sobre a seção inicial e só
  * ganha fundo sólido depois que a página rola — usado na home, onde o hero
  * ocupa a tela inteira e não pode ter uma barra branca cortando o topo. */
+/* Uma lista só, consumida pela barra no desktop e pelo painel no celular —
+   assim não existe a chance de as duas navegações divergirem. */
+const LINKS = [
+  { href: "/#como-funciona", label: "Como funciona" },
+  { href: "/#servicos", label: "Serviços" },
+  /* Vem antes das landings de parceiro: é a página que interessa a quem está
+     procurando alguém, que é a maior parte de quem chega no site. */
+  { href: "/profissionais", label: "Profissionais" },
+  // Aponta para a landing de parceiros, não mais para uma âncora da home.
+  { href: "/parceiros", label: "Para profissionais" },
+  /* Planos fica colado em "Para profissionais": quem clica ali é quem cogita
+     ser parceiro, e preço é a próxima pergunta dele. */
+  { href: "/planos", label: "Planos" },
+  { href: "/distribuidoras", label: "Para distribuidoras" },
+];
+
 export function SiteHeader({ overHero = false, logado = false }: { overHero?: boolean; logado?: boolean }) {
   const [solid, setSolid] = useState(!overHero);
+  const [aberto, setAberto] = useState(false);
 
   useEffect(() => {
     if (!overHero) return;
@@ -19,7 +36,17 @@ export function SiteHeader({ overHero = false, logado = false }: { overHero?: bo
     return () => window.removeEventListener("scroll", onScroll);
   }, [overHero]);
 
-  const solidLook = !overHero || solid;
+  /* Esc fecha o menu. Sem isso, quem navega por teclado abre o painel e fica
+     preso tendo que tabular por ele inteiro para sair. */
+  useEffect(() => {
+    if (!aberto) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setAberto(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [aberto]);
+
+  // Painel aberto sobre o hero transparente ficaria ilegível.
+  const solidLook = !overHero || solid || aberto;
 
   return (
     <header
@@ -32,7 +59,9 @@ export function SiteHeader({ overHero = false, logado = false }: { overHero?: bo
         transition: "background .25s ease, border-color .25s ease",
       }}
     >
-      <div className="container" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: 66 }}>
+      {/* `relative` ancora o painel do menu mobile, que é posicionado a partir
+          da base desta barra. */}
+      <div className="container" style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "space-between", height: 66 }}>
         <Link href="/" style={{ display: "flex", alignItems: "center", gap: 9, fontWeight: 700, fontSize: 18, letterSpacing: "-0.02em", color: solidLook ? "var(--ink)" : "#fff" }}>
           <span style={{ display: "grid", placeItems: "center", width: 32, height: 32, borderRadius: 9, background: solidLook ? "var(--cool)" : "rgba(255,255,255,.16)", color: "#fff", backdropFilter: solidLook ? undefined : "blur(6px)" }}>
             <Logo size={19} />
@@ -41,14 +70,11 @@ export function SiteHeader({ overHero = false, logado = false }: { overHero?: bo
         </Link>
 
         <nav style={{ display: "flex", alignItems: "center", gap: 30 }} className="site-nav-links">
-          <Link href="/#como-funciona" style={{ ...navLink, color: solidLook ? "var(--ink-soft)" : "rgba(255,255,255,.82)" }}>Como funciona</Link>
-          <Link href="/#servicos" style={{ ...navLink, color: solidLook ? "var(--ink-soft)" : "rgba(255,255,255,.82)" }}>Serviços</Link>
-          {/* Aponta para a landing de parceiros, não mais para uma âncora da home. */}
-          <Link href="/parceiros" style={{ ...navLink, color: solidLook ? "var(--ink-soft)" : "rgba(255,255,255,.82)" }}>Para profissionais</Link>
-          {/* Planos fica colado em "Para profissionais": quem clica ali é quem
-              cogita ser parceiro, e preço é a próxima pergunta dele. */}
-          <Link href="/planos" style={{ ...navLink, color: solidLook ? "var(--ink-soft)" : "rgba(255,255,255,.82)" }}>Planos</Link>
-          <Link href="/distribuidoras" style={{ ...navLink, color: solidLook ? "var(--ink-soft)" : "rgba(255,255,255,.82)" }}>Para distribuidoras</Link>
+          {LINKS.map((l) => (
+            <Link key={l.href} href={l.href} style={{ ...navLink, color: solidLook ? "var(--ink-soft)" : "rgba(255,255,255,.82)" }}>
+              {l.label}
+            </Link>
+          ))}
         </nav>
 
         {/* Oferecer "Entrar" a quem já entrou é ruído. Logado vê o caminho de volta. */}
@@ -58,12 +84,51 @@ export function SiteHeader({ overHero = false, logado = false }: { overHero?: bo
           ) : (
             <>
               <Link href="/login" style={{ ...navLink, fontWeight: 600, color: solidLook ? "var(--ink-soft)" : "rgba(255,255,255,.9)" }}>Entrar</Link>
-              <Link href="/signup" className="btn btn-primary" style={{ height: 40, padding: "0 16px", fontSize: 14 }}>Criar conta</Link>
+              <Link href="/signup" className="btn btn-primary site-cta-desktop" style={{ height: 40, padding: "0 16px", fontSize: 14 }}>Criar conta</Link>
             </>
           )}
+          <button
+            type="button"
+            className="site-nav-toggle"
+            data-sobre-hero={String(!solidLook)}
+            aria-expanded={aberto}
+            aria-controls="menu-site"
+            aria-label={aberto ? "Fechar menu" : "Abrir menu"}
+            onClick={() => setAberto((a) => !a)}
+          >
+            <Sanduiche aberto={aberto} />
+          </button>
         </div>
+
+        {aberto && (
+          <nav id="menu-site" className="site-nav-painel">
+            {LINKS.map((l) => (
+              <Link key={l.href} href={l.href} onClick={() => setAberto(false)}>{l.label}</Link>
+            ))}
+            {!logado && (
+              <Link href="/signup" className="btn btn-primary" style={{ marginTop: 14 }} onClick={() => setAberto(false)}>
+                Criar conta
+              </Link>
+            )}
+          </nav>
+        )}
       </div>
     </header>
+  );
+}
+
+/* Duas barras que viram X. `aria-hidden` porque o rótulo já está no botão —
+   sem isso o leitor de tela anuncia o ícone além do nome da ação. */
+function Sanduiche({ aberto }: { aberto: boolean }) {
+  const barra: React.CSSProperties = {
+    display: "block", width: 18, height: 2, borderRadius: 2,
+    background: "currentColor", transition: "transform .18s ease, opacity .18s ease",
+  };
+  return (
+    <span aria-hidden style={{ display: "grid", gap: 4 }}>
+      <span style={{ ...barra, transform: aberto ? "translateY(3px) rotate(45deg)" : undefined }} />
+      <span style={{ ...barra, transform: aberto ? "translateY(-3px) rotate(-45deg)" : undefined }} />
+    </span>
   );
 }
 
@@ -100,6 +165,7 @@ export function SiteFooter() {
             titulo="FrioHub"
             itens={[
               { label: "Como funciona", href: "/#como-funciona" },
+              { label: "Ver profissionais", href: "/profissionais" },
               { label: "Para profissionais", href: "/parceiros" },
               { label: "Para distribuidoras", href: "/distribuidoras" },
               { label: "Entrar", href: "/login" },

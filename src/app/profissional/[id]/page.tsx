@@ -9,9 +9,7 @@ import { BotaoMensagem } from "./BotaoMensagem";
 const SPEC_LABEL: Record<string, string> = {
   instalacao: "Instalação", manutencao: "Manutenção", remanejamento: "Remanejamento", limpeza: "Limpeza", conserto: "Conserto",
 };
-function one<T>(v: T | T[] | null | undefined): T | null {
-  return Array.isArray(v) ? v[0] ?? null : v ?? null;
-}
+import { one } from "@/lib/relacional";
 function Estrelas({ nota, size = 16 }: { nota: number; size?: number }) {
   return (
     <span style={{ display: "inline-flex", gap: 2 }}>

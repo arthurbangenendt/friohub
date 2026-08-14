@@ -60,7 +60,7 @@ export function CatalogoEditor({ produtos, markup }: { produtos: ProdutoLinha[];
         </button>
       </div>
 
-      {erro && <p style={{ color: "#b3261e", fontSize: 13.5, margin: 0 }}>{erro}</p>}
+      {erro && <p style={{ color: "var(--danger)", fontSize: 13.5, margin: 0 }}>{erro}</p>}
 
       {editando && (
         <Formulario
@@ -209,7 +209,7 @@ function Formulario({
         </label>
       </div>
 
-      {erro && <p style={{ color: "#b3261e", fontSize: 13.5, margin: 0 }}>{erro}</p>}
+      {erro && <p style={{ color: "var(--danger)", fontSize: 13.5, margin: 0 }}>{erro}</p>}
 
       <div style={{ display: "flex", gap: 10 }}>
         <button className="btn btn-primary" onClick={salvar} disabled={pending}>

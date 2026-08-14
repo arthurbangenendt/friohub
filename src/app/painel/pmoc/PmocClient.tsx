@@ -12,7 +12,7 @@ const label: React.CSSProperties = { display: "flex", flexDirection: "column", g
 
 function Mensagem({ erro, sucesso }: { erro: string | null; sucesso?: string | null }) {
   if (!erro && !sucesso) return null;
-  return <p role="status" style={{ margin: 0, fontSize: 13.5, color: erro ? "#b3261e" : "var(--good)" }}>{erro ?? sucesso}</p>;
+  return <p role="status" style={{ margin: 0, fontSize: 13.5, color: erro ? "var(--danger)" : "var(--good)" }}>{erro ?? sucesso}</p>;
 }
 
 export function SolicitarPmocForm() {

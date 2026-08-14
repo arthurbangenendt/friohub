@@ -14,6 +14,6 @@ export function RolloutForm({ flagKey, regionSlug, enabled, rollout }: { flagKey
     <label style={{ fontSize: 12, color: "var(--ink-faint)" }}>Rollout %<input name="rollout" type="number" min={0} max={100} step={1} required defaultValue={rollout} style={{ ...field, width: "100%", display: "block", marginTop: 4 }}/></label>
     <label style={{ fontSize: 12, color: "var(--ink-faint)" }}>Justificativa<input name="reason" minLength={5} maxLength={500} required placeholder="Por que o rollout está mudando?" style={{ ...field, width: "100%", display: "block", marginTop: 4 }}/></label>
     <button className="btn btn-primary" disabled={pending}>{pending ? "Salvando…" : "Aplicar"}</button>
-    {state.message && <span role="status" style={{ gridColumn: "1/-1", fontSize: 12.5, color: state.ok ? "var(--good)" : "#b3261e" }}>{state.message}</span>}
+    {state.message && <span role="status" style={{ gridColumn: "1/-1", fontSize: 12.5, color: state.ok ? "var(--good)" : "var(--danger)" }}>{state.message}</span>}
   </form>;
 }

@@ -22,7 +22,7 @@ export function AbrirChatPedido({ pedidoId, professionalId }: { pedidoId: string
         })}>
         <Chat size={17} /> {pending ? "Abrindo…" : "Conversar sobre este pedido"}
       </button>
-      {erro && <p style={{ color: "#b3261e", fontSize: 12.5, margin: "8px 0 0" }}>{erro}</p>}
+      {erro && <p style={{ color: "var(--danger)", fontSize: 12.5, margin: "8px 0 0" }}>{erro}</p>}
     </div>
   );
 }

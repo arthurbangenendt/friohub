@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { REGIAO_LABEL } from "@/lib/regiao";
 import "./globals.css";
 import { AnalyticsConsent } from "@/components/AnalyticsConsent";
+import { ToastProvider } from "@/components/ui";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -28,7 +29,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="pt-BR"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}<AnalyticsConsent /></body>
+      <body className="min-h-full flex flex-col">
+        {/* Só aparece ao receber foco pelo teclado. Primeiro elemento tabulável
+            da página de propósito: é o atalho para pular a navegação. */}
+        <a href="#conteudo" className="skip-link">Pular para o conteúdo</a>
+        <ToastProvider>{children}</ToastProvider>
+        <AnalyticsConsent />
+      </body>
     </html>
   );
 }

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
-const cor: Record<string, string> = { healthy: "var(--good)", degraded: "var(--warm)", down: "#b3261e" };
+const cor: Record<string, string> = { healthy: "var(--good)", degraded: "var(--warm)", down: "var(--danger)" };
 const rotulo: Record<string, string> = { healthy: "Saudável", degraded: "Degradado", down: "Indisponível" };
 
 export default async function SaudePage() {

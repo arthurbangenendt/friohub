@@ -4,17 +4,13 @@ import { createClient } from "@/lib/supabase/server";
 import { rotuloJob } from "@/app/solicitar/tipos";
 import { Cabecalho, dataCurta, mono, wrap } from "../shared";
 import { comoPapel } from "../navegacao";
+import { STATUS_PEDIDO as MAPA_PEDIDO, resolverMapa } from "@/lib/status";
 
 /* Orçamentos, dos dois lados.
    Cliente: os pedidos que enviou e quantas propostas voltaram.
    Profissional: os pedidos que chegaram até ele e o que já respondeu. */
 
-const STATUS_PEDIDO: Record<string, { label: string; cor: string; bg: string }> = {
-  aberto: { label: "Aguardando propostas", cor: "var(--warm)", bg: "var(--warm-wash)" },
-  fechado: { label: "Fechado", cor: "#2E8B6F", bg: "#e4f3ee" },
-  cancelado: { label: "Cancelado", cor: "#b3261e", bg: "#fdeceb" },
-  expirado: { label: "Expirado", cor: "var(--ink-faint)", bg: "var(--surface-2)" },
-};
+const STATUS_PEDIDO = resolverMapa(MAPA_PEDIDO);
 
 type PedidoBase = {
   id: string;

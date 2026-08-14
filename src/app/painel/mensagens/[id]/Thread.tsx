@@ -198,7 +198,7 @@ export function Thread({
         <div ref={fimRef} />
       </div>
 
-      {erro && <p style={{ color: "#b3261e", fontSize: 13.5, margin: 0 }}>{erro}</p>}
+      {erro && <p style={{ color: "var(--danger)", fontSize: 13.5, margin: 0 }}>{erro}</p>}
 
       <div aria-label="Respostas rápidas" style={{ display: "flex", gap: 7, overflowX: "auto", paddingBottom: 2 }}>
         {RESPOSTAS_RAPIDAS.map((resposta) => (

@@ -137,7 +137,7 @@ export function MidiaEditor({
         <span style={dica}>Sem foto, mostramos suas iniciais. Até {MAX_MB} MB.</span>
       </div>
 
-      {erro && <p style={{ color: "#b3261e", fontSize: 13.5, margin: 0 }}>{erro}</p>}
+      {erro && <p style={{ color: "var(--danger)", fontSize: 13.5, margin: 0 }}>{erro}</p>}
     </div>
   );
 }

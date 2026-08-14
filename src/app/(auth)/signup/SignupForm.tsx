@@ -13,7 +13,7 @@ const SENHA_MINIMA = 8;
    Ver validação equivalente em (auth)/actions.ts. */
 export type PapelCadastro = "cliente" | "profissional" | "distribuidora";
 
-export function SignupForm({ roleInicial }: { roleInicial: PapelCadastro }) {
+export function SignupForm({ roleInicial, proximo }: { roleInicial: PapelCadastro; proximo?: string }) {
   const [role, setRole] = useState(roleInicial);
   const [nome, setNome] = useState("");
   const [telefone, setTelefone] = useState("");
@@ -40,6 +40,8 @@ export function SignupForm({ roleInicial }: { roleInicial: PapelCadastro }) {
   return (
     <form action={signup}>
       <input type="hidden" name="role" value={role} />
+      {/* Só vale para o papel cliente; ver a regra no server action. */}
+      {proximo ? <input type="hidden" name="next" value={proximo} /> : null}
 
       <div style={{ marginBottom: 18 }}>
         <span style={{ ...labelStyle, display: "block", marginBottom: 8 }}>Eu sou</span>
@@ -122,7 +124,7 @@ function Campo({ label, erro, dica, children }: { label: string; erro?: string |
       <span style={labelStyle}>{label}</span>
       {children}
       {dica && !erro && <span style={{ fontSize: 12, color: "var(--ink-faint)" }}>{dica}</span>}
-      {erro && <span style={{ fontSize: 12, color: "#b3261e" }}>{erro}</span>}
+      {erro && <span style={{ fontSize: 12, color: "var(--danger)" }}>{erro}</span>}
     </label>
   );
 }

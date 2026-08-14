@@ -171,7 +171,7 @@ export function PortfolioEditor({ uid, inicial }: { uid: string; inicial: FotoIt
       </button>
 
       <input ref={inputRef} type="file" accept="image/*" onChange={aoEscolher} style={{ display: "none" }} />
-      {erro && <p style={{ color: "#b3261e", fontSize: 13.5, marginTop: 10 }}>{erro}</p>}
+      {erro && <p style={{ color: "var(--danger)", fontSize: 13.5, marginTop: 10 }}>{erro}</p>}
       <p style={{ color: "var(--ink-faint)", fontSize: 12.5, marginTop: 12 }}>
         Até {MAX_PARES} serviços, cada um com foto antes e depois. É o que mais pesa
         na hora do cliente escolher. Até {MAX_MB} MB por imagem.

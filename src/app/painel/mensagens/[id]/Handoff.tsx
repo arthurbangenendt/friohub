@@ -91,7 +91,7 @@ export function Handoff({
         </>
       )}
 
-      {erro && <p style={{ color: "#b3261e", fontSize: 13, margin: "10px 0 0" }}>{erro}</p>}
+      {erro && <p style={{ color: "var(--danger)", fontSize: 13, margin: "10px 0 0" }}>{erro}</p>}
     </div>
   );
 }

@@ -85,15 +85,18 @@ export function PropostaForm({ pedidoId, taxaComissao }: { pedidoId: string; tax
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {/* Preço fechado x visita: em instalação e conserto, nem sempre dá para
           orçar sem ver. Ter a segunda opção evita o chute defensivo. */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10 }}>
         <Opcao ativo={tipo === "preco_fechado"} onClick={() => setTipo("preco_fechado")}
           titulo="Preço fechado" desc="Consigo orçar com o que foi informado" />
         <Opcao ativo={tipo === "visita_tecnica"} onClick={() => setTipo("visita_tecnica")}
           titulo="Visita técnica" desc="Preciso ver o local antes de fechar" />
       </div>
 
+      {/* Grades com `auto-fit` em vez de duas colunas fixas: este formulário é
+          usado majoritariamente no celular, onde `1fr 1fr` espremia os dois
+          campos de valor a menos de 160px cada. */}
       {tipo === "preco_fechado" ? (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
           <label>
             <span style={rotulo}>Mão de obra (R$)</span>
             <input value={maoObra} onChange={(e) => setMaoObra(e.target.value)} inputMode="decimal" placeholder="0,00" style={campo} />
@@ -186,7 +189,7 @@ export function PropostaForm({ pedidoId, taxaComissao }: { pedidoId: string; tax
           </label>
           <div style={{ display: "flex", gap: 9, marginTop: 10 }}>
             <button className="btn" onClick={recusar} disabled={pending}
-              style={{ background: "#b3261e", color: "white" }}>
+              style={{ background: "var(--danger-solid)", color: "#fff" }}>
               {pending ? "Registrando…" : "Confirmar recusa"}
             </button>
             <button className="btn" onClick={() => { setRecusando(false); setErro(null); }} disabled={pending}
@@ -197,7 +200,7 @@ export function PropostaForm({ pedidoId, taxaComissao }: { pedidoId: string; tax
         </div>
       )}
 
-      {erro && <p style={{ color: "#b3261e", fontSize: 13.5, margin: 0 }}>{erro}</p>}
+      {erro && <p style={{ color: "var(--danger)", fontSize: 13.5, margin: 0 }}>{erro}</p>}
 
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         <button className="btn btn-primary" onClick={enviar} disabled={pending}>

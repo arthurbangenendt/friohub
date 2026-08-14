@@ -11,7 +11,13 @@
   --surface-2:  #eef3f5;
   --ink:        #0c1e2a;
   --ink-soft:   #51636c;
-  --ink-faint:  #8797a0;
+  /* Era #8797a0, que dá ~3.1:1 sobre o branco e reprova o AA (4.5:1). Não era
+     detalhe: este é o token de quase todo texto de apoio do produto — rótulo de
+     KPI, data, metadado de cartão, dica de formulário, rodapé — e boa parte
+     dele é renderizada entre 11.5 e 13px. Corrigido no token, e não nas ~200
+     chamadas, para não errar caso a caso; a hierarquia se mantém, porque
+     continua mais claro que --ink-soft. Agora dá 4.75:1. */
+  --ink-faint:  #64757f;
   --line:       #e2eaee;
   --line-soft:  #eef3f5;
   --cool:       #0d6e8f;   /* marca / ação */
@@ -20,7 +26,20 @@
   --brand-ink:  #082532;   /* fundos escuros de seção */
   --warm:       #b9691f;   /* usado com parcimônia (ex.: Patrocinado) */
   --warm-wash:  #f6ecdf;
+  /* Semânticos de estado. Antes só existia --good, então "Concluído" era
+     #2E8B6F em shared.tsx e var(--good) em servico/[id] — mesmo status, duas
+     cores. E o vermelho de erro (#b3261e) estava cravado em ~15 arquivos, o que
+     no modo escuro virava um bloco claro dentro de um card escuro. */
   --good:       #1f7a5c;
+  --good-wash:  #e4f3ee;
+  --danger:     #b3261e;
+  --danger-wash:#fdeceb;
+  /* Fundo de botão destrutivo sólido (texto branco por cima). Separado de
+     --danger porque no modo escuro --danger precisa clarear para ser legível
+     como texto, e um salmão claro com #fff em cima reprova contraste. */
+  --danger-solid:#b3261e;
+  --warning:    #8a5a10;
+  --warning-wash:#fbf0dc;
   /* Cores de gráfico. Não são as da marca: o --cool (#0d6e8f) reprova no piso
      de croma e lê como cinza numa barra. Estes passos foram validados para
      banda de luminosidade, croma, separação em daltonismo e contraste. */
@@ -38,7 +57,7 @@
     --surface-2:  #163039;
     --ink:        #e7eff2;
     --ink-soft:   #a2b3bb;
-    --ink-faint:  #6f858f;
+    --ink-faint:  #7d939d;   /* 4.92:1 sobre o --surface escuro; era 4.09:1 */
     --line:       #1e3742;
     --line-soft:  #16303a;
     --cool:       #2ca6c4;
@@ -51,7 +70,16 @@
        não um clarão automático dos tokens claros. */
     --chart-1:    #2492ae;
     --chart-2:    #c78440;
+    /* Estados no escuro: o texto clareia e o wash escurece. Reaproveitar os
+       passos do tema claro (#e4f3ee, #fdeceb) cravava um retângulo branco
+       dentro do card escuro. */
     --good:       #49bd93;
+    --good-wash:  #10332a;
+    --danger:     #ff9b91;
+    --danger-wash:#3a1c19;
+    --danger-solid:#c2402f;
+    --warning:    #e0ac63;
+    --warning-wash:#33250f;
     --shadow-sm:  0 1px 2px rgba(0,0,0,.3);
     --shadow-md:  0 4px 16px rgba(0,0,0,.35);
     --shadow-lg:  0 18px 48px rgba(0,0,0,.5);
@@ -59,15 +87,21 @@
 }
 :root[data-theme="light"] {
   --bg:#ffffff; --bg-subtle:#f3f7f9; --surface:#ffffff; --surface-2:#eef3f5;
-  --ink:#0c1e2a; --ink-soft:#51636c; --ink-faint:#8797a0; --line:#e2eaee; --line-soft:#eef3f5;
+  --ink:#0c1e2a; --ink-soft:#51636c; --ink-faint:#64757f; --line:#e2eaee; --line-soft:#eef3f5;
   --cool:#0d6e8f; --cool-deep:#0a5670; --cool-wash:#e6f1f4; --brand-ink:#082532;
-  --warm:#b9691f; --warm-wash:#f6ecdf; --good:#1f7a5c;
+  --warm:#b9691f; --warm-wash:#f6ecdf;
+  --good:#1f7a5c; --good-wash:#e4f3ee;
+  --danger:#b3261e; --danger-wash:#fdeceb; --danger-solid:#b3261e;
+  --warning:#8a5a10; --warning-wash:#fbf0dc;
 }
 :root[data-theme="dark"] {
   --bg:#0a1720; --bg-subtle:#0c1e28; --surface:#0f2531; --surface-2:#163039;
-  --ink:#e7eff2; --ink-soft:#a2b3bb; --ink-faint:#6f858f; --line:#1e3742; --line-soft:#16303a;
+  --ink:#e7eff2; --ink-soft:#a2b3bb; --ink-faint:#7d939d; --line:#1e3742; --line-soft:#16303a;
   --cool:#2ca6c4; --cool-deep:#57c3da; --cool-wash:#103440; --brand-ink:#081f2a;
-  --warm:#dfa05c; --warm-wash:#291d12; --good:#49bd93;
+  --warm:#dfa05c; --warm-wash:#291d12;
+  --good:#49bd93; --good-wash:#10332a;
+  --danger:#ff9b91; --danger-wash:#3a1c19; --danger-solid:#c2402f;
+  --warning:#e0ac63; --warning-wash:#33250f;
 }
 
 @theme inline {
@@ -105,6 +139,39 @@ a { color: inherit; text-decoration: none; }
   outline-offset: 2px;
   border-radius: 4px;
 }
+
+/* ---------- acessibilidade ---------- */
+/* Texto só para leitor de tela. Existia como `.pl-sr` dentro de planos.css, com
+   um comentário admitindo que devia ser global — agora é. */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+/* Pular para o conteúdo: com 13 itens de navegação repetidos em toda página do
+   painel, chegar ao conteúdo pelo teclado custava 13 tabs por navegação. */
+.skip-link {
+  position: absolute; left: 8px; top: -60px; z-index: 200;
+  background: var(--cool); color: #fff; padding: 10px 16px; border-radius: 10px;
+  font-size: 14px; font-weight: 600; transition: top .15s ease;
+}
+.skip-link:focus { top: 8px; }
+
+/* ---------- carregamento ---------- */
+/* O app é RSC e cada tela do painel faz de 5 a 7 consultas. Sem nada em tela
+   durante a navegação, o usuário fica olhando a página anterior e conclui que
+   travou. O esqueleto imita o formato do conteúdo que está vindo. */
+.skel {
+  position: relative; overflow: hidden;
+  background: var(--surface-2); border-radius: 8px;
+}
+.skel::after {
+  content: ""; position: absolute; inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--bg) 60%, transparent), transparent);
+  animation: skel-brilho 1.4s infinite;
+}
+@keyframes skel-brilho { 100% { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { .skel::after { display: none; } }
 
 /* ---------- layout ---------- */
 .container { width: 100%; max-width: 1120px; margin: 0 auto; padding-inline: 24px; }
@@ -184,7 +251,44 @@ a { color: inherit; text-decoration: none; }
 }
 
 /* ---------- nav ---------- */
-@media (max-width: 860px) { .site-nav-links { display: none !important; } }
+/* Abaixo de 860px os links saem da barra — mas antes eles simplesmente sumiam,
+   e não havia menu nenhum: o visitante no celular perdia o acesso a Como
+   funciona, Serviços, Para profissionais, Planos e Para distribuidoras. Numa
+   landing de marketplace, onde a maior parte do tráfego é mobile, sobrava só
+   "Entrar". Agora eles migram para o painel do botão sanduíche. */
+.site-nav-toggle { display: none; }
+@media (max-width: 860px) {
+  .site-nav-links { display: none !important; }
+  .site-nav-toggle {
+    display: inline-grid; place-items: center;
+    width: 40px; height: 40px; border-radius: 10px;
+    border: 1px solid var(--line); background: var(--surface);
+    color: var(--ink); cursor: pointer;
+  }
+  /* Sobre o hero a barra é transparente: um botão branco cravado ali cortaria
+     a imagem. */
+  .site-nav-toggle[data-sobre-hero="true"] {
+    background: rgba(255, 255, 255, .1);
+    border-color: rgba(255, 255, 255, .22);
+    color: #fff;
+    backdrop-filter: blur(8px);
+  }
+  /* Com o menu aberto, "Criar conta" viraria um terceiro botão na mesma linha
+     de 360px — ele já está dentro do painel. */
+  .site-cta-desktop { display: none; }
+}
+.site-nav-painel {
+  position: absolute; left: 0; right: 0; top: 100%;
+  background: var(--bg); border-bottom: 1px solid var(--line);
+  box-shadow: var(--shadow-lg);
+  padding: 10px 24px 20px;
+  display: flex; flex-direction: column;
+}
+.site-nav-painel a {
+  padding: 14px 4px; font-size: 16px; color: var(--ink);
+  border-bottom: 1px solid var(--line-soft);
+}
+.site-nav-painel a:last-of-type { border-bottom: none; }
 
 /* ---------- FAQ ---------- */
 .faq-mark { transition: transform .2s ease; display: inline-block; }
@@ -295,6 +399,33 @@ details[open] .faq-mark { transform: rotate(45deg); }
 .painel-link:hover { background: var(--surface-2); color: var(--ink); }
 .painel-link[data-on="true"] { background: var(--cool-wash); color: var(--cool-deep); font-weight: 650; }
 .painel-link-ic { display: flex; color: currentColor; opacity: .85; }
+.painel-link-n {
+  margin-left: auto; flex-shrink: 0;
+  min-width: 20px; height: 18px; padding: 0 6px;
+  display: grid; place-items: center;
+  border-radius: 100px; background: var(--cool); color: #fff;
+  font-size: 11px; font-weight: 700; line-height: 1;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+/* ---------- sino de notificações ---------- */
+.painel-sino {
+  position: relative; flex-shrink: 0;
+  display: grid; place-items: center;
+  width: 38px; height: 38px; border-radius: 11px;
+  border: 1px solid var(--line); background: var(--bg);
+  color: var(--ink-soft);
+}
+.painel-sino:hover { border-color: var(--ink-faint); color: var(--ink); }
+.painel-sino-n {
+  position: absolute; top: -5px; right: -5px;
+  min-width: 18px; height: 18px; padding: 0 5px;
+  display: grid; place-items: center;
+  border-radius: 100px; background: var(--danger-solid); color: #fff;
+  font-size: 10.5px; font-weight: 700; line-height: 1;
+  border: 2px solid var(--surface);
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+}
 .painel-main { min-width: 0; background: var(--bg); }
 .painel-sair-wrap { margin-top: auto; }
 .painel-sair {
@@ -315,6 +446,20 @@ details[open] .faq-mark { transform: rotate(45deg); }
   }
   .painel-brand { display: none; }
   .painel-nav { flex-direction: row; gap: 6px; }
+  /* A faixa rola, mas nada indicava isso: o profissional tem 13 itens e
+     precisava arrastar às cegas para achar Financeiro ou Avaliações. O
+     degradê na borda direita mostra que a lista continua, e o scroll-snap faz
+     o arrasto parar em cima de um item em vez de no meio de dois. */
+  .painel-side {
+    scroll-snap-type: x proximity;
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent 100%);
+    mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent 100%);
+  }
+  .painel-link { scroll-snap-align: start; }
+  /* Barra de rolagem nativa some no iOS e ocupa altura no Android; o degradê
+     já cumpre o papel de afordância. */
+  .painel-side::-webkit-scrollbar { display: none; }
+  .painel-side { scrollbar-width: none; }
   .painel-nav-t { display: none; }
   .painel-link { white-space: nowrap; }
   .painel-user { padding: 6px 10px 6px 6px; flex-shrink: 0; }

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { SolicitarWizard } from "./SolicitarWizard";
 import type { ProdutoDTO } from "./marketplace-types";
+import { urlLogin } from "@/lib/proximo";
 
 export default async function SolicitarPage(props: PageProps<"/solicitar">) {
   // A home já manda o CEP digitado no hero (?cep=). Sem ler aqui, o cliente
@@ -14,7 +15,15 @@ export default async function SolicitarPage(props: PageProps<"/solicitar">) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/login?aviso=" + encodeURIComponent("Entre para solicitar um serviço."));
+  /* Leva junto o que a pessoa já tinha informado. Antes o CEP digitado no hero
+     morria aqui e o login jogava todo mundo em `/painel`. */
+  if (!user) {
+    const query = new URLSearchParams();
+    if (cepInicial) query.set("cep", cepInicial);
+    if (equipmentId) query.set("equipment", equipmentId);
+    const destino = query.size ? `/solicitar?${query.toString()}` : "/solicitar";
+    redirect(urlLogin(destino, "Entre para solicitar um serviço."));
+  }
 
   const { data: equipment } = equipmentId
     ? await supabase.from("customer_equipment").select("id, brand, model, capacity_btu, site:customer_sites(label, cep)").eq("id", equipmentId).eq("customer_id", user.id).maybeSingle()
@@ -27,7 +36,14 @@ export default async function SolicitarPage(props: PageProps<"/solicitar">) {
     p_limit: 12,
     p_offset: 0,
   });
-  if (produtosError) throw new Error(`Falha ao carregar catálogo: ${produtosError.message}`);
+  /* Falha no catálogo não pode derrubar o wizard. O catálogo só é usado por
+     quem ainda não tem aparelho — quem já tem passa direto por esse passo. Um
+     `throw` aqui trocava o fluxo principal de conversão por uma tela de erro
+     inteira por causa de um passo opcional. Sem produtos, o wizard segue e o
+     passo do catálogo mostra o próprio estado vazio. */
+  if (produtosError) {
+    console.error("[solicitar] falha ao carregar catálogo:", produtosError.message);
+  }
 
   const produtosDTO: ProdutoDTO[] = (produtos ?? []).map((p) => {
     return {

@@ -5,15 +5,9 @@ import { formatarBtu } from "@/lib/btu";
 import { Cabecalho, dataCurta, mono, one, wrap } from "../../shared";
 import { comoPapel } from "../../navegacao";
 import { AcoesRepasse } from "./AcoesRepasse";
+import { STATUS_REPASSE, resolverMapa } from "@/lib/status";
 
-const STATUS: Record<string, { label: string; cor: string; bg: string }> = {
-  a_repassar: { label: "A repassar", cor: "var(--warm)", bg: "var(--warm-wash)" },
-  confirmado: { label: "Confirmado", cor: "var(--cool-deep)", bg: "var(--cool-wash)" },
-  faturado: { label: "Faturado", cor: "var(--cool-deep)", bg: "var(--cool-wash)" },
-  enviado: { label: "Enviado", cor: "var(--cool-deep)", bg: "var(--cool-wash)" },
-  entregue: { label: "Entregue", cor: "#2E8B6F", bg: "#e4f3ee" },
-  cancelado: { label: "Cancelado", cor: "#b3261e", bg: "#fdeceb" },
-};
+const STATUS = resolverMapa(STATUS_REPASSE);
 
 const ABERTOS = ["a_repassar", "confirmado", "faturado", "enviado"];
 

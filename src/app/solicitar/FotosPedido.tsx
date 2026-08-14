@@ -132,7 +132,7 @@ export function FotosPedido({
       </div>
 
       <input ref={inputRef} type="file" accept="image/*" multiple onChange={aoEscolher} style={{ display: "none" }} />
-      {erro && <p style={{ color: "#b3261e", fontSize: 12.5, margin: "8px 0 0" }}>{erro}</p>}
+      {erro && <p style={{ color: "var(--danger)", fontSize: 12.5, margin: "8px 0 0" }}>{erro}</p>}
     </div>
   );
 }

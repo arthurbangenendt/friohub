@@ -70,7 +70,7 @@ export function AvaliarCliente({ jobId, clienteNome }: { jobId: string; clienteN
                   padding: "7px 13px", borderRadius: 100, fontSize: 13, cursor: "pointer",
                   fontWeight: on ? 650 : 500,
                   border: `1px solid ${on ? (t.bom ? "var(--good)" : "var(--warm)") : "var(--line)"}`,
-                  background: on ? (t.bom ? "#e4f3ee" : "var(--warm-wash)") : "var(--surface)",
+                  background: on ? (t.bom ? "var(--good-wash)" : "var(--warm-wash)") : "var(--surface)",
                   color: on ? (t.bom ? "#1f7a5c" : "var(--warm)") : "var(--ink-soft)",
                 }}>
                 {t.label}
@@ -80,7 +80,7 @@ export function AvaliarCliente({ jobId, clienteNome }: { jobId: string; clienteN
         </div>
       </div>
 
-      {erro && <p style={{ color: "#b3261e", fontSize: 13.5, margin: 0 }}>{erro}</p>}
+      {erro && <p style={{ color: "var(--danger)", fontSize: 13.5, margin: 0 }}>{erro}</p>}
 
       <button onClick={enviar} disabled={rating === 0 || pending} className="btn btn-primary"
         style={{ alignSelf: "flex-start", opacity: rating === 0 ? 0.55 : 1 }}>

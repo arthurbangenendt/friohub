@@ -978,7 +978,7 @@ function Nav({ onBack, onNext, nextLabel, disabled }: { onBack: () => void; onNe
   );
 }
 function Aviso({ children, erro }: { children: React.ReactNode; erro?: boolean }) {
-  return <div style={{ ...avisoBox, background: erro ? "#fdeceb" : "var(--warm-wash)", color: erro ? "#b3261e" : "var(--warm)" }}>{children}</div>;
+  return <div style={{ ...avisoBox, background: erro ? "var(--danger-wash)" : "var(--warm-wash)", color: erro ? "var(--danger)" : "var(--warm)" }}>{children}</div>;
 }
 function LinhaResumo({ k, v }: { k: React.ReactNode; v: React.ReactNode }) {
   return (

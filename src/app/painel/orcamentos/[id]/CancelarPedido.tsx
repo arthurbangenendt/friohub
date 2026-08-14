@@ -30,7 +30,7 @@ export function CancelarPedido({ pedidoId }: { pedidoId: string }) {
       <button
         className="btn"
         onClick={() => setAberto(true)}
-        style={{ border: "1px solid var(--line)", background: "var(--surface)", color: "#b3261e" }}
+        style={{ border: "1px solid var(--line)", background: "var(--surface)", color: "var(--danger)" }}
       >
         Cancelar pedido
       </button>
@@ -58,10 +58,10 @@ export function CancelarPedido({ pedidoId }: { pedidoId: string }) {
       <p style={{ margin: "7px 0 0", fontSize: 12.5, color: "var(--ink-faint)" }}>
         O motivo fica registrado no histórico e ajuda a melhorar o atendimento.
       </p>
-      {erro && <p style={{ color: "#b3261e", fontSize: 13, margin: "8px 0 0" }}>{erro}</p>}
+      {erro && <p style={{ color: "var(--danger)", fontSize: 13, margin: "8px 0 0" }}>{erro}</p>}
       <div style={{ display: "flex", gap: 9, marginTop: 12 }}>
         <button className="btn" onClick={confirmar} disabled={pending}
-          style={{ background: "#b3261e", color: "white" }}>
+          style={{ background: "var(--danger-solid)", color: "#fff" }}>
           {pending ? "Cancelando…" : "Confirmar cancelamento"}
         </button>
         <button className="btn" onClick={() => { setAberto(false); setErro(null); }} disabled={pending}

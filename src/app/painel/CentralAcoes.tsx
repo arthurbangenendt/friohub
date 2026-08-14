@@ -32,7 +32,7 @@ export type ResumoCentral = {
 };
 
 const PRIORIDADE = {
-  agora: { label: "Agora", cor: "#b3261e", bg: "#fdeceb" },
+  agora: { label: "Agora", cor: "var(--danger)", bg: "var(--danger-wash)" },
   hoje: { label: "Hoje", cor: "var(--warm)", bg: "var(--warm-wash)" },
   acompanhar: { label: "Acompanhar", cor: "var(--cool-deep)", bg: "var(--cool-wash)" },
 };

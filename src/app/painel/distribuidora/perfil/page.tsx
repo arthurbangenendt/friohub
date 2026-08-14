@@ -4,13 +4,9 @@ import { CIDADE } from "@/lib/regiao";
 import { Cabecalho, mono, wrap } from "../../shared";
 import { comoPapel } from "../../navegacao";
 import { PerfilDistribuidoraForm } from "./PerfilDistribuidoraForm";
+import { STATUS_VERIFICACAO, resolverMapa } from "@/lib/status";
 
-const STATUS: Record<string, { label: string; cor: string; bg: string }> = {
-  pendente: { label: "Pendente", cor: "var(--warm)", bg: "var(--warm-wash)" },
-  em_analise: { label: "Em análise", cor: "var(--warm)", bg: "var(--warm-wash)" },
-  verificado: { label: "Verificado", cor: "#2E8B6F", bg: "#e4f3ee" },
-  rejeitado: { label: "Rejeitado", cor: "#b3261e", bg: "#fdeceb" },
-};
+const STATUS = resolverMapa(STATUS_VERIFICACAO);
 
 export default async function PerfilDistribuidoraPage() {
   const supabase = await createClient();

@@ -52,7 +52,7 @@ export function ReviewForm({ jobId }: { jobId: string }) {
       >
         {pending ? "Enviando..." : "Enviar avaliação"}
       </button>
-      {erro && <p style={{ color: "#b3261e", fontSize: 13.5, marginTop: 8 }}>{erro}</p>}
+      {erro && <p style={{ color: "var(--danger)", fontSize: 13.5, marginTop: 8 }}>{erro}</p>}
     </div>
   );
 }

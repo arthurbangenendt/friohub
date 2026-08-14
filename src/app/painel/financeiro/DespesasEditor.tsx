@@ -77,7 +77,7 @@ export function DespesasEditor({ inicial: lista }: { inicial: Despesa[] }) {
         </button>
       </div>
 
-      {erro && <p style={{ color: "#b3261e", fontSize: 13.5, marginTop: 10 }}>{erro}</p>}
+      {erro && <p style={{ color: "var(--danger)", fontSize: 13.5, marginTop: 10 }}>{erro}</p>}
 
       {lista.length === 0 ? (
         <p style={{ color: "var(--ink-faint)", fontSize: 13.5, marginTop: 18 }}>

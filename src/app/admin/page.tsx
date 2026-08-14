@@ -3,21 +3,14 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AdminActions } from "./AdminActions";
 import { CIDADE } from "@/lib/regiao";
+import { STATUS_VERIFICACAO, resolverMapa } from "@/lib/status";
+import { one } from "@/lib/relacional";
 
 const mono = "var(--font-geist-mono), ui-monospace, monospace";
 const SPEC_LABEL: Record<string, string> = {
   instalacao: "Instalação", manutencao: "Manutenção", remanejamento: "Remanejamento", limpeza: "Limpeza", conserto: "Conserto",
 };
-const STATUS_LABEL: Record<string, { label: string; cor: string; bg: string }> = {
-  pendente: { label: "Pendente", cor: "var(--warm)", bg: "var(--warm-wash)" },
-  em_analise: { label: "Em análise", cor: "var(--warm)", bg: "var(--warm-wash)" },
-  verificado: { label: "Verificado", cor: "var(--good)", bg: "var(--cool-wash)" },
-  rejeitado: { label: "Rejeitado", cor: "#b3261e", bg: "#fdeceb" },
-};
-
-function one<T>(v: T | T[] | null | undefined): T | null {
-  return Array.isArray(v) ? v[0] ?? null : v ?? null;
-}
+const STATUS_LABEL = resolverMapa(STATUS_VERIFICACAO);
 
 export default async function AdminPage() {
   const supabase = await createClient();
@@ -235,7 +228,7 @@ function CardDivergencia({ item }: { item: DivergenciaFinanceira }) {
   return (
     <div className="card" style={{ padding: 18 }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-        <strong style={{ color: "#b3261e", fontSize: 14.5 }}>
+        <strong style={{ color: "var(--danger)", fontSize: 14.5 }}>
           {DIVERGENCIA_LABEL[item.divergence_type] ?? item.divergence_type}
         </strong>
         <time style={{ color: "var(--ink-faint)", fontSize: 12.5 }}>
@@ -262,7 +255,7 @@ function CardOperacional({ caso }: { caso: CasoOperacional }) {
   const rotulo = caso.case_type === "quote_without_response"
     ? "Pedido sem proposta no prazo"
     : "Serviço aguardando aceite do profissional";
-  const cor = caso.priority === "critical" ? "#b3261e" : "var(--warm)";
+  const cor = caso.priority === "critical" ? "var(--danger)" : "var(--warm)";
 
   return (
     <div className="card" style={{ padding: 18, display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>

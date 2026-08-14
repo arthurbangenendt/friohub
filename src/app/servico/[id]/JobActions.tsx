@@ -31,7 +31,7 @@ export function JobActions({ jobId, status }: { jobId: string; status: string })
       >
         {pending ? "Salvando..." : acao.label}
       </button>
-      {erro && <p style={{ color: "#b3261e", fontSize: 13.5, marginTop: 8 }}>{erro}</p>}
+      {erro && <p style={{ color: "var(--danger)", fontSize: 13.5, marginTop: 8 }}>{erro}</p>}
     </div>
   );
 }

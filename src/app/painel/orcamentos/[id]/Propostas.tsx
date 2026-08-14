@@ -148,7 +148,7 @@ export function Propostas({
             </div>
 
             {aceita && (
-              <p style={{ marginTop: 14, marginBottom: 0, color: "#2E8B6F", fontWeight: 700, fontSize: 14 }}>
+              <p style={{ marginTop: 14, marginBottom: 0, color: "var(--good)", fontWeight: 700, fontSize: 14 }}>
                 Proposta aceita — o serviço foi criado.
               </p>
             )}
@@ -196,7 +196,7 @@ export function Propostas({
                       </div>
                     )}
 
-                    {erro && <p style={{ color: "#b3261e", fontSize: 13, margin: 0 }}>{erro}</p>}
+                    {erro && <p style={{ color: "var(--danger)", fontSize: 13, margin: 0 }}>{erro}</p>}
                     <div style={{ display: "flex", gap: 10 }}>
                       <button className="btn btn-primary" onClick={() => confirmar(p.id)} disabled={pending}>
                         {pending ? "Confirmando…" : "Confirmar contratação"}
@@ -230,7 +230,7 @@ function Linha({ k, v, destaque }: { k: string; v: string; destaque?: boolean })
   return (
     <div style={{ display: "flex", justifyContent: "space-between", gap: 16, paddingBottom: 8, borderBottom: "1px solid var(--line-soft)" }}>
       <span style={{ color: "var(--ink-faint)", flexShrink: 0 }}>{k}</span>
-      <span style={{ textAlign: "right", color: destaque ? "#b3261e" : "var(--ink)" }}>{v}</span>
+      <span style={{ textAlign: "right", color: destaque ? "var(--danger)" : "var(--ink)" }}>{v}</span>
     </div>
   );
 }

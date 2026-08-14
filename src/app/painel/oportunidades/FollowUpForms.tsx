@@ -14,7 +14,7 @@ export function CriarFollowUpForm({ pedidoId }: { pedidoId: string }) {
     <input name="titulo" aria-label="Objetivo do follow-up" defaultValue="Retornar proposta" minLength={2} maxLength={160} style={{ ...input, flex: "1 1 145px" }} />
     <input name="data" aria-label="Data do follow-up" type="datetime-local" required style={input} />
     <button className="btn" disabled={pending} style={{ height: 38, fontSize: 13 }}>{pending ? "Salvando…" : "Lembrar"}</button>
-    {state.message && <span role="status" style={{ width: "100%", fontSize: 12, color: state.ok ? "var(--good)" : "#b3261e" }}>{state.message}</span>}
+    {state.message && <span role="status" style={{ width: "100%", fontSize: 12, color: state.ok ? "var(--good)" : "var(--danger)" }}>{state.message}</span>}
   </form>;
 }
 
@@ -38,6 +38,6 @@ export function ConcluirFollowUpForm({ taskId, dueAt }: { taskId: string; dueAt:
       <input name="notes" aria-label="Observação" maxLength={1000} placeholder="Observação opcional" style={{ ...input, flex: "1 1 180px" }} />
       <button className="btn btn-primary" disabled={pending} style={{ height: 38, fontSize: 13 }}>{pending ? "Concluindo…" : "Concluir"}</button>
     </div>
-    {state.message && <span role="status" style={{ fontSize: 12, color: state.ok ? "var(--good)" : "#b3261e" }}>{state.message}</span>}
+    {state.message && <span role="status" style={{ fontSize: 12, color: state.ok ? "var(--good)" : "var(--danger)" }}>{state.message}</span>}
   </form>;
 }

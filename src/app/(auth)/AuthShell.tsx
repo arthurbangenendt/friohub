@@ -18,6 +18,7 @@ export function AuthShell({
   error,
   aviso,
   aba,
+  proximo,
 }: {
   title: string;
   subtitle: string;
@@ -27,7 +28,12 @@ export function AuthShell({
   aviso?: string;
   /** Qual aba fica ativa. `null` esconde as abas (fluxos fora do par entrar/criar). */
   aba?: "login" | "signup" | null;
+  /** Destino a preservar ao alternar entre Entrar e Criar conta. Sem isso, quem
+   *  chega de `/solicitar` e percebe que ainda não tem conta perde o contexto
+   *  justamente no clique da aba. */
+  proximo?: string;
 }) {
+  const q = proximo && proximo !== "/painel" ? `?next=${encodeURIComponent(proximo)}` : "";
   return (
     <main className="auth-split">
       {/* ---- coluna do formulário ---- */}
@@ -40,8 +46,8 @@ export function AuthShell({
 
           {aba !== null && (
             <div className="auth-tabs">
-              <Link href="/login" className="auth-tab" data-on={String(aba === "login")}>Entrar</Link>
-              <Link href="/signup" className="auth-tab" data-on={String(aba === "signup")}>Criar conta</Link>
+              <Link href={`/login${q}`} className="auth-tab" data-on={String(aba === "login")}>Entrar</Link>
+              <Link href={`/signup${q}`} className="auth-tab" data-on={String(aba === "signup")}>Criar conta</Link>
             </div>
           )}
 
@@ -127,8 +133,8 @@ function alerta(kind: "erro" | "aviso"): CSSProperties {
     padding: "10px 14px",
     borderRadius: 10,
     marginBottom: 18,
-    background: erro ? "#fdeceb" : "var(--warm-wash)",
-    color: erro ? "#b3261e" : "var(--warm)",
+    background: erro ? "var(--danger-wash)" : "var(--warm-wash)",
+    color: erro ? "var(--danger)" : "var(--warm)",
     border: `1px solid ${erro ? "#f5c6c2" : "transparent"}`,
   };
 }

@@ -162,7 +162,7 @@ export function PerfilForm({ inicial, catalogo }: { inicial: PerfilInput; catalo
         <Campo label="Atende CEPs iniciados em"><input value={cepPrefix} onChange={(e) => setCepPrefix(e.target.value)} style={input} placeholder="01" /></Campo>
       </div>
 
-      {erro && <p style={{ color: "#b3261e", fontSize: 14 }}>{erro}</p>}
+      {erro && <p style={{ color: "var(--danger)", fontSize: 14 }}>{erro}</p>}
       {salvo && <p style={{ color: "var(--good)", fontSize: 14, fontWeight: 600 }}>Perfil salvo! Você já aparece nas buscas dos clientes.</p>}
 
       <button className="btn btn-primary" onClick={salvar} disabled={pending} style={{ alignSelf: "flex-start", opacity: pending ? 0.7 : 1 }}>
