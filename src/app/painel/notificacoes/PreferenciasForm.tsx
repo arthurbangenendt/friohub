@@ -2,56 +2,143 @@
 
 import { useState, useTransition } from "react";
 import { salvarPreferencias, type PreferenciasNotificacao } from "./actions";
+import { Alert, useToast } from "@/components/ui";
 
-const OPCOES: { key: Exclude<keyof PreferenciasNotificacao, "email_enabled">; titulo: string; texto: string }[] = [
-  { key: "quote_requests", titulo: "Novos pedidos de orçamento", texto: "Quando um cliente envia um pedido para você." },
-  { key: "quotes", titulo: "Propostas e decisões", texto: "Proposta recebida, aceita, recusada ou pedido cancelado." },
-  { key: "job_updates", titulo: "Atualizações do serviço", texto: "Mudanças de estado durante o atendimento." },
-  { key: "messages", titulo: "Novas mensagens", texto: "Agrupadas em janelas de cinco minutos para evitar spam." },
-  { key: "reminders", titulo: "Agenda e lembretes", texto: "Propostas de horário, confirmações e lembretes de atendimento." },
+type ChaveEmail = "quote_requests" | "quotes" | "job_updates" | "messages" | "reminders";
+type ChaveApp = "inapp_quote_requests" | "inapp_quotes" | "inapp_job_updates" | "inapp_messages" | "inapp_reminders";
+
+const OPCOES: { email: ChaveEmail; app: ChaveApp; titulo: string; texto: string }[] = [
+  { email: "quote_requests", app: "inapp_quote_requests", titulo: "Novos pedidos de orçamento", texto: "Quando um cliente envia um pedido para você." },
+  { email: "quotes", app: "inapp_quotes", titulo: "Propostas e decisões", texto: "Proposta recebida, aceita, recusada ou pedido cancelado." },
+  { email: "job_updates", app: "inapp_job_updates", titulo: "Atualizações do serviço", texto: "Mudanças de estado durante o atendimento." },
+  { email: "messages", app: "inapp_messages", titulo: "Novas mensagens", texto: "Agrupadas em janelas de cinco minutos para evitar spam." },
+  { email: "reminders", app: "inapp_reminders", titulo: "Agenda e lembretes", texto: "Propostas de horário, confirmações e lembretes de atendimento." },
 ];
 
 export function PreferenciasForm({ inicial }: { inicial: PreferenciasNotificacao }) {
   const [valor, setValor] = useState(inicial);
-  const [mensagem, setMensagem] = useState<string | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const { mostrar } = useToast();
+
+  const alternar = (chave: keyof PreferenciasNotificacao) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setValor((atual) => ({ ...atual, [chave]: e.target.checked }));
 
   return (
     <div style={{ display: "grid", gap: 12 }}>
-      <label className="card" style={{ padding: 18, display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}>
-        <input type="checkbox" checked={valor.email_enabled}
-          onChange={(event) => setValor((atual) => ({ ...atual, email_enabled: event.target.checked }))} />
-        <span>
-          <strong style={{ display: "block", fontSize: 15 }}>Receber notificações por e-mail</strong>
-          <span style={{ color: "var(--ink-faint)", fontSize: 13 }}>Desative para pausar todos os e-mails transacionais.</span>
-        </span>
-      </label>
+      {/* O canal de e-mail ainda não tem entrega implementada. Deixar a coluna
+          ativa sem dizer isso seria prometer o que o produto não faz — o mesmo
+          critério que a tela de planos usa para a cobrança. */}
+      <Alert tipo="info">
+        O envio por e-mail ainda não está ativo. Você já pode deixar sua escolha
+        registrada: ela passa a valer assim que o canal for ligado. As
+        notificações dentro do app funcionam normalmente.
+      </Alert>
 
-      {OPCOES.map((opcao) => (
-        <label key={opcao.key} className="card" style={{
-          padding: 18, display: "flex", alignItems: "center", gap: 12,
-          cursor: valor.email_enabled ? "pointer" : "not-allowed", opacity: valor.email_enabled ? 1 : 0.55,
-        }}>
-          <input type="checkbox" checked={valor[opcao.key]} disabled={!valor.email_enabled}
-            onChange={(event) => setValor((atual) => ({ ...atual, [opcao.key]: event.target.checked }))} />
-          <span>
-            <strong style={{ display: "block", fontSize: 14.5 }}>{opcao.titulo}</strong>
-            <span style={{ color: "var(--ink-faint)", fontSize: 13 }}>{opcao.texto}</span>
+      <div className="card" style={{ padding: 18, display: "grid", gap: 14 }}>
+        <Interruptor
+          titulo="Notificações dentro do app"
+          texto="Desative para parar de receber avisos na sua caixa de notificações."
+          checked={valor.inapp_enabled}
+          onChange={alternar("inapp_enabled")}
+        />
+        <Interruptor
+          titulo="Notificações por e-mail"
+          texto="Vale para todos os e-mails transacionais quando o canal for ligado."
+          checked={valor.email_enabled}
+          onChange={alternar("email_enabled")}
+        />
+      </div>
+
+      <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+        {/* Cabeçalho da grade. Some no leitor de tela porque cada caixa já tem
+            rótulo próprio; aqui ele é orientação visual das duas colunas. */}
+        <div style={{ ...linha, borderBottom: "1px solid var(--line)", background: "var(--surface-2)" }} aria-hidden>
+          <span style={{ flex: 1, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--ink-soft)" }}>
+            Evento
           </span>
-        </label>
-      ))}
+          <span style={coluna}>No app</span>
+          <span style={coluna}>E-mail</span>
+        </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 4 }}>
-        <button className="btn btn-primary" disabled={pending}
-          onClick={() => startTransition(async () => {
-            setMensagem(null);
-            const resultado = await salvarPreferencias(valor);
-            setMensagem(resultado.ok ? "Preferências salvas." : resultado.error);
-          })}>
+        {OPCOES.map((o, i) => (
+          <div key={o.email} style={{ ...linha, borderTop: i === 0 ? "none" : "1px solid var(--line-soft)" }}>
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <strong style={{ display: "block", fontSize: 14.5 }}>{o.titulo}</strong>
+              <span style={{ fontSize: 13, color: "var(--ink-soft)" }}>{o.texto}</span>
+            </span>
+            <Caixa
+              rotulo={`${o.titulo} — no app`}
+              checked={valor[o.app]}
+              disabled={!valor.inapp_enabled}
+              onChange={alternar(o.app)}
+            />
+            <Caixa
+              rotulo={`${o.titulo} — por e-mail`}
+              checked={valor[o.email]}
+              disabled={!valor.email_enabled}
+              onChange={alternar(o.email)}
+            />
+          </div>
+        ))}
+      </div>
+
+      {erro && <Alert tipo="erro">{erro}</Alert>}
+
+      <div>
+        <button
+          className="btn btn-primary"
+          disabled={pending}
+          onClick={() =>
+            startTransition(async () => {
+              setErro(null);
+              const r = await salvarPreferencias(valor);
+              if (!r.ok) return setErro(r.error);
+              mostrar("Preferências salvas.");
+            })
+          }
+        >
           {pending ? "Salvando…" : "Salvar preferências"}
         </button>
-        {mensagem && <span style={{ fontSize: 13.5, color: mensagem === "Preferências salvas." ? "var(--good)" : "#b3261e" }}>{mensagem}</span>}
       </div>
     </div>
   );
 }
+
+function Interruptor({ titulo, texto, checked, onChange }: {
+  titulo: string; texto: string; checked: boolean;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+}) {
+  return (
+    <label style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}>
+      <input type="checkbox" checked={checked} onChange={onChange} />
+      <span>
+        <strong style={{ display: "block", fontSize: 15 }}>{titulo}</strong>
+        <span style={{ color: "var(--ink-soft)", fontSize: 13 }}>{texto}</span>
+      </span>
+    </label>
+  );
+}
+
+/* O rótulo é invisível mas existe: numa grade de caixas idênticas, sem ele o
+   leitor de tela anuncia dez vezes "caixa de seleção" e nada mais. */
+function Caixa({ rotulo, checked, disabled, onChange }: {
+  rotulo: string; checked: boolean; disabled: boolean;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+}) {
+  return (
+    <label style={{ ...coluna, cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.45 : 1 }}>
+      <span className="sr-only">{rotulo}</span>
+      <input type="checkbox" checked={checked} disabled={disabled} onChange={onChange} />
+    </label>
+  );
+}
+
+const linha: React.CSSProperties = {
+  display: "flex", alignItems: "center", gap: 12, padding: "14px 18px",
+};
+const coluna: React.CSSProperties = {
+  width: 64, flexShrink: 0, display: "grid", placeItems: "center",
+  fontSize: 12, fontWeight: 700, textTransform: "uppercase",
+  letterSpacing: "0.06em", color: "var(--ink-soft)",
+};

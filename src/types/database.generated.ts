@@ -118,6 +118,13 @@ export type Database = {
             foreignKeyName: "client_reviews_professional_id_fkey"
             columns: ["professional_id"]
             isOneToOne: false
+            referencedRelation: "diretorio_profissionais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_reviews_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
             referencedRelation: "professionals"
             referencedColumns: ["id"]
           },
@@ -240,6 +247,13 @@ export type Database = {
             columns: ["job_id"]
             isOneToOne: false
             referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
+            referencedRelation: "diretorio_profissionais"
             referencedColumns: ["id"]
           },
           {
@@ -534,6 +548,13 @@ export type Database = {
             foreignKeyName: "expenses_professional_id_fkey"
             columns: ["professional_id"]
             isOneToOne: false
+            referencedRelation: "diretorio_profissionais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
             referencedRelation: "professionals"
             referencedColumns: ["id"]
           },
@@ -612,6 +633,13 @@ export type Database = {
           starts_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "featured_placements_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
+            referencedRelation: "diretorio_profissionais"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "featured_placements_professional_id_fkey"
             columns: ["professional_id"]
@@ -964,6 +992,13 @@ export type Database = {
             foreignKeyName: "follow_up_tasks_professional_id_fkey"
             columns: ["professional_id"]
             isOneToOne: false
+            referencedRelation: "diretorio_profissionais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "follow_up_tasks_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
             referencedRelation: "professionals"
             referencedColumns: ["id"]
           },
@@ -1190,6 +1225,13 @@ export type Database = {
             foreignKeyName: "jobs_profissional_id_fkey"
             columns: ["profissional_id"]
             isOneToOne: false
+            referencedRelation: "diretorio_profissionais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "jobs_profissional_id_fkey"
+            columns: ["profissional_id"]
+            isOneToOne: false
             referencedRelation: "professionals"
             referencedColumns: ["id"]
           },
@@ -1239,6 +1281,13 @@ export type Database = {
             columns: ["equipment_id"]
             isOneToOne: false
             referencedRelation: "customer_equipment"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_recommendations_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
+            referencedRelation: "diretorio_profissionais"
             referencedColumns: ["id"]
           },
           {
@@ -1336,11 +1385,14 @@ export type Database = {
           available_at: string
           created_at: string
           dedupe_key: string
+          email_allowed: boolean
           event_type: string
           id: string
+          inapp_allowed: boolean
           last_error: string | null
           locked_at: string | null
           payload: Json
+          read_at: string | null
           recipient_id: string
           sent_at: string | null
           status: string
@@ -1353,11 +1405,14 @@ export type Database = {
           available_at?: string
           created_at?: string
           dedupe_key: string
+          email_allowed?: boolean
           event_type: string
           id?: string
+          inapp_allowed?: boolean
           last_error?: string | null
           locked_at?: string | null
           payload?: Json
+          read_at?: string | null
           recipient_id: string
           sent_at?: string | null
           status?: string
@@ -1370,11 +1425,14 @@ export type Database = {
           available_at?: string
           created_at?: string
           dedupe_key?: string
+          email_allowed?: boolean
           event_type?: string
           id?: string
+          inapp_allowed?: boolean
           last_error?: string | null
           locked_at?: string | null
           payload?: Json
+          read_at?: string | null
           recipient_id?: string
           sent_at?: string | null
           status?: string
@@ -1393,6 +1451,12 @@ export type Database = {
       notification_preferences: {
         Row: {
           email_enabled: boolean
+          inapp_enabled: boolean
+          inapp_job_updates: boolean
+          inapp_messages: boolean
+          inapp_quote_requests: boolean
+          inapp_quotes: boolean
+          inapp_reminders: boolean
           job_updates: boolean
           messages: boolean
           quote_requests: boolean
@@ -1403,6 +1467,12 @@ export type Database = {
         }
         Insert: {
           email_enabled?: boolean
+          inapp_enabled?: boolean
+          inapp_job_updates?: boolean
+          inapp_messages?: boolean
+          inapp_quote_requests?: boolean
+          inapp_quotes?: boolean
+          inapp_reminders?: boolean
           job_updates?: boolean
           messages?: boolean
           quote_requests?: boolean
@@ -1413,6 +1483,12 @@ export type Database = {
         }
         Update: {
           email_enabled?: boolean
+          inapp_enabled?: boolean
+          inapp_job_updates?: boolean
+          inapp_messages?: boolean
+          inapp_quote_requests?: boolean
+          inapp_quotes?: boolean
+          inapp_reminders?: boolean
           job_updates?: boolean
           messages?: boolean
           quote_requests?: boolean
@@ -1774,6 +1850,13 @@ export type Database = {
             foreignKeyName: "plan_interest_professional_id_fkey"
             columns: ["professional_id"]
             isOneToOne: false
+            referencedRelation: "diretorio_profissionais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plan_interest_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
             referencedRelation: "professionals"
             referencedColumns: ["id"]
           },
@@ -1909,6 +1992,13 @@ export type Database = {
             foreignKeyName: "pmoc_plans_professional_id_fkey"
             columns: ["professional_id"]
             isOneToOne: false
+            referencedRelation: "diretorio_profissionais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pmoc_plans_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
             referencedRelation: "professionals"
             referencedColumns: ["id"]
           },
@@ -1993,6 +2083,13 @@ export type Database = {
           url?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "portfolio_items_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
+            referencedRelation: "diretorio_profissionais"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "portfolio_items_professional_id_fkey"
             columns: ["professional_id"]
@@ -2095,6 +2192,13 @@ export type Database = {
             foreignKeyName: "professional_client_notes_professional_id_fkey"
             columns: ["professional_id"]
             isOneToOne: false
+            referencedRelation: "diretorio_profissionais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "professional_client_notes_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
             referencedRelation: "professionals"
             referencedColumns: ["id"]
           },
@@ -2126,6 +2230,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "professional_goals_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
+            referencedRelation: "diretorio_profissionais"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "professional_goals_professional_id_fkey"
             columns: ["professional_id"]
@@ -2171,6 +2282,13 @@ export type Database = {
             foreignKeyName: "professional_skills_professional_id_fkey"
             columns: ["professional_id"]
             isOneToOne: false
+            referencedRelation: "diretorio_profissionais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "professional_skills_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
             referencedRelation: "professionals"
             referencedColumns: ["id"]
           },
@@ -2193,6 +2311,13 @@ export type Database = {
           tag_slug?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "professional_tags_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
+            referencedRelation: "diretorio_profissionais"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "professional_tags_professional_id_fkey"
             columns: ["professional_id"]
@@ -2560,6 +2685,13 @@ export type Database = {
             foreignKeyName: "quote_request_targets_professional_id_fkey"
             columns: ["professional_id"]
             isOneToOne: false
+            referencedRelation: "diretorio_profissionais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_request_targets_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
             referencedRelation: "professionals"
             referencedColumns: ["id"]
           },
@@ -2724,6 +2856,13 @@ export type Database = {
             foreignKeyName: "quotes_professional_id_fkey"
             columns: ["professional_id"]
             isOneToOne: false
+            referencedRelation: "diretorio_profissionais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
             referencedRelation: "professionals"
             referencedColumns: ["id"]
           },
@@ -2813,6 +2952,13 @@ export type Database = {
             foreignKeyName: "reviews_professional_id_fkey"
             columns: ["professional_id"]
             isOneToOne: false
+            referencedRelation: "diretorio_profissionais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
             referencedRelation: "professionals"
             referencedColumns: ["id"]
           },
@@ -2841,6 +2987,13 @@ export type Database = {
           professional_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "service_areas_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
+            referencedRelation: "diretorio_profissionais"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "service_areas_professional_id_fkey"
             columns: ["professional_id"]
@@ -2941,6 +3094,13 @@ export type Database = {
             columns: ["job_id"]
             isOneToOne: true
             referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_executions_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
+            referencedRelation: "diretorio_profissionais"
             referencedColumns: ["id"]
           },
           {
@@ -3137,6 +3297,33 @@ export type Database = {
       }
     }
     Views: {
+      diretorio_profissionais: {
+        Row: {
+          anos_experiencia: number | null
+          avaliacoes: number | null
+          avatar_url: string | null
+          banner_url: string | null
+          bio: string | null
+          cidade: string | null
+          especialidades: string[] | null
+          estado: string | null
+          id: string | null
+          nome: string | null
+          nota: number | null
+          servicos: number | null
+          tipo: string | null
+          verification_status: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "professionals_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       entregas_cliente: {
         Row: {
           codigo_rastreio: string | null
@@ -3417,6 +3604,7 @@ export type Database = {
         Args: { p_plan_id: string; p_reason: string }
         Returns: undefined
       }
+      categoria_notificacao: { Args: { p_event_type: string }; Returns: string }
       cliente_da_purchase_order: {
         Args: { p_order_id: string }
         Returns: boolean
@@ -3533,6 +3721,8 @@ export type Database = {
         Args: { p_conversation_id: string }
         Returns: undefined
       }
+      marcar_notificacao_lida: { Args: { p_id: string }; Returns: boolean }
+      marcar_notificacoes_lidas: { Args: never; Returns: number }
       obter_cnpj_distribuidora: {
         Args: { p_distributor_id: string }
         Returns: string

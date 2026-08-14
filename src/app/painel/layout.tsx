@@ -7,6 +7,16 @@ import { PainelNav } from "./PainelNav";
 import { Avatar } from "./Avatar";
 import { comoPapel, HREF_PERFIL, NAV_POR_PAPEL, ROTULO_PAPEL } from "./navegacao";
 import { featureHabilitada } from "@/lib/feature-flags";
+import { categoriaNotificacao } from "@/lib/notificacoes";
+import { Bell } from "@/components/icons";
+
+/* O rótulo carrega o número porque o badge visual é `aria-hidden`: quem usa
+   leitor de tela precisa ouvir "3 notificações novas", não "Notificações" e
+   depois um "3" solto. */
+function rotuloSino(n: number) {
+  if (n === 0) return "Notificações";
+  return `Notificações, ${n} ${n === 1 ? "nova" : "novas"}`;
+}
 
 /* Shell da área logada. Cada papel vê uma navegação diferente — a distinção sai
    de `profiles.role`, não de heurística na tela. O mapa papel → itens vive em
@@ -40,6 +50,29 @@ export default async function PainelLayout({ children }: LayoutProps<"/painel">)
     .is("read_at", null)
     .neq("sender_id", user.id);
 
+  /* Notificações não lidas, trazidas como lista de tipos em vez de contagem:
+     com uma consulta só dá para alimentar o sino (total) e os contadores por
+     item de menu (orçamentos, agenda). A política de SELECT já recorta por
+     destinatário e por `inapp_allowed`. O teto de 200 existe porque nenhum
+     badge precisa dizer mais que "99+", e sem ele o shell pagaria por uma
+     varredura que cresce sem limite. */
+  const { data: avisos } = await supabase
+    .from("notification_outbox")
+    .select("event_type")
+    .is("read_at", null)
+    .limit(200);
+
+  const contagem = new Map<string, number>();
+  for (const a of avisos ?? []) {
+    const c = categoriaNotificacao(a.event_type);
+    contagem.set(c, (contagem.get(c) ?? 0) + 1);
+  }
+  const badges: Record<string, number> = {
+    notificacoes: avisos?.length ?? 0,
+    orcamentos: (contagem.get("quote_requests") ?? 0) + (contagem.get("quotes") ?? 0),
+    agenda: contagem.get("reminders") ?? 0,
+  };
+
   return (
     <div className="painel-shell">
       <aside className="painel-side">
@@ -61,14 +94,27 @@ export default async function PainelLayout({ children }: LayoutProps<"/painel">)
           </span>
         </Link>
 
-        <PainelNav itens={itens} naoLidas={naoLidas ?? 0} />
+        {/* O sino fica fora da lista de navegação de propósito: no celular a
+            lista vira uma faixa rolável, e o aviso de "tem coisa nova" não pode
+            depender de a pessoa arrastar até achar. Aqui ele está sempre
+            visível, nos dois layouts. */}
+        <Link href="/painel/notificacoes" className="painel-sino" aria-label={rotuloSino(badges.notificacoes)}>
+          <Bell size={18} />
+          {badges.notificacoes > 0 && (
+            <span aria-hidden className="painel-sino-n">
+              {badges.notificacoes > 99 ? "99+" : badges.notificacoes}
+            </span>
+          )}
+        </Link>
+
+        <PainelNav itens={itens} naoLidas={naoLidas ?? 0} badges={badges} />
 
         <form action={logout} className="painel-sair-wrap">
           <button type="submit" className="painel-sair">Sair</button>
         </form>
       </aside>
 
-      <main className="painel-main">{children}</main>
+      <main className="painel-main" id="conteudo">{children}</main>
     </div>
   );
 }

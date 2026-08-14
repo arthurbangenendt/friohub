@@ -17,7 +17,14 @@ const ICONE = {
 
 /* Único pedaço cliente do shell: só existe para marcar o link ativo, que
    depende do pathname. O resto do layout continua sendo server component. */
-export function PainelNav({ itens, naoLidas = 0 }: { itens: ItemNav[]; naoLidas?: number }) {
+export function PainelNav({
+  itens, naoLidas = 0, badges = {},
+}: {
+  itens: ItemNav[];
+  naoLidas?: number;
+  /** Não lidas por item, chaveado pelo `icone`. Ver o cálculo em `layout.tsx`. */
+  badges?: Record<string, number>;
+}) {
   const pathname = usePathname();
 
   return (
@@ -27,17 +34,21 @@ export function PainelNav({ itens, naoLidas = 0 }: { itens: ItemNav[]; naoLidas?
         const Icone = ICONE[i.icone];
         // "/painel" casa exato; as demais casam por prefixo (subrotas ficam ativas).
         const ativo = i.href === "/painel" ? pathname === "/painel" : pathname.startsWith(i.href);
-        const marcar = i.icone === "mensagens" && naoLidas > 0;
+        /* Mensagens tem contagem própria (tabela `messages`), que é mais fiel do
+           que derivar da outbox: ela sabe o que foi aberto na conversa. */
+        const n = i.icone === "mensagens" ? naoLidas : badges[i.icone] ?? 0;
         return (
           <Link key={i.href} href={i.href} className="painel-link" data-on={String(ativo)}>
             <span className="painel-link-ic"><Icone size={17} /></span>
             {i.label}
-            {/* Bolinha, não contador: o menu só precisa dizer "tem coisa nova". */}
-            {marcar && (
-              <span
-                aria-label={`${naoLidas} não lidas`}
-                style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--cool)", marginLeft: "auto" }}
-              />
+            {/* Número, não bolinha: "3 orçamentos esperando" e "12 esperando"
+                pedem urgências diferentes, e a bolinha dizia o mesmo para os
+                dois casos. */}
+            {n > 0 && (
+              <>
+                <span aria-hidden className="painel-link-n">{n > 99 ? "99+" : n}</span>
+                <span className="sr-only">{`, ${n} ${n === 1 ? "não lida" : "não lidas"}`}</span>
+              </>
             )}
           </Link>
         );
