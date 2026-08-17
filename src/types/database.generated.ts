@@ -53,83 +53,6 @@ export type Database = {
           },
         ]
       }
-      chatwoot_events: {
-        Row: {
-          attempts: number
-          chatwoot_event_id: string
-          event_type: string
-          id: string
-          last_error: string | null
-          occurred_at: string
-          payload: Json
-          processed_at: string | null
-          processing_status: string
-          received_at: string
-        }
-        Insert: {
-          attempts?: number
-          chatwoot_event_id: string
-          event_type: string
-          id?: string
-          last_error?: string | null
-          occurred_at: string
-          payload: Json
-          processed_at?: string | null
-          processing_status?: string
-          received_at?: string
-        }
-        Update: {
-          attempts?: number
-          chatwoot_event_id?: string
-          event_type?: string
-          id?: string
-          last_error?: string | null
-          occurred_at?: string
-          payload?: Json
-          processed_at?: string | null
-          processing_status?: string
-          received_at?: string
-        }
-        Relationships: []
-      }
-      chatwoot_identities: {
-        Row: {
-          chatwoot_contact_id: number | null
-          chatwoot_user_id: number | null
-          contact_synced_at: string | null
-          created_at: string
-          pii_synced_at: string | null
-          profile_id: string
-          updated_at: string
-        }
-        Insert: {
-          chatwoot_contact_id?: number | null
-          chatwoot_user_id?: number | null
-          contact_synced_at?: string | null
-          created_at?: string
-          pii_synced_at?: string | null
-          profile_id: string
-          updated_at?: string
-        }
-        Update: {
-          chatwoot_contact_id?: number | null
-          chatwoot_user_id?: number | null
-          contact_synced_at?: string | null
-          created_at?: string
-          pii_synced_at?: string | null
-          profile_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "chatwoot_identities_profile_id_fkey"
-            columns: ["profile_id"]
-            isOneToOne: true
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       city_billing_config: {
         Row: {
           cidade: string
@@ -288,40 +211,28 @@ export type Database = {
       }
       conversations: {
         Row: {
-          canal: string
-          chatwoot_conversation_id: number | null
-          chatwoot_inbox_id: number | null
           cliente_id: string
           created_at: string
           id: string
           job_id: string | null
           last_message_at: string | null
           professional_id: string
-          status_atendimento: string
         }
         Insert: {
-          canal?: string
-          chatwoot_conversation_id?: number | null
-          chatwoot_inbox_id?: number | null
           cliente_id: string
           created_at?: string
           id?: string
           job_id?: string | null
           last_message_at?: string | null
           professional_id: string
-          status_atendimento?: string
         }
         Update: {
-          canal?: string
-          chatwoot_conversation_id?: number | null
-          chatwoot_inbox_id?: number | null
           cliente_id?: string
           created_at?: string
           id?: string
           job_id?: string | null
           last_message_at?: string | null
           professional_id?: string
-          status_atendimento?: string
         }
         Relationships: [
           {
@@ -1513,36 +1424,27 @@ export type Database = {
       messages: {
         Row: {
           body: string
-          canal: string
-          chatwoot_message_id: number | null
           conversation_id: string
           created_at: string
           id: string
           read_at: string | null
-          sender_id: string | null
-          sender_kind: string
+          sender_id: string
         }
         Insert: {
           body: string
-          canal?: string
-          chatwoot_message_id?: number | null
           conversation_id: string
           created_at?: string
           id?: string
           read_at?: string | null
-          sender_id?: string | null
-          sender_kind: string
+          sender_id: string
         }
         Update: {
           body?: string
-          canal?: string
-          chatwoot_message_id?: number | null
           conversation_id?: string
           created_at?: string
           id?: string
           read_at?: string | null
-          sender_id?: string | null
-          sender_kind?: string
+          sender_id?: string
         }
         Relationships: [
           {
@@ -1581,7 +1483,6 @@ export type Database = {
           sent_at: string | null
           status: string
           updated_at: string
-          whatsapp_allowed: boolean
         }
         Insert: {
           aggregate_id: string
@@ -1602,7 +1503,6 @@ export type Database = {
           sent_at?: string | null
           status?: string
           updated_at?: string
-          whatsapp_allowed?: boolean
         }
         Update: {
           aggregate_id?: string
@@ -1623,7 +1523,6 @@ export type Database = {
           sent_at?: string | null
           status?: string
           updated_at?: string
-          whatsapp_allowed?: boolean
         }
         Relationships: [
           {
@@ -1651,12 +1550,6 @@ export type Database = {
           reminders: boolean
           updated_at: string
           user_id: string
-          whatsapp_enabled: boolean
-          whatsapp_job_updates: boolean
-          whatsapp_messages: boolean
-          whatsapp_quote_requests: boolean
-          whatsapp_quotes: boolean
-          whatsapp_reminders: boolean
         }
         Insert: {
           email_enabled?: boolean
@@ -1673,12 +1566,6 @@ export type Database = {
           reminders?: boolean
           updated_at?: string
           user_id: string
-          whatsapp_enabled?: boolean
-          whatsapp_job_updates?: boolean
-          whatsapp_messages?: boolean
-          whatsapp_quote_requests?: boolean
-          whatsapp_quotes?: boolean
-          whatsapp_reminders?: boolean
         }
         Update: {
           email_enabled?: boolean
@@ -1695,12 +1582,6 @@ export type Database = {
           reminders?: boolean
           updated_at?: string
           user_id?: string
-          whatsapp_enabled?: boolean
-          whatsapp_job_updates?: boolean
-          whatsapp_messages?: boolean
-          whatsapp_quote_requests?: boolean
-          whatsapp_quotes?: boolean
-          whatsapp_reminders?: boolean
         }
         Relationships: [
           {
@@ -3906,10 +3787,6 @@ export type Database = {
         Args: { p_plan_id: string; p_professional_id: string }
         Returns: undefined
       }
-      atualizar_status_conversa_chatwoot: {
-        Args: { p_chatwoot_conversation_id: number; p_status: string }
-        Returns: undefined
-      }
       avaliar_saude_sistema: { Args: never; Returns: string }
       avancar_purchase_order: {
         Args: {
@@ -4003,16 +3880,8 @@ export type Database = {
         Args: { p_order_id: string }
         Returns: boolean
       }
-      concluir_evento_chatwoot: {
-        Args: { p_error?: string; p_event_id: string; p_status: string }
-        Returns: string
-      }
       concluir_follow_up: {
         Args: { p_notes?: string; p_outcome: string; p_task_id: string }
-        Returns: undefined
-      }
-      concluir_notificacao_whatsapp: {
-        Args: { p_enviado: boolean; p_erro?: string; p_id: string }
         Returns: undefined
       }
       concluir_visita_pmoc: {
@@ -4036,10 +3905,6 @@ export type Database = {
           p_subject_id: string
           p_window_seconds: number
         }
-        Returns: undefined
-      }
-      consumir_limite_mensagem: {
-        Args: { p_user_id: string }
         Returns: undefined
       }
       criar_follow_up: {
@@ -4083,8 +3948,6 @@ export type Database = {
         Args: { p_quote_request_id: string }
         Returns: boolean
       }
-      destravar_notificacoes_presas: { Args: never; Returns: number }
-      disparar_worker_chatwoot: { Args: never; Returns: undefined }
       distancia_coordenadas_km: {
         Args: {
           p_latitude_destino: number
@@ -4109,18 +3972,6 @@ export type Database = {
           p_event_type: string
           p_payload: Json
           p_recipient_id: string
-        }
-        Returns: string
-      }
-      espelhar_mensagem_chatwoot: {
-        Args: {
-          p_body: string
-          p_canal?: string
-          p_chatwoot_conversation_id: number
-          p_chatwoot_message_id: number
-          p_created_at?: string
-          p_sender_kind: string
-          p_sender_profile_id?: string
         }
         Returns: string
       }
@@ -4155,10 +4006,6 @@ export type Database = {
       }
       marcar_notificacao_lida: { Args: { p_id: string }; Returns: boolean }
       marcar_notificacoes_lidas: { Args: never; Returns: number }
-      marcar_pii_sincronizado_chatwoot: {
-        Args: { p_profile_ids: string[] }
-        Returns: number
-      }
       obter_cnpj_distribuidora: {
         Args: { p_distributor_id: string }
         Returns: string
@@ -4182,14 +4029,6 @@ export type Database = {
         Returns: {
           checked_at: string
           status: string
-        }[]
-      }
-      pii_liberado_para_chatwoot: {
-        Args: { p_conversation_id: string }
-        Returns: {
-          email: string
-          profile_id: string
-          telefone: string
         }[]
       }
       pode_ler_foto_orcamento: {
@@ -4263,19 +4102,6 @@ export type Database = {
         Args: { p_quote_request_id: string; p_reason: string }
         Returns: undefined
       }
-      registrar_evento_chatwoot: {
-        Args: {
-          p_chatwoot_event_id: string
-          p_event_type: string
-          p_occurred_at?: string
-          p_payload: Json
-        }
-        Returns: {
-          event_id: string
-          novo: boolean
-          status: string
-        }[]
-      }
       registrar_evento_gateway: {
         Args: {
           p_amount: number
@@ -4287,28 +4113,6 @@ export type Database = {
           p_payload: Json
         }
         Returns: string
-      }
-      registrar_identidade_chatwoot: {
-        Args: {
-          p_contact_id?: number
-          p_profile_id: string
-          p_user_id?: number
-        }
-        Returns: {
-          chatwoot_contact_id: number | null
-          chatwoot_user_id: number | null
-          contact_synced_at: string | null
-          created_at: string
-          pii_synced_at: string | null
-          profile_id: string
-          updated_at: string
-        }
-        SetofOptions: {
-          from: "*"
-          to: "chatwoot_identities"
-          isOneToOne: true
-          isSetofReturn: false
-        }
       }
       registrar_interesse_plano: {
         Args: { p_ciclo: string; p_slug: string }
@@ -4327,18 +4131,6 @@ export type Database = {
           p_reversal_of?: string
         }
         Returns: string
-      }
-      reservar_notificacoes_whatsapp: {
-        Args: { p_limite?: number }
-        Returns: {
-          aggregate_id: string
-          aggregate_type: string
-          attempts: number
-          event_type: string
-          id: string
-          payload: Json
-          recipient_id: string
-        }[]
       }
       responder_agendamento: {
         Args: { p_accept: boolean; p_appointment_id: string; p_reason?: string }
@@ -4396,14 +4188,6 @@ export type Database = {
           p_checkout_url: string
           p_due_date: string
           p_gateway_payment_id: string
-        }
-        Returns: undefined
-      }
-      vincular_conversa_chatwoot: {
-        Args: {
-          p_chatwoot_conversation_id: number
-          p_chatwoot_inbox_id?: number
-          p_conversation_id: string
         }
         Returns: undefined
       }
