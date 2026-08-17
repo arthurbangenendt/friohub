@@ -189,6 +189,19 @@ async function classificarAutor(
     return { sender_kind: "automacao", sender_profile_id: null };
   }
 
+  /* Via principal: `chatwoot-outbound` autentica sempre com o token do agente
+     de integração — o profissional não tem token próprio (ele nunca loga no
+     Chatwoot, ver ADR 004). Sem esta marca, TODA resposta de profissional
+     chegaria aqui como se fosse do bot de integração e cairia em 'equipe' lá
+     embaixo, e `handoff_liberado()` nunca contaria o lado dele. A marca só é
+     confiável porque quem a grava (chatwoot-outbound) já verificou a
+     participação antes de gravar; aqui ainda cruzamos contra a conversa local
+     antes de aceitar. */
+  const marcado = msg.content_attributes?.friohub_sender_profile_id;
+  if (marcado && marcado === conversa.professional_id) {
+    return { sender_kind: "profissional", sender_profile_id: marcado };
+  }
+
   const { data } = await db
     .from("chatwoot_identities")
     .select("profile_id")

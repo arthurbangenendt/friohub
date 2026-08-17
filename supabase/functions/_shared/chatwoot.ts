@@ -75,6 +75,9 @@ export type MensagemWebhook = {
   inbox: { id: number; name: string; channel_type?: string };
   sender?: { id: number; type?: string; identifier?: string | null } | null;
   source_id?: string | null;
+  /* `friohub_sender_profile_id`: quem realmente escreveu, do nosso lado — ver
+     o comentário em classificarAutor() no chatwoot-webhook. */
+  content_attributes?: { friohub_sender_profile_id?: string } | null;
 };
 
 export type EventoWebhook = {

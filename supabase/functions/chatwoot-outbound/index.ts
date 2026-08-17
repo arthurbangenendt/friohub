@@ -71,11 +71,24 @@ Deno.serve(async (req) => {
 
     /* No modelo do Chatwoot o Contact é o cliente e o agente é o profissional.
        `incoming` = veio do contato; `outgoing` = veio do lado do agente. É essa
-       distinção que o webhook usa depois para classificar `sender_kind`. */
+       distinção que o webhook usa depois para classificar `sender_kind` — mas
+       só para o lado cliente. Do lado profissional NÃO basta: esta função
+       autentica sempre com o token do agente de integração (o profissional não
+       tem token próprio — é a proteção #2 do ADR 004, ele nunca loga no
+       Chatwoot), então, sem mais nada, TODA resposta de profissional seria
+       atribuída ao bot de integração e o webhook a classificaria como
+       'equipe'. Isso quebraria `handoff_liberado()` de vez: nenhuma resposta
+       de profissional contaria como "o lado dele falou", e a regra de 4 dias
+       nunca seria cumprida por conversa nenhuma vinda do Chatwoot.
+       `content_attributes.friohub_sender_profile_id` carrega quem de fato
+       está autenticado aqui — já verificado acima como participante da
+       conversa — e o webhook usa isso para classificar corretamente antes de
+       cair no fallback por `chatwoot_user_id`. */
     const mensagem = await chatwoot("POST", `/conversations/${displayId}/messages`, {
       content: texto,
       message_type: ehCliente ? "incoming" : "outgoing",
       private: false,
+      content_attributes: { friohub_sender_profile_id: userId },
     });
 
     return json({

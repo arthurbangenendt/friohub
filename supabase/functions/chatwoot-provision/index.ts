@@ -44,17 +44,34 @@ Deno.serve(async (req) => {
 
   const limite = Math.min(Math.max(1, corpo.limite ?? LOTE_MAXIMO), LOTE_MAXIMO);
 
-  /* Quem ainda não tem usuário no Chatwoot. `chatwoot_user_id is null` cobre
-     tanto quem nunca foi provisionado quanto quem só tem contato. */
-  const { data, error } = await db
+  /* Quem ainda não tem usuário no Chatwoot. Duas consultas, não um embed:
+     `chatwoot_identities.profile_id` referencia `profiles(id)`, não
+     `professionals(id)` — mesmo os dois compartilhando o mesmo espaço de PK,
+     não há FK direta entre as duas tabelas para o PostgREST inferir o embed
+     (`professionals!left(chatwoot_identities...)` falha com "Could not find a
+     relationship"). O anti-join fica em memória, sobre no máximo LOTE_MAXIMO
+     ids de cada lado. */
+  const { data: profissionais, error: erroProfissionais } = await db
     .from("professionals")
-    .select("id, chatwoot_identities!left(chatwoot_user_id)")
-    .is("chatwoot_identities.chatwoot_user_id", null)
-    .limit(limite);
+    .select("id")
+    .limit(limite * 4);
+  if (erroProfissionais) return json({ error: `consulta falhou: ${erroProfissionais.message}` }, 500);
 
-  if (error) return json({ error: `consulta falhou: ${error.message}` }, 500);
+  const idsProfissionais = (profissionais ?? []).map((p: { id: string }) => p.id);
+  const { data: identidades, error: erroIdentidades } = idsProfissionais.length
+    ? await db
+        .from("chatwoot_identities")
+        .select("profile_id, chatwoot_user_id")
+        .in("profile_id", idsProfissionais)
+        .not("chatwoot_user_id", "is", null)
+    : { data: [] as Array<{ profile_id: string }>, error: null };
+  if (erroIdentidades) return json({ error: `consulta falhou: ${erroIdentidades.message}` }, 500);
 
-  const pendentes = (data ?? []) as Array<{ id: string }>;
+  const jaProvisionados = new Set((identidades ?? []).map((i: { profile_id: string }) => i.profile_id));
+  const pendentes = idsProfissionais
+    .filter((id: string) => !jaProvisionados.has(id))
+    .slice(0, limite)
+    .map((id: string) => ({ id }));
   const resultados: Array<Record<string, unknown>> = [];
 
   for (const p of pendentes) {
