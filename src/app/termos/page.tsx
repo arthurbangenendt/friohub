@@ -45,6 +45,12 @@ export default function TermosPage() {
         É proibido usar o chat para assédio, ofensa, spam ou oferta de serviço alheio à
         plataforma. As mensagens ficam registradas e podem ser consultadas pela FrioHub
         em caso de suporte ou disputa sobre um serviço.
+        <br />
+        <br />
+        A conversa pode continuar por outros canais de atendimento (WhatsApp, e-mail,
+        redes sociais) e, quando isso acontece, ela é reunida no mesmo histórico. As
+        regras acima valem igualmente em qualquer canal, inclusive a de que o telefone
+        só é compartilhado com autorização das duas partes.
       </Secao>
       <Secao t="7. Cancelamento">
         Cliente e profissional podem cancelar uma solicitação antes do início da

@@ -55,8 +55,11 @@ insert into public.notification_preferences(user_id,email_enabled,inapp_enabled)
 values ('98000000-0000-0000-0000-000000000001',false,true);
 
 -- Usuário 2 desligou os dois canais.
-insert into public.notification_preferences(user_id,email_enabled,inapp_enabled)
-values ('98000000-0000-0000-0000-000000000002',false,false);
+/* Desde 20260815093000 são TRÊS canais. A regra continua a mesma — sem nenhum
+   canal para entregar, o evento não é gravado —, mas desligar dois já não basta
+   para exercitá-la. */
+insert into public.notification_preferences(user_id,email_enabled,inapp_enabled,whatsapp_enabled)
+values ('98000000-0000-0000-0000-000000000002',false,false,false);
 
 select public.enqueue_notification(
   '98000000-0000-0000-0000-000000000001','new_message','conversation',
@@ -85,7 +88,7 @@ select is(
 select is(
   (select count(*)::integer from public.notification_outbox where dedupe_key='teste-inbox-2'),
   0,
-  'com os dois canais desligados nada é gravado'
+  'com todos os canais desligados nada é gravado'
 );
 
 -- ---------------------------------------------------------------------------

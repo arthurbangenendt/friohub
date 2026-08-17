@@ -47,8 +47,8 @@ select lives_ok('select public.avaliar_saude_sistema()', 'health check completo 
 select ok((select count(*) > 0 from public.system_health_runs), 'health check cria uma execução');
 select is(
   (select count(*)::integer from public.system_health_checks where run_id = (select id from public.system_health_runs order by started_at desc limit 1)),
-  6,
-  'execução cobre banco, notificações, webhooks, reconciliação, SLA e PMOC'
+  8,
+  'execução cobre banco, notificações, webhooks, reconciliação, SLA, PMOC e os dois componentes do Chatwoot'
 );
 select ok(has_function_privilege('anon', 'public.obter_saude_publica()', 'execute'), 'status agregado pode alimentar endpoint público');
 select ok(not has_table_privilege('anon', 'public.system_health_checks', 'SELECT'), 'detalhes internos não vazam no endpoint público');

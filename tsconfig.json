@@ -30,5 +30,6 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules"]
+  "//": "supabase/functions roda em Deno, não no Next: usa o global Deno, imports jsr: e extensão .ts explícita. Tipar com este tsconfig só produziria erro falso. A verificação delas é o próprio bundle do `supabase functions deploy`.",
+  "exclude": ["node_modules", "supabase/functions"]
 }

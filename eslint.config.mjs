@@ -14,6 +14,9 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Artefatos locais gerados pelo Supabase CLI (Edge Runtime, secrets etc.).
     "supabase/.temp/**",
+    // Edge Functions são Deno, não Next: global `Deno`, imports `jsr:` e
+    // extensão `.ts` explícita. Quem as valida é `supabase functions deploy`.
+    "supabase/functions/**",
   ]),
 ]);
 

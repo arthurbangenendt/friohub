@@ -8,9 +8,33 @@ import { enviarMensagem } from "../actions";
 
 export type Mensagem = {
   id: string;
-  sender_id: string;
+  /* Nulo quando o autor não tem perfil no FrioHub: equipe respondendo pelo
+     painel do Chatwoot, automação, aviso de sistema. */
+  sender_id: string | null;
+  sender_kind: string;
   body: string;
   created_at: string;
+  canal: string;
+  chatwoot_message_id: number | null;
+};
+
+/* Nome do canal para quem lê. 'app' não aparece: é o normal, e rotular o normal
+   só polui — a etiqueta serve para avisar que a conversa saiu daqui. */
+const ROTULO_CANAL: Record<string, string> = {
+  whatsapp: "WhatsApp",
+  site: "Site",
+  email: "E-mail",
+  instagram: "Instagram",
+  facebook: "Facebook",
+  telegram: "Telegram",
+  sms: "SMS",
+  outro: "Outro canal",
+};
+
+const ROTULO_AUTOR: Record<string, string> = {
+  equipe: "Equipe FrioHub",
+  automacao: "Mensagem automática",
+  sistema: "Sistema",
 };
 
 export type ParticipanteAuditoria = {
@@ -66,11 +90,28 @@ export function Thread({
 
   /* Junta mensagens sem duplicar e mantém a ordem cronológica. Três fontes
      escrevem aqui — o retorno do envio, o Realtime e o refresh do servidor —
-     e sem dedupe por id a mesma mensagem apareceria mais de uma vez. */
+     e sem dedupe a mesma mensagem apareceria mais de uma vez.
+
+     A chave não é o `id` sozinho. Quando a mensagem vai pelo Chatwoot, quem
+     insere em `messages` é o webhook, então o retorno do envio traz uma linha
+     otimista com id provisório e a linha real chega depois, pelo Realtime, com
+     id de banco. As duas só se reconhecem pelo `chatwoot_message_id`, que é o
+     mesmo nas duas pontas. */
+  const chave = (m: Mensagem) =>
+    m.chatwoot_message_id != null ? `cw:${m.chatwoot_message_id}` : m.id;
+
   const juntar = (atual: Mensagem[], novas: Mensagem[]) => {
-    const porId = new Map(atual.map((m) => [m.id, m]));
-    for (const m of novas) porId.set(m.id, m);
-    return [...porId.values()].sort((a, b) => a.created_at.localeCompare(b.created_at));
+    const porChave = new Map(atual.map((m) => [chave(m), m]));
+    for (const m of novas) {
+      const k = chave(m);
+      const anterior = porChave.get(k);
+      /* A linha do banco substitui a otimista, nunca o contrário: o Realtime
+         pode chegar ANTES do retorno do envio, e nesse caso o retorno não pode
+         rebaixar a versão definitiva. */
+      if (anterior && m.id.startsWith("pendente:")) continue;
+      porChave.set(k, m);
+    }
+    return [...porChave.values()].sort((a, b) => a.created_at.localeCompare(b.created_at));
   };
 
   /* `useState` só usa o valor inicial na montagem: quando o server component
@@ -152,11 +193,16 @@ export function Thread({
         )}
 
         {mensagens.map((m, i) => {
-          const meu = m.sender_id === meuId;
+          const meu = m.sender_id !== null && m.sender_id === meuId;
           const autorAuditoria = participantesAuditoria?.find((participante) => participante.id === m.sender_id);
+          /* Equipe, automação e sistema não são "o outro participante": vão
+             centralizadas, com etiqueta, para ninguém achar que foi a pessoa do
+             outro lado que escreveu aquilo. */
+          const deTerceiro = m.sender_kind === "equipe" || m.sender_kind === "automacao" || m.sender_kind === "sistema";
           const alinhadaDireita = somenteLeitura
             ? autorAuditoria?.papel === "Profissional"
             : meu;
+          const rotuloCanal = ROTULO_CANAL[m.canal];
           const anterior = mensagens[i - 1];
           const novoDia = !anterior || diaLabel(anterior.created_at) !== diaLabel(m.created_at);
           const inicioDaSequencia = !anterior || anterior.sender_id !== m.sender_id;
@@ -164,8 +210,43 @@ export function Thread({
           const proxima = mensagens[i + 1];
           const fimDaSequencia = !proxima || proxima.sender_id !== m.sender_id;
 
+          if (deTerceiro) {
+            return (
+              <div key={chave(m)}>
+                {novoDia && (
+                  <div style={{ textAlign: "center", fontSize: 12, color: "var(--ink-faint)", margin: "16px 0 10px" }}>
+                    {diaLabel(m.created_at)}
+                  </div>
+                )}
+                <div style={{ display: "flex", justifyContent: "center", margin: "6px 0 10px" }}>
+                  <div
+                    title={hora(m.created_at)}
+                    style={{
+                      maxWidth: "84%",
+                      border: "1px solid var(--line)",
+                      borderRadius: 14,
+                      background: "var(--surface-2)",
+                      color: "var(--ink-soft)",
+                      padding: "9px 14px",
+                      fontSize: 13.5,
+                      lineHeight: 1.45,
+                      whiteSpace: "pre-wrap",
+                      wordBreak: "break-word",
+                    }}
+                  >
+                    <div style={{ fontSize: 11.5, fontWeight: 650, color: "var(--ink-faint)", marginBottom: 3 }}>
+                      {ROTULO_AUTOR[m.sender_kind] ?? "FrioHub"}
+                      {rotuloCanal ? ` · ${rotuloCanal}` : ""}
+                    </div>
+                    {m.body}
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
           return (
-            <div key={m.id}>
+            <div key={chave(m)}>
               {novoDia && (
                 <div style={{ textAlign: "center", fontSize: 12, color: "var(--ink-faint)", margin: "16px 0 10px" }}>
                   {diaLabel(m.created_at)}
@@ -200,6 +281,17 @@ export function Thread({
                       color: "var(--ink-faint)", fontSize: 11.5, fontWeight: 650,
                     }}>
                       {autorAuditoria?.nome ?? "Participante"} · {autorAuditoria?.papel ?? "Participante"}
+                    </div>
+                  )}
+                  {/* Só quando a mensagem NÃO veio pelo app: saber que a pessoa
+                      respondeu do WhatsApp muda a expectativa de resposta. */}
+                  {rotuloCanal && inicioDaSequencia && (
+                    <div style={{
+                      margin: alinhadaDireita ? "0 4px 4px 0" : "0 0 4px 4px",
+                      textAlign: alinhadaDireita ? "right" : "left",
+                      color: "var(--ink-faint)", fontSize: 11,
+                    }}>
+                      via {rotuloCanal}
                     </div>
                   )}
                   <div

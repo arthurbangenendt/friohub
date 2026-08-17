@@ -34,16 +34,35 @@ export default function PrivacidadePage() {
         os dados necessários para a transação. Não vendemos dados pessoais.
       </Secao>
       <Secao t="4.1. Chat e troca de telefone">
-        A conversa entre cliente e profissional acontece dentro da plataforma. O seu
+        A conversa entre cliente e profissional acontece na plataforma. O seu
         <strong> telefone não é entregue à outra parte automaticamente</strong>: ele só
         é revelado depois que a conversa se torna frequente — ou que um serviço é
         fechado — e <strong>apenas se as duas pessoas autorizarem</strong>. Você pode
-        conversar sem nunca compartilhar o número.
+        conversar sem nunca compartilhar o número. Essa regra continua valendo mesmo
+        quando a conversa passa por outro canal.
         <br />
         <br />
         As mensagens ficam registradas e podem ser lidas pela administração da
         plataforma em caso de suporte ou disputa sobre um serviço. Elas não são
         públicas, não aparecem em nenhum perfil e não são usadas para publicidade.
+      </Secao>
+      <Secao t="4.2. Canais de atendimento e mensagens que enviamos">
+        Além do chat da plataforma, atendemos por WhatsApp, e-mail e redes sociais.
+        Quando você fala com a gente por um desses canais, a conversa é registrada na
+        nossa ferramenta de atendimento, hospedada em infraestrutura própria da FrioHub,
+        e fica ligada ao seu cadastro para que você não precise repetir seu histórico a
+        cada contato.
+        <br />
+        <br />
+        Também <strong>enviamos avisos sobre o que você mesmo iniciou</strong> — um
+        orçamento recebido, uma proposta aceita, um horário confirmado. Você escolhe
+        por quais canais quer receber em <strong>Painel → Notificações → Preferências</strong>,
+        e pode desligar qualquer um deles a qualquer momento. Não usamos esses canais
+        para divulgação ou propaganda.
+        <br />
+        <br />
+        Ao usar WhatsApp, Instagram ou Facebook, a entrega da mensagem passa pela
+        infraestrutura dessas empresas, que têm políticas de privacidade próprias.
       </Secao>
       <Secao t="5. Por quanto tempo guardamos">
         Enquanto sua conta existir e pelo prazo exigido pela legislação fiscal e civil

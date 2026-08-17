@@ -49,13 +49,17 @@ export default async function PainelLayout({ children }: LayoutProps<"/painel">)
      não lidas do sistema fossem pendências pessoais dele. O admin acompanha o
      fluxo, mas não é destinatário; por isso o badge fica restrito aos dois
      participantes reais. */
+  /* `sender_id` pode ser nulo desde 20260815092000 (equipe FrioHub respondendo
+     pelo painel do Chatwoot, automação). `neq` sozinho descartaria essas linhas
+     — em SQL, `null <> uuid` é NULL, não `true` —, e mensagem da equipe nunca
+     apareceria no badge. O `or` restaura o sentido de "não fui eu quem mandou". */
   const { count: naoLidas } = papel === "admin"
     ? { count: 0 }
     : await supabase
       .from("messages")
       .select("id", { count: "exact", head: true })
       .is("read_at", null)
-      .neq("sender_id", user.id);
+      .or(`sender_id.is.null,sender_id.neq.${user.id}`);
 
   /* Notificações não lidas, trazidas como lista de tipos em vez de contagem:
      com uma consulta só dá para alimentar o sino (total) e os contadores por

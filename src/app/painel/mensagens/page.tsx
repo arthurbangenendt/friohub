@@ -79,7 +79,8 @@ export default async function MensagensPage({
       .from("messages")
       .select("conversation_id")
       .is("read_at", null)
-      .neq("sender_id", user.id);
+      // `or` e não `neq`: sender_id nulo (equipe, automação) seria descartado (ver painel/layout.tsx).
+      .or(`sender_id.is.null,sender_id.neq.${user.id}`);
 
   const temNaoLida = new Set((naoLidas ?? []).map((m) => (m as { conversation_id: string }).conversation_id));
 
@@ -88,16 +89,32 @@ export default async function MensagensPage({
     ? { data: [] }
     : await supabase
       .from("messages")
-      .select("conversation_id, body, sender_id, created_at")
+      .select("conversation_id, body, sender_id, sender_kind, canal, created_at")
       .in("conversation_id", ids)
       .order("created_at", { ascending: false })
       .limit(admin ? 500 : 200);
 
+  type UltimaMensagem = {
+    conversation_id: string;
+    body: string;
+    sender_id: string | null;
+    sender_kind: string;
+    canal: string;
+  };
+
   // A primeira ocorrência de cada conversa já é a mais recente (ordem desc).
-  const previa = new Map<string, { body: string; sender_id: string }>();
-  for (const m of (ultimas ?? []) as { conversation_id: string; body: string; sender_id: string }[]) {
-    if (!previa.has(m.conversation_id)) previa.set(m.conversation_id, { body: m.body, sender_id: m.sender_id });
+  const previa = new Map<string, UltimaMensagem>();
+  for (const m of (ultimas ?? []) as UltimaMensagem[]) {
+    if (!previa.has(m.conversation_id)) previa.set(m.conversation_id, m);
   }
+
+  /* Nome de quem escreveu, para a prévia. Sai de `sender_kind` e não de
+     `sender_id`: equipe e automação têm autor nulo, e comparar id devolveria
+     "Profissional" para uma mensagem que o profissional não escreveu. */
+  const ROTULO_CANAL: Record<string, string> = {
+    whatsapp: "WhatsApp", site: "Site", email: "E-mail", instagram: "Instagram",
+    facebook: "Facebook", telegram: "Telegram", sms: "SMS", outro: "Outro canal",
+  };
 
   return (
     <div style={wrap}>
@@ -134,11 +151,23 @@ export default async function MensagensPage({
           const idAvatar = souCliente ? c.professional_id : c.cliente_id;
           const nao = temNaoLida.has(c.id);
           const ult = previa.get(c.id);
-          const autorAdmin = ult?.sender_id === c.cliente_id
+          const autorAdmin = ult?.sender_kind === "cliente"
             ? cliente?.nome ?? "Cliente"
-            : profissional?.nome ?? "Profissional";
+            : ult?.sender_kind === "profissional"
+              ? profissional?.nome ?? "Profissional"
+              : ult?.sender_kind === "equipe"
+                ? "Equipe FrioHub"
+                : "FrioHub";
+          const prefixo = admin
+            ? `${autorAdmin}: `
+            : ult?.sender_id === user.id
+              ? "Você: "
+              : ult?.sender_kind === "equipe" || ult?.sender_kind === "automacao"
+                ? "FrioHub: "
+                : "";
+          const canalOrigem = ult && ult.canal !== "app" ? ROTULO_CANAL[ult.canal] : null;
           const resumo = ult
-            ? `${admin ? `${autorAdmin}: ` : ult.sender_id === user.id ? "Você: " : ""}${ult.body}`
+            ? `${prefixo}${ult.body}`
             : admin ? "Conversa aberta, ainda sem mensagens" : souCliente ? "Profissional" : "Cliente";
 
           return (
@@ -173,7 +202,9 @@ export default async function MensagensPage({
                   }}
                 >
                   {resumo}
-                  <span style={{ color: "var(--ink-faint)", fontWeight: 400 }}> · {quando(c.last_message_at)}</span>
+                  <span style={{ color: "var(--ink-faint)", fontWeight: 400 }}>
+                    {canalOrigem ? ` · ${canalOrigem}` : ""} · {quando(c.last_message_at)}
+                  </span>
                 </div>
               </div>
               {/* Bolinha de não lida, no lugar do contador — é o sinal que o

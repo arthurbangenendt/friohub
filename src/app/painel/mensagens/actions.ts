@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { featureHabilitada } from "@/lib/feature-flags";
 
 /* Ações do chat.
  *
@@ -31,13 +32,35 @@ export async function abrirConversa(
   return { ok: true as const, conversaId: data as string };
 }
 
+export type MensagemEnviada = {
+  id: string;
+  sender_id: string | null;
+  sender_kind: string;
+  body: string;
+  created_at: string;
+  canal: string;
+  chatwoot_message_id: number | null;
+};
+
 /** Envia e DEVOLVE a mensagem gravada.
  *
  *  Devolver a linha não é detalhe: a thread mantém as mensagens em estado local,
  *  e `revalidatePath` sozinho não atualiza `useState` já montado. Sem a linha de
  *  volta, a mensagem era gravada no banco e sumia da tela — que foi exatamente o
  *  bug relatado. O Realtime continua existindo, mas como reforço, não como única
- *  fonte. */
+ *  fonte.
+ *
+ *  Dois caminhos de escrita, escolhidos pela flag `chatwoot_messaging`:
+ *
+ *  · DESLIGADA — INSERT direto em `messages`, como sempre foi.
+ *
+ *  · LIGADA — a mensagem vai para o Chatwoot e volta pelo webhook, que é quem
+ *    insere em `messages`. Assim existe uma ordem dos fatos só, e mensagem que o
+ *    Chatwoot recusou não aparece na tela como enviada. O custo é que a linha
+ *    real ainda não existe quando esta função retorna; devolvemos uma linha
+ *    otimista carregando o `chatwoot_message_id`, que é a chave pela qual a
+ *    thread reconhece a versão definitiva quando ela chega pelo Realtime.
+ */
 export async function enviarMensagem(conversaId: string, body: string) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -47,17 +70,58 @@ export async function enviarMensagem(conversaId: string, body: string) {
   if (!texto) return { ok: false as const, error: "Escreva uma mensagem." };
   if (texto.length > 4000) return { ok: false as const, error: "Mensagem muito longa (máximo 4000 caracteres)." };
 
+  /* A RLS já recorta: se o usuário não participa, não vem linha nenhuma. A
+     consulta serve para saber de que lado ele está — é isso que define
+     `sender_kind`, e é `sender_kind` (não `sender_id`) que o handoff conta. */
+  const { data: conversa } = await supabase
+    .from("conversations")
+    .select("cliente_id, professional_id")
+    .eq("id", conversaId)
+    .maybeSingle();
+
+  if (!conversa) return { ok: false as const, error: "Conversa não encontrada." };
+  const senderKind = conversa.professional_id === user.id ? "profissional" : "cliente";
+
+  if (await featureHabilitada(supabase, "chatwoot_messaging", user.id)) {
+    const { data: resposta, error: erroFn } = await supabase.functions.invoke("chatwoot-outbound", {
+      body: { conversa_id: conversaId, body: texto },
+    });
+
+    if (erroFn) return { ok: false as const, error: "Não foi possível enviar a mensagem agora." };
+
+    const enviada = resposta as { chatwoot_message_id: number | null } | null;
+
+    revalidatePath(`/painel/mensagens/${conversaId}`);
+    revalidatePath("/painel/mensagens");
+
+    return {
+      ok: true as const,
+      mensagem: {
+        /* Id provisório: a linha definitiva nasce no espelho, com id próprio. A
+           thread deduplica por `chatwoot_message_id` justamente para as duas se
+           colapsarem numa só quando o Realtime entregar. */
+        id: `pendente:${crypto.randomUUID()}`,
+        sender_id: user.id,
+        sender_kind: senderKind,
+        body: texto,
+        created_at: new Date().toISOString(),
+        canal: "app",
+        chatwoot_message_id: enviada?.chatwoot_message_id ?? null,
+      } satisfies MensagemEnviada,
+    };
+  }
+
   const { data, error } = await supabase
     .from("messages")
-    .insert({ conversation_id: conversaId, sender_id: user.id, body: texto })
-    .select("id, sender_id, body, created_at")
+    .insert({ conversation_id: conversaId, sender_id: user.id, sender_kind: senderKind, body: texto })
+    .select("id, sender_id, sender_kind, body, created_at, canal, chatwoot_message_id")
     .single();
 
   if (error) return { ok: false as const, error: error.message };
 
   revalidatePath(`/painel/mensagens/${conversaId}`);
   revalidatePath("/painel/mensagens");
-  return { ok: true as const, mensagem: data as { id: string; sender_id: string; body: string; created_at: string } };
+  return { ok: true as const, mensagem: data as MensagemEnviada };
 }
 
 export async function marcarLida(conversaId: string) {

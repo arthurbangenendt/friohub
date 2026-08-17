@@ -52,7 +52,7 @@ export default async function ConversaPage({ params }: { params: Promise<{ id: s
 
   const { data: msgs } = await supabase
     .from("messages")
-    .select("id, sender_id, body, created_at")
+    .select("id, sender_id, sender_kind, body, created_at, canal, chatwoot_message_id")
     .eq("conversation_id", id)
     .order("created_at", { ascending: true });
 

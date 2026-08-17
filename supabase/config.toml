@@ -385,6 +385,24 @@ deno_version = 2
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
+# O Chatwoot não manda JWT do Supabase no webhook — se a verificação continuar
+# ligada, a requisição leva 401 no gateway e o nosso código nunca roda.
+# A autenticação deste endpoint é a assinatura HMAC do próprio Chatwoot
+# (X-Chatwoot-Signature), conferida em _shared/assinatura.ts.
+[functions.chatwoot-webhook]
+verify_jwt = false
+
+# As três abaixo mantêm a verificação padrão: outbound recebe o JWT do usuário,
+# dispatch e provision são chamadas com a chave de serviço.
+[functions.chatwoot-outbound]
+verify_jwt = true
+
+[functions.chatwoot-dispatch]
+verify_jwt = true
+
+[functions.chatwoot-provision]
+verify_jwt = true
+
 [analytics]
 enabled = true
 port = 54327
