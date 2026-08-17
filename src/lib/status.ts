@@ -34,6 +34,7 @@ export const STATUS_JOB: Record<string, Estado> = {
   aguardando_profissional: { label: "Aguardando profissional", tom: "espera" },
   aceito: { label: "Aceito", tom: "andamento" },
   em_execucao: { label: "Em execução", tom: "andamento" },
+  aguardando_orcamento_final: { label: "Aguardando orçamento final", tom: "espera" },
   concluido: { label: "Concluído", tom: "sucesso" },
   avaliado: { label: "Avaliado", tom: "sucesso" },
   cancelado: { label: "Cancelado", tom: "erro" },

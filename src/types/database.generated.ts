@@ -1221,6 +1221,57 @@ export type Database = {
           },
         ]
       }
+      job_final_quotes: {
+        Row: {
+          created_at: string
+          enviado_por: string
+          id: string
+          job_id: string
+          motivo_recusa: string | null
+          observacoes: string | null
+          respondido_em: string | null
+          status: string
+          valor_servico: number
+        }
+        Insert: {
+          created_at?: string
+          enviado_por: string
+          id?: string
+          job_id: string
+          motivo_recusa?: string | null
+          observacoes?: string | null
+          respondido_em?: string | null
+          status?: string
+          valor_servico: number
+        }
+        Update: {
+          created_at?: string
+          enviado_por?: string
+          id?: string
+          job_id?: string
+          motivo_recusa?: string | null
+          observacoes?: string | null
+          respondido_em?: string | null
+          status?: string
+          valor_servico?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_final_quotes_enviado_por_fkey"
+            columns: ["enviado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_final_quotes_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_itens: {
         Row: {
           ambiente: string
@@ -1756,8 +1807,10 @@ export type Database = {
           comissao_servico: number
           created_at: string
           id: string
+          job_final_quote_id: string | null
           job_id: string
           margem_produto: number
+          origem: string
           payment_ref: string | null
           payment_status: string
           preco_produto: number
@@ -1768,8 +1821,10 @@ export type Database = {
           comissao_servico?: number
           created_at?: string
           id?: string
+          job_final_quote_id?: string | null
           job_id: string
           margem_produto?: number
+          origem?: string
           payment_ref?: string | null
           payment_status?: string
           preco_produto?: number
@@ -1780,8 +1835,10 @@ export type Database = {
           comissao_servico?: number
           created_at?: string
           id?: string
+          job_final_quote_id?: string | null
           job_id?: string
           margem_produto?: number
+          origem?: string
           payment_ref?: string | null
           payment_status?: string
           preco_produto?: number
@@ -1790,9 +1847,16 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "orders_job_final_quote_id_fkey"
+            columns: ["job_final_quote_id"]
+            isOneToOne: false
+            referencedRelation: "job_final_quotes"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "orders_job_id_fkey"
             columns: ["job_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "jobs"
             referencedColumns: ["id"]
           },
@@ -3727,7 +3791,7 @@ export type Database = {
           {
             foreignKeyName: "orders_job_id_fkey"
             columns: ["job_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "jobs"
             referencedColumns: ["id"]
           },
@@ -3808,6 +3872,7 @@ export type Database = {
           created_at: string | null
           id: string | null
           job_id: string | null
+          origem: string | null
           payment_status: string | null
           preco_produto: number | null
           preco_servico: number | null
@@ -3817,7 +3882,7 @@ export type Database = {
           {
             foreignKeyName: "orders_job_id_fkey"
             columns: ["job_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "jobs"
             referencedColumns: ["id"]
           },
@@ -3901,6 +3966,10 @@ export type Database = {
       adiar_follow_up: {
         Args: { p_due_at: string; p_task_id: string }
         Returns: undefined
+      }
+      aprovar_orcamento_final: {
+        Args: { p_job_final_quote_id: string }
+        Returns: string
       }
       atribuir_pmoc: {
         Args: { p_plan_id: string; p_professional_id: string }
@@ -4112,6 +4181,14 @@ export type Database = {
         }
         Returns: string
       }
+      enviar_orcamento_final: {
+        Args: {
+          p_job_id: string
+          p_observacoes?: string
+          p_valor_servico: number
+        }
+        Returns: string
+      }
       espelhar_mensagem_chatwoot: {
         Args: {
           p_body: string
@@ -4259,6 +4336,10 @@ export type Database = {
         Returns: string
       }
       reconciliar_financeiro: { Args: never; Returns: string }
+      recusar_orcamento_final: {
+        Args: { p_job_final_quote_id: string; p_motivo?: string }
+        Returns: undefined
+      }
       recusar_pedido_orcamento: {
         Args: { p_quote_request_id: string; p_reason: string }
         Returns: undefined

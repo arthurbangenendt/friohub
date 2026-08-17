@@ -208,7 +208,7 @@ export default async function FinanceiroPage({ searchParams }: PageProps<"/paine
               const custo = despesas.filter((d) => d.job_id === order.job_id).reduce((sum, d) => sum + d.valor, 0);
               const receita = order.preco_servico - (order.comissao_servico ?? 0);
               return (
-                <Link key={order.job_id} href={`/servico/${order.job_id}`} style={{ display: "flex", justifyContent: "space-between", gap: 12, borderBottom: "1px solid var(--line-soft)", padding: "8px 0" }}>
+                <Link key={`${order.job_id}-${order.created_at}`} href={`/servico/${order.job_id}`} style={{ display: "flex", justifyContent: "space-between", gap: 12, borderBottom: "1px solid var(--line-soft)", padding: "8px 0" }}>
                   <span>{rotuloServico.get(order.job_id) ?? `Serviço #${order.job_id.slice(0, 8)}`}</span>
                   <strong>{formatarBRL(receita - custo)}</strong>
                 </Link>

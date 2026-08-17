@@ -97,6 +97,52 @@ export async function cancelarAgendamento(input: {
   return { ok: true as const };
 }
 
+export async function enviarOrcamentoFinal(input: {
+  jobId: string;
+  valorServico: number;
+  observacoes: string;
+}) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false as const, error: "Não autenticado." };
+
+  const { error } = await supabase.rpc("enviar_orcamento_final", {
+    p_job_id: input.jobId,
+    p_valor_servico: input.valorServico,
+    p_observacoes: input.observacoes,
+  });
+  if (error) return { ok: false as const, error: error.message };
+  revalidatePath(`/servico/${input.jobId}`);
+  revalidatePath("/painel");
+  return { ok: true as const };
+}
+
+export async function aprovarOrcamentoFinal(input: { jobId: string; jobFinalQuoteId: string }) {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("aprovar_orcamento_final", {
+    p_job_final_quote_id: input.jobFinalQuoteId,
+  });
+  if (error) return { ok: false as const, error: error.message };
+  revalidatePath(`/servico/${input.jobId}`);
+  revalidatePath("/painel");
+  return { ok: true as const };
+}
+
+export async function recusarOrcamentoFinal(input: {
+  jobId: string;
+  jobFinalQuoteId: string;
+  motivo: string;
+}) {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("recusar_orcamento_final", {
+    p_job_final_quote_id: input.jobFinalQuoteId,
+    p_motivo: input.motivo,
+  });
+  if (error) return { ok: false as const, error: error.message };
+  revalidatePath(`/servico/${input.jobId}`);
+  return { ok: true as const };
+}
+
 export async function avaliarJob(input: { jobId: string; rating: number; comment: string }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();

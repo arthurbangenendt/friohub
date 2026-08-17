@@ -10,16 +10,17 @@ export function precoInstalacao(btu: number): number {
 /* Comissão da plataforma sobre a mão de obra (receita nº 2).
  *
  * ATENÇÃO: este valor é só para EXIBIR o percentual na tela. O valor cobrado é
- * calculado no banco, por `criar_order`, a partir de `platform_config
- * .comissao_servico_pct` — ver 20260812220000_trava_jobs_reviews. Mudar a taxa
- * exige mudar nos dois lugares, e o que vale é o do banco.
+ * calculado no banco — por `aceitar_quote` (order da visita/preço fechado) e
+ * por `aprovar_orcamento_final` (order do serviço pós-visita) — a partir de
+ * `platform_config.comissao_servico_pct`. Mudar a taxa exige mudar nos dois
+ * lugares, e o que vale é o do banco.
  *
- * 7% desde 2026-08-14 (antes: 15%) — ver 20260814210000_comissao_servico_7pct.
- * Ordens criadas antes disso guardam a comissão em reais e seguem em 15%; as
- * telas que mostram o valor cobrado leem `orders.comissao_servico`, não esta
- * constante, então histórico não fica errado. Só o rótulo do percentual usa
- * este número. */
-export const TAXA_COMISSAO = 0.07;
+ * 4% desde 2026-08-17 (antes: 7% desde 2026-08-14, e 15% até então) — ver
+ * 20260817140000_comissao_servico_4pct. Ordens criadas antes disso guardam a
+ * comissão em reais e seguem na taxa vigente na hora; as telas que mostram o
+ * valor cobrado leem `orders.comissao_servico`, não esta constante, então
+ * histórico não fica errado. Só o rótulo do percentual usa este número. */
+export const TAXA_COMISSAO = 0.04;
 
 export function formatarBRL(v: number): string {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });

@@ -17,6 +17,7 @@ import { one } from "@/lib/relacional";
 import { Rastreio, type EtapaId } from "./Rastreio";
 import { Evidencias } from "./Evidencias";
 import { Pagamento } from "./Pagamento";
+import { OrcamentoFinal } from "./OrcamentoFinal";
 
 const mono = "var(--font-geist-mono), ui-monospace, monospace";
 const STATUS = resolverMapa(STATUS_JOB);
@@ -45,31 +46,36 @@ type OrderView = {
   preco_servico: number;
   total: number;
   payment_status: string;
+  origem: "aceite_quote" | "orcamento_final";
   comissao_servico?: number; // só existe para o profissional
 };
 
 /* Profissional lê `orders` direto; cliente lê a view `orders_cliente`, que não
    expõe margem nem comissão da plataforma. As duas fontes são protegidas no
-   banco — se o papel não bater, o retorno é vazio, não um erro. */
-async function carregarOrder(
+   banco — se o papel não bater, o retorno é vazio, não um erro.
+
+   Um job pode ter até duas orders: a do aceite da proposta (produto e/ou
+   mão de obra, ou a visita técnica) e a do orçamento final pós-visita
+   (nasce só depois que o cliente aprova, ver aprovar_orcamento_final). */
+async function carregarOrders(
   supabase: Awaited<ReturnType<typeof createClient>>,
   jobId: string,
   isPro: boolean,
-): Promise<OrderView | null> {
+): Promise<OrderView[]> {
   if (isPro) {
     const { data } = await supabase
       .from("orders")
-      .select("id, preco_produto, preco_servico, comissao_servico, total, payment_status")
+      .select("id, preco_produto, preco_servico, comissao_servico, total, payment_status, origem")
       .eq("job_id", jobId)
-      .maybeSingle();
-    return data as OrderView | null;
+      .order("created_at", { ascending: true });
+    return (data ?? []) as OrderView[];
   }
   const { data } = await supabase
     .from("orders_cliente")
-    .select("id, preco_produto, preco_servico, total, payment_status")
+    .select("id, preco_produto, preco_servico, total, payment_status, origem")
     .eq("job_id", jobId)
-    .maybeSingle();
-  return data as OrderView | null;
+    .order("created_at", { ascending: true });
+  return (data ?? []) as OrderView[];
 }
 
 export default async function ServicoPage({ params }: { params: Promise<{ id: string }> }) {
@@ -111,10 +117,34 @@ export default async function ServicoPage({ params }: { params: Promise<{ id: st
     .sort((a, b) => a.ordem - b.ordem);
   const proNome = one(one(job.profissional)?.profiles)?.nome ?? "Profissional";
   const cliNome = one(job.cliente)?.nome ?? "Cliente";
-  /* A order vem de fonte diferente conforme quem olha: o profissional lê a
+  /* As orders vêm de fonte diferente conforme quem olha: o profissional lê a
      tabela (enxerga a comissão descontada dele), o cliente lê a view sem margem
      nem comissão. Ver migration 20260812130000_orders_cliente_view. */
-  const order = await carregarOrder(supabase, job.id, isPro);
+  const orders = await carregarOrders(supabase, job.id, isPro);
+  const ordemAceite = orders.find((o) => o.origem === "aceite_quote") ?? null;
+
+  /* Orçamento final só existe para propostas do tipo 'visita_tecnica' — em
+     preço fechado o valor do serviço já está definido desde o aceite. */
+  const { data: quoteAceita } = await supabase
+    .from("quotes")
+    .select("tipo")
+    .eq("job_id", job.id)
+    .eq("status", "aceita")
+    .maybeSingle();
+  const isVisitaTecnica = quoteAceita?.tipo === "visita_tecnica";
+
+  const { data: orcamentosFinais } = await supabase
+    .from("job_final_quotes")
+    .select("id, valor_servico, observacoes, status, motivo_recusa, created_at")
+    .eq("job_id", job.id)
+    .order("created_at", { ascending: false });
+  const jfqPendente = (orcamentosFinais ?? []).find((q) => q.status === "enviado") ?? null;
+  const jfqUltimo = (orcamentosFinais ?? [])[0] ?? null;
+  const jfqUltimoRecusado = !jfqPendente && jfqUltimo?.status === "recusado" ? jfqUltimo : null;
+  const podeEnviarOrcamentoFinal =
+    isVisitaTecnica &&
+    !jfqPendente &&
+    ["em_execucao", "aguardando_orcamento_final"].includes(job.status);
 
   const { data: agendamento } = await supabase
     .from("job_appointments")
@@ -231,35 +261,65 @@ export default async function ServicoPage({ params }: { params: Promise<{ id: st
           {job.descricao && <Linha k="Descrição" v={job.descricao} />}
         </div>
 
-        {/* valores */}
-        {order && (
-          <div className="card" style={{ padding: 22 }}>
-            <SecTitle>{isPro ? "Seu recebimento" : "Valores"}</SecTitle>
+        {/* valores — até duas orders: a do aceite (produto/mão de obra/visita) e a
+            do orçamento final pós-visita, quando aprovado. */}
+        {orders.map((o) => (
+          <div key={o.id} className="card" style={{ padding: 22 }}>
+            <SecTitle>{isPro ? "Seu recebimento" : "Valores"} — {rotuloOrigemOrder(o.origem, isVisitaTecnica)}</SecTitle>
             {isPro ? (
               <>
-                <Linha k="Mão de obra (instalação)" v={formatarBRL(order.preco_servico)} />
-                <Linha k={`Taxa FrioHub (${Math.round(TAXA_COMISSAO * 100)}%)`} v={`- ${formatarBRL(order.comissao_servico ?? 0)}`} />
-                <Linha k={<strong>Você recebe</strong>} v={<strong>{formatarBRL(order.preco_servico - (order.comissao_servico ?? 0))}</strong>} />
+                <Linha k={rotuloServicoOrder(o.origem, isVisitaTecnica)} v={formatarBRL(o.preco_servico)} />
+                <Linha k={`Taxa FrioHub (${Math.round(TAXA_COMISSAO * 100)}%)`} v={`- ${formatarBRL(o.comissao_servico ?? 0)}`} />
+                <Linha k={<strong>Você recebe</strong>} v={<strong>{formatarBRL(o.preco_servico - (o.comissao_servico ?? 0))}</strong>} />
               </>
             ) : (
               <>
-                {order.preco_produto > 0 && <Linha k="Aparelho" v={formatarBRL(order.preco_produto)} />}
-                <Linha k="Instalação" v={formatarBRL(order.preco_servico)} />
-                <Linha k={<strong>Total</strong>} v={<strong>{formatarBRL(order.total)}</strong>} />
-                <Linha k="Pagamento" v={PAGAMENTO_LABEL[order.payment_status] ?? order.payment_status} />
+                {o.preco_produto > 0 && <Linha k="Aparelho" v={formatarBRL(o.preco_produto)} />}
+                <Linha k={rotuloServicoOrder(o.origem, isVisitaTecnica)} v={formatarBRL(o.preco_servico)} />
+                <Linha k={<strong>Total</strong>} v={<strong>{formatarBRL(o.total)}</strong>} />
+                <Linha k="Pagamento" v={PAGAMENTO_LABEL[o.payment_status] ?? o.payment_status} />
               </>
             )}
+          </div>
+        ))}
+
+        {/* orçamento final pós-visita: profissional lança o valor, cliente aprova
+            ou recusa. Só aparece para propostas do tipo visita_tecnica. */}
+        {isVisitaTecnica && isPro && podeEnviarOrcamentoFinal && (
+          <div className="card" style={{ padding: 22 }}>
+            <SecTitle>Orçamento do serviço</SecTitle>
+            <OrcamentoFinal
+              jobId={job.id}
+              isPro
+              valorVisita={ordemAceite?.preco_servico ?? 0}
+              pendente={null}
+              ultimoRecusado={jfqUltimoRecusado ? { valor_servico: jfqUltimoRecusado.valor_servico, motivo_recusa: jfqUltimoRecusado.motivo_recusa } : null}
+              podeEnviar={podeEnviarOrcamentoFinal}
+            />
+          </div>
+        )}
+        {isVisitaTecnica && isCliente && jfqPendente && (
+          <div className="card" style={{ padding: 22 }}>
+            <SecTitle>Orçamento do serviço</SecTitle>
+            <OrcamentoFinal
+              jobId={job.id}
+              isPro={false}
+              valorVisita={ordemAceite?.preco_servico ?? 0}
+              pendente={{ id: jfqPendente.id, valor_servico: jfqPendente.valor_servico, observacoes: jfqPendente.observacoes }}
+              ultimoRecusado={null}
+              podeEnviar={false}
+            />
           </div>
         )}
 
         {/* Pagamento fica em bloco próprio, e não dentro de "Valores": um é o
             que foi combinado, o outro é o que aconteceu com o dinheiro. */}
-        {order && !isPro && (
-          <div className="card" style={{ padding: 22 }}>
-            <SecTitle>Pagamento</SecTitle>
-            <Pagamento orderId={order.id} total={order.total} />
+        {!isPro && orders.map((o) => (
+          <div key={`pag-${o.id}`} className="card" style={{ padding: 22 }}>
+            <SecTitle>Pagamento — {rotuloOrigemOrder(o.origem, isVisitaTecnica)}</SecTitle>
+            <Pagamento orderId={o.id} total={o.total} />
           </div>
-        )}
+        ))}
 
         {/* entrega do equipamento */}
         {entrega && (
@@ -407,6 +467,16 @@ function Linha({ k, v }: { k: React.ReactNode; v: React.ReactNode }) {
       <span style={{ textAlign: "right" }}>{v}</span>
     </div>
   );
+}
+
+function rotuloOrigemOrder(origem: "aceite_quote" | "orcamento_final", isVisitaTecnica: boolean): string {
+  if (origem === "orcamento_final") return "Serviço (pós-visita)";
+  return isVisitaTecnica ? "Visita técnica" : "Instalação";
+}
+
+function rotuloServicoOrder(origem: "aceite_quote" | "orcamento_final", isVisitaTecnica: boolean): string {
+  if (origem === "orcamento_final") return "Serviço (pós-visita)";
+  return isVisitaTecnica ? "Visita técnica" : "Mão de obra (instalação)";
 }
 
 function rotuloEventoServico(evento: string, status: string | null) {
