@@ -90,7 +90,11 @@ export function Propostas({
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       {propostas.map((p) => {
         const servico = p.tipo === "visita_tecnica" ? p.valor_visita : p.valor_mao_obra + p.valor_materiais;
-        const total = servico + produtoPreco;
+        /* Em visita técnica, o total exibido é só o que é cobrado agora (a
+           visita) — a mão de obra ainda não existe, e o aparelho é uma compra
+           à parte, detalhada como linha própria abaixo. Somar o catálogo aqui
+           inflava o número e o rótulo "visita técnica" escondia isso. */
+        const total = p.tipo === "visita_tecnica" ? servico : servico + produtoPreco;
         const vencida = new Date(`${p.validade_ate}T23:59:59`) < new Date();
         const aceita = p.status === "aceita";
 
@@ -132,12 +136,16 @@ export function Propostas({
             )}
 
             <div style={{ display: "grid", gap: 8, fontSize: 14 }}>
-              {p.tipo === "preco_fechado" && (
+              {p.tipo === "preco_fechado" ? (
                 <>
                   <Linha k="Mão de obra" v={formatarBRL(p.valor_mao_obra)} />
                   {p.valor_materiais > 0 && <Linha k="Materiais" v={formatarBRL(p.valor_materiais)} />}
                   {produtoPreco > 0 && <Linha k="Aparelho (catálogo)" v={formatarBRL(produtoPreco)} />}
                 </>
+              ) : (
+                produtoPreco > 0 && (
+                  <Linha k="Aparelho (catálogo, à parte)" v={formatarBRL(produtoPreco)} />
+                )
               )}
               {p.inclui && <Linha k="Inclui" v={p.inclui} />}
               {p.nao_inclui && <Linha k="Não inclui" v={p.nao_inclui} destaque />}
