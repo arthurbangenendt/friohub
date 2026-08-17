@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import type { JobType } from "@/app/solicitar/tipos";
-import { MAX_DESTINATARIOS } from "./config";
+import { MAX_AMBIENTES, MAX_DESTINATARIOS } from "./config";
 
 /* Orçamentos (RFQ).
  *
@@ -13,17 +13,33 @@ import { MAX_DESTINATARIOS } from "./config";
  * a comissão da plataforma. Ver 20260812240000_orcamentos.sql.
  */
 
+/* Um ambiente do pedido. Climatizar a casa inteira é um pedido só com N itens:
+   o cliente descreve uma vez, recebe uma proposta pelo pacote e o técnico faz
+   tudo numa visita. Ver 20260817120000_pedido_multi_ambiente.sql. */
+export type ItemPedido = {
+  ambiente: string;
+  areaM2?: number | null;
+  numPessoas?: number | null;
+  eletronicos?: number | null;
+  insolacaoAlta?: boolean;
+  andarOuTelhado?: boolean;
+  btuRecomendado?: number | null;
+  produtoId?: string | null;
+  quantidade: number;
+};
+
 export type NovoPedido = {
   jobType: JobType;
   cep: string;
   cidade: string;
   bairro?: string;
-  quantidade: number;
+  itens: ItemPedido[];
   urgencia?: "sem_pressa" | "proximos_dias" | "urgente";
   descricao?: string;
   detalhes: Record<string, string>;
-  produtoId?: string | null;
-  btuRecomendado?: number | null;
+  /* Produto e BTU não vivem mais no topo do pedido: cada ambiente tem o seu.
+     As colunas singulares de `quote_requests` continuam existindo, mas quem as
+     preenche é a RPC, espelhando o primeiro item. */
   profissionaisIds: string[];
   fotos?: string[];
   latitude?: number | null;
@@ -38,6 +54,19 @@ export async function criarPedidoOrcamento(input: NovoPedido) {
   const destinatarios = [...new Set(input.profissionaisIds)];
   if (destinatarios.length === 0 || destinatarios.length > MAX_DESTINATARIOS) {
     return { ok: false as const, error: `Escolha entre um e ${MAX_DESTINATARIOS} profissionais.` };
+  }
+
+  /* O banco também valida isto (a RPC recusa ambiente sem nome e o trigger
+     limita a 20). Aqui a checagem existe só para virar mensagem legível antes
+     de gastar uma ida ao servidor. */
+  const itens = (input.itens ?? [])
+    .map((item) => ({ ...item, ambiente: item.ambiente.trim() }))
+    .filter((item) => item.ambiente.length > 0);
+  if (itens.length === 0) {
+    return { ok: false as const, error: "Informe pelo menos um ambiente." };
+  }
+  if (itens.length > MAX_AMBIENTES) {
+    return { ok: false as const, error: `Um pedido aceita no máximo ${MAX_AMBIENTES} ambientes.` };
   }
 
   const fotos = [...new Set(input.fotos ?? [])];
@@ -62,16 +91,33 @@ export async function criarPedidoOrcamento(input: NovoPedido) {
     p_cep: input.cep,
     p_cidade: input.cidade.trim(),
     p_bairro: input.bairro ?? "",
-    p_quantidade: input.quantidade,
+    /* `quantidade` deixou de ser digitada pelo cliente: a RPC a recalcula
+       somando os aparelhos de cada ambiente. Continua no payload porque a
+       assinatura da função a exige. */
+    p_quantidade: itens.reduce((total, item) => total + Math.max(1, item.quantidade), 0),
     p_urgencia: input.urgencia ?? "",
     p_descricao: input.descricao ?? "",
     p_detalhes: input.detalhes ?? {},
-    p_produto_id: input.produtoId ?? "",
-    p_btu_recomendado: input.btuRecomendado ?? 0,
+    /* Produto e BTU singulares seguem espelhando o primeiro ambiente — a RPC
+       refaz esse espelho de qualquer forma, mas mandar coerente evita que uma
+       chamada antiga grave um produto que não é de ambiente nenhum. */
+    p_produto_id: itens[0].produtoId ?? "",
+    p_btu_recomendado: itens[0].btuRecomendado ?? 0,
     p_profissionais_ids: destinatarios,
     p_fotos: fotos,
     p_latitude: coordenadasValidas ? Number(input.latitude) : undefined,
     p_longitude: coordenadasValidas ? Number(input.longitude) : undefined,
+    p_itens: itens.map((item) => ({
+      ambiente: item.ambiente,
+      area_m2: item.areaM2 ?? null,
+      num_pessoas: item.numPessoas ?? null,
+      eletronicos: item.eletronicos ?? null,
+      insolacao_alta: item.insolacaoAlta ?? false,
+      andar_ou_telhado: item.andarOuTelhado ?? false,
+      btu_recomendado: item.btuRecomendado ?? null,
+      produto_id: item.produtoId ?? null,
+      quantidade: Math.max(1, item.quantidade),
+    })),
   });
 
   if (error || !pedidoId) {

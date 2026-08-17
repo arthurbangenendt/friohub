@@ -82,6 +82,8 @@ export default async function ServicoPage({ params }: { params: Promise<{ id: st
     .from("jobs")
     .select(`id, job_type, status, created_at, ambiente, area_m2, btu_recomendado, cep, endereco, descricao, cliente_id, profissional_id,
              produto:products ( marca, modelo, btu, preco_venda ),
+             itens:job_itens ( id, ordem, ambiente, area_m2, btu_recomendado, quantidade,
+                               produto:products ( marca, modelo ) ),
              profissional:professionals ( id, tipo, profiles ( nome ) ),
              cliente:profiles!jobs_cliente_id_fkey ( nome ),
              review:reviews ( rating, comment )`)
@@ -96,6 +98,17 @@ export default async function ServicoPage({ params }: { params: Promise<{ id: st
   const podeIniciarExecucao = isPro && await featureHabilitada(supabase, "ux_execution", user.id);
 
   const produto = one(job.produto) as { marca: string; modelo: string; btu: number; preco_venda: number } | null;
+
+  /* Escopo contratado, congelado no aceite. O técnico em campo precisa ver os
+     três cômodos que ele fechou, não só o primeiro. */
+  type ItemServico = {
+    id: string; ordem: number; ambiente: string;
+    area_m2: number | null; btu_recomendado: number | null; quantidade: number;
+    produto: { marca: string; modelo: string } | null;
+  };
+  const itens = ((job.itens ?? []) as unknown as ItemServico[])
+    .map((item) => ({ ...item, produto: one(item.produto) }))
+    .sort((a, b) => a.ordem - b.ordem);
   const proNome = one(one(job.profissional)?.profiles)?.nome ?? "Profissional";
   const cliNome = one(job.cliente)?.nome ?? "Cliente";
   /* A order vem de fonte diferente conforme quem olha: o profissional lê a
@@ -189,10 +202,31 @@ export default async function ServicoPage({ params }: { params: Promise<{ id: st
         {/* detalhes */}
         <div className="card" style={{ padding: 22 }}>
           <SecTitle>Detalhes</SecTitle>
-          {job.ambiente && <Linha k="Ambiente" v={job.ambiente} />}
-          {job.area_m2 && <Linha k="Área" v={`${job.area_m2} m²`} />}
-          {job.btu_recomendado ? <Linha k="Capacidade" v={formatarBtu(job.btu_recomendado)} /> : null}
-          {produto && <Linha k="Aparelho" v={`${produto.marca} — ${produto.modelo}`} />}
+          {itens.length > 1 ? (
+            <Linha
+              k={`Ambientes (${itens.length})`}
+              v={
+                <span style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  {itens.map((item) => (
+                    <span key={item.id}>
+                      <strong>{item.ambiente}</strong>
+                      {item.quantidade > 1 ? ` · ${item.quantidade} aparelhos` : ""}
+                      {item.area_m2 ? ` · ${item.area_m2} m²` : ""}
+                      {item.btu_recomendado ? ` · ${formatarBtu(item.btu_recomendado)}` : ""}
+                      {item.produto ? ` · ${item.produto.marca} ${item.produto.modelo}` : ""}
+                    </span>
+                  ))}
+                </span>
+              }
+            />
+          ) : (
+            <>
+              {job.ambiente && <Linha k="Ambiente" v={job.ambiente} />}
+              {job.area_m2 && <Linha k="Área" v={`${job.area_m2} m²`} />}
+              {job.btu_recomendado ? <Linha k="Capacidade" v={formatarBtu(job.btu_recomendado)} /> : null}
+              {produto && <Linha k="Aparelho" v={`${produto.marca} — ${produto.modelo}`} />}
+            </>
+          )}
           <Linha k="Endereço" v={`${job.endereco ?? "-"} · ${job.cep}`} />
           {job.descricao && <Linha k="Descrição" v={job.descricao} />}
         </div>

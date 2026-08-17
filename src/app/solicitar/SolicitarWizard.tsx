@@ -7,7 +7,7 @@ import { precoInstalacao, formatarBRL } from "@/lib/pricing";
 import { buscarCep, detectarLocalizacaoDetalhada, formatarCep } from "@/lib/cep";
 import { CIDADE, ESTADO } from "@/lib/regiao";
 import { criarPedidoOrcamento } from "@/app/painel/orcamentos/actions";
-import { MAX_DESTINATARIOS } from "@/app/painel/orcamentos/config";
+import { MAX_AMBIENTES, MAX_DESTINATARIOS } from "@/app/painel/orcamentos/config";
 import { FotosPedido, type FotoPendente } from "./FotosPedido";
 import { aceitaCatalogo, type JobType } from "./tipos";
 import type { PaginaMarketplace, ProdutoDTO, ProfissionalDTO } from "./marketplace-types";
@@ -56,7 +56,54 @@ const URGENCIA_ID: Record<string, "sem_pressa" | "proximos_dias" | "urgente" | u
 
 const TIPOS_IMOVEL = ["Casa", "Apartamento", "Escritório", "Loja", "Galpão"];
 const AMBIENTES = ["Sala", "Quarto", "Cozinha", "Escritório", "Loja", "Outro"];
+/* Ordem de quem climatiza a casa aos poucos: sala primeiro, depois os quartos.
+   É a sugestão do botão "Adicionar ambiente". */
+const SUGESTOES_AMBIENTE = [
+  "Sala", "Quarto de casal", "Quarto 1", "Quarto 2", "Suíte",
+  "Escritório", "Cozinha", "Sala de jantar",
+];
 const PERIODOS = ["Durante o dia", "À noite", "O dia inteiro"];
+
+/* Um cômodo a climatizar. Cada um tem a própria carga térmica e o próprio
+   aparelho: 9k na suíte e 18k na sala é o caso normal, não a exceção. */
+type AmbienteForm = {
+  /** Chave estável de lista — o nome muda enquanto o cliente digita. */
+  chave: string;
+  nome: string;
+  areaM2: number;
+  numPessoas: number;
+  eletronicos: number;
+  insolacaoAlta: boolean;
+  andarOuTelhado: boolean;
+  quantidade: number;
+  produtoId: string | null;
+  produto: ProdutoDTO | null;
+};
+
+let sequenciaAmbiente = 0;
+function novoAmbiente(nome: string): AmbienteForm {
+  sequenciaAmbiente += 1;
+  return {
+    chave: `amb-${sequenciaAmbiente}`,
+    nome,
+    areaM2: 20,
+    numPessoas: 2,
+    eletronicos: 1,
+    insolacaoAlta: false,
+    andarOuTelhado: false,
+    quantidade: 1,
+    produtoId: null,
+    produto: null,
+  };
+}
+
+/* Sugere o próximo cômodo em vez de abrir um campo vazio. Reduzir o pedido de
+   três ambientes a três cliques é o ponto inteiro desta tela. */
+function proximoNomeSugerido(existentes: AmbienteForm[]): string {
+  const usados = new Set(existentes.map((a) => a.nome.trim().toLowerCase()));
+  const sugestao = SUGESTOES_AMBIENTE.find((nome) => !usados.has(nome.toLowerCase()));
+  return sugestao ?? `Ambiente ${existentes.length + 1}`;
+}
 
 async function carregarPagina<T>(params: URLSearchParams, signal?: AbortSignal) {
   const response = await fetch(`/api/marketplace/catalogo?${params}`, { signal });
@@ -161,15 +208,17 @@ export function SolicitarWizard({
   const [jobType, setJobType] = useState<JobType | null>(() => equipmentInitial ? "manutencao" : null);
   const [idx, setIdx] = useState(() => equipmentInitial ? 1 : 0);
 
-  // calculadora
+  // calculadora — tipo de imóvel e uso são do IMÓVEL, não de cada cômodo
   const [tipoImovel, setTipoImovel] = useState("Apartamento");
-  const [ambiente, setAmbiente] = useState("Sala");
-  const [areaM2, setAreaM2] = useState(20);
-  const [numPessoas, setNumPessoas] = useState(2);
-  const [eletronicos, setEletronicos] = useState(1);
   const [periodo, setPeriodo] = useState(PERIODOS[0]);
-  const [insolacaoAlta, setInsolacaoAlta] = useState(false);
-  const [andarOuTelhado, setAndarOuTelhado] = useState(false);
+
+  /* Um ambiente por cômodo a climatizar. Quem quer ar na casa inteira quer um
+     pedido, não três: descreve uma vez, recebe UMA proposta pelo pacote e o
+     técnico faz tudo numa visita — que é onde nasce o desconto que a
+     concorrência não consegue dar. */
+  const [ambientes, setAmbientes] = useState<AmbienteForm[]>(() => [novoAmbiente("Sala")]);
+  // Qual ambiente está sendo editado no catálogo (uma aba por cômodo).
+  const [ambienteFoco, setAmbienteFoco] = useState(0);
 
   // já tem equipamento?
   const [jaTemEquipamento, setJaTemEquipamento] = useState<boolean | null>(() => equipmentInitial ? true : null);
@@ -179,8 +228,6 @@ export function SolicitarWizard({
   const [urgencia, setUrgencia] = useState<string>("");
   const [servicoOutro, setServicoOutro] = useState("");
 
-  const [produtoId, setProdutoId] = useState<string | null>(null);
-  const [produtoSelecionado, setProdutoSelecionado] = useState<ProdutoDTO | null>(null);
   const [produtosLista, setProdutosLista] = useState(produtos);
   const [produtosTotal, setProdutosTotal] = useState(totalProdutos);
   const [produtosPagina, setProdutosPagina] = useState(1);
@@ -195,7 +242,6 @@ export function SolicitarWizard({
   const [chaveSelecao, setChaveSelecao] = useState("");
   const [profissionaisCarregando, setProfissionaisCarregando] = useState(false);
   const [fotos, setFotos] = useState<FotoPendente[]>([]);
-  const [quantidade, setQuantidade] = useState(1);
 
   // endereço — o CEP pode chegar já preenchido pelo hero da home
   const [cep, setCep] = useState(() => formatarCep(cepInicial));
@@ -289,10 +335,26 @@ export function SolicitarWizard({
     return () => { vivo = false; };
   }, [cepInicial]);
 
-  const btu = useMemo(
-    () => calcularBtu({ areaM2, numPessoas, insolacaoAlta, andarOuTelhado, eletronicos }),
-    [areaM2, numPessoas, insolacaoAlta, andarOuTelhado, eletronicos],
+  /* Uma carga térmica por ambiente. Calcular tudo de uma vez mantém a lista e o
+     catálogo lendo do mesmo número — nada de recalcular BTU em dois lugares e
+     eles divergirem. */
+  const btus = useMemo(
+    () => ambientes.map((a) => calcularBtu({
+      areaM2: a.areaM2,
+      numPessoas: a.numPessoas,
+      insolacaoAlta: a.insolacaoAlta,
+      andarOuTelhado: a.andarOuTelhado,
+      eletronicos: a.eletronicos,
+    })),
+    [ambientes],
   );
+  /* O foco é clampado na leitura em vez de num efeito: remover o último
+     ambiente enquanto ele está selecionado não pode deixar o índice apontando
+     para fora da lista nem por um render. */
+  const focoSeguro = Math.min(ambienteFoco, Math.max(0, ambientes.length - 1));
+  const ambienteAtivo = ambientes[focoSeguro];
+  // Carga do ambiente em edição — é ela que filtra o catálogo.
+  const btu = btus[focoSeguro] ?? btus[0];
 
   useEffect(() => {
     if (stepAtual !== "catalogo") return;
@@ -378,21 +440,103 @@ export function SolicitarWizard({
       .filter((p) => p.skill);
   }, [profissionaisLista, specialty]);
 
-  const produtoSel = produtoSelecionado;
   // Se a cobertura mudar enquanto o cliente está no fluxo, a seleção antiga
   // deixa de ser válida imediatamente, sem depender de um efeito posterior.
   const prosSel = chaveSelecao === chaveCobertura ? profissionaisSelecionados : [];
   const profissionaisIds = prosSel.map((p) => p.id);
   /* Estimativa de mão de obra, exibida apenas como referência. O preço real vem
      da proposta de cada profissional — instalação varia demais com metragem de
-     linha, parede e acesso para ter tabela fixa. */
-  const estimativaInstalacao = comCatalogo ? precoInstalacao(btu.btuRecomendado) : 0;
+     linha, parede e acesso para ter tabela fixa. Com vários ambientes, soma-se a
+     estimativa de cada um: é o piso do pacote, não de um cômodo. */
+  const estimativaInstalacao = comCatalogo
+    ? ambientes.reduce((total, a, i) => total + precoInstalacao(btus[i].btuRecomendado) * a.quantidade, 0)
+    : 0;
+  const totalAparelhos = ambientes.reduce((total, a) => total + a.quantidade, 0);
+  // Soma do catálogo: só os ambientes em que o cliente já escolheu o aparelho.
+  const totalProdutosEscolhidos = ambientes.reduce(
+    (total, a) => total + (a.produto ? a.produto.precoVenda * a.quantidade : 0),
+    0,
+  );
   const foraDaArea = cepStatus === "ok" && ufCep && ufCep !== ESTADO;
 
+  function alterarAmbiente(indice: number, mudanca: Partial<AmbienteForm>) {
+    setAmbientes((atuais) => atuais.map((a, i) => i === indice ? { ...a, ...mudanca } : a));
+  }
+  function adicionarAmbiente() {
+    setAmbientes((atuais) => {
+      if (atuais.length >= MAX_AMBIENTES) return atuais;
+      const lista = [...atuais, novoAmbiente(proximoNomeSugerido(atuais))];
+      setAmbienteFoco(lista.length - 1);
+      return lista;
+    });
+  }
+  /* Escolher o aparelho já leva para o próximo cômodo pendente. Sem isso, o
+     cliente com três ambientes escolhe o primeiro e fica olhando para uma tela
+     que parece não ter reagido. */
+  function escolherProduto(produto: ProdutoDTO) {
+    const destino = focoSeguro;
+    setAmbientes((atuais) => {
+      const lista = atuais.map((a, i) => (
+        i === destino ? { ...a, produtoId: produto.id, produto } : a
+      ));
+      const pendente = lista.findIndex((a, i) => i !== destino && !a.produtoId);
+      if (pendente >= 0) setAmbienteFoco(pendente);
+      return lista;
+    });
+  }
+
+  function removerAmbiente(indice: number) {
+    setAmbientes((atuais) => {
+      // Um pedido sempre tem pelo menos um ambiente — é o que o banco espera.
+      if (atuais.length <= 1) return atuais;
+      const lista = atuais.filter((_, i) => i !== indice);
+      setAmbienteFoco((foco) => Math.min(foco, lista.length - 1));
+      return lista;
+    });
+  }
+
+  /* Uma única fonte de verdade para "esta etapa está respondida?". É usada pelo
+     botão Continuar de cada passo E pela navegação direta da barra de progresso —
+     manter as duas em regras separadas é o caminho garantido para o cliente pular
+     para "Enviar" sem profissional escolhido. */
+  const stepValido = useMemo(() => {
+    const mapa: Record<StepId, boolean> = {
+      servico: jobType !== null,
+      ambiente: true,
+      detalhes: jobType !== "outros" || servicoOutro.trim().length >= 10,
+      equipamento: jaTemEquipamento !== null,
+      // Nenhum ambiente pode ficar sem aparelho: o pedido incompleto viraria
+      // proposta incompleta e a diferença apareceria só na hora de pagar.
+      catalogo: ambientes.every((a) => Boolean(a.produtoId)),
+      endereco: cepDigitos.length === 8 && cepStatus === "ok",
+      profissional: profissionaisIds.length > 0,
+      confirmar: true,
+    };
+    return mapa;
+  }, [jobType, servicoOutro, jaTemEquipamento, ambientes, cepDigitos, cepStatus, profissionaisIds.length]);
+
+  // Voltar é sempre livre. Avançar pela barra só até onde tudo antes está pronto.
+  function podeIrPara(destino: number) {
+    if (destino <= idx) return true;
+    return steps.slice(0, destino).every((s) => stepValido[s]);
+  }
+
+  function irPara(destino: number) {
+    if (!podeIrPara(destino)) return;
+    setIdx(Math.max(0, Math.min(destino, steps.length - 1)));
+  }
+
   function goTriagem(t: JobType) {
-    setJobType(t); setProdutoId(null); setProdutoSelecionado(null); setProfissionaisSelecionados([]);
+    /* Voltar à etapa 1 só para conferir não pode custar as respostas: se o cliente
+       reconfirma o mesmo serviço, seguimos em frente sem limpar nada. A limpeza só
+       faz sentido quando ele realmente troca de serviço — aí as respostas
+       anteriores são de outro questionário. */
+    if (t === jobType) { setIdx(1); return; }
+    setJobType(t); setProfissionaisSelecionados([]);
     setProblemas([]); setUrgencia(""); setServicoOutro(""); setJaTemEquipamento(null);
-    setFotos([]); setQuantidade(1);
+    setFotos([]);
+    setAmbientes([novoAmbiente("Sala")]);
+    setAmbienteFoco(0);
     setIdx(1);
   }
   function toggleProfissional(profissional: ProfissionalDTO) {
@@ -488,6 +632,13 @@ export function SolicitarWizard({
     return [
       servicoOutro.trim() ? `Serviço: ${servicoOutro.trim()}` : "",
       comCatalogo ? `Imóvel: ${tipoImovel} · Uso: ${periodo}` : "",
+      /* Com mais de um cômodo, o resumo entra na descrição: é o que o
+         profissional lê primeiro para decidir se responde. */
+      ambientes.length > 1
+        ? `Ambientes (${ambientes.length}): ${ambientes.map((a, i) => (
+            comCatalogo ? `${a.nome} — ${formatarBtu(btus[i].btuRecomendado)}` : a.nome
+          )).join("; ")}`
+        : "",
       jaTemEquipamento === true ? "Cliente já tem o equipamento" : "",
       problemas.length ? `Problemas: ${problemas.join(", ")}` : "",
       urgencia ? `Urgência: ${urgencia}` : "",
@@ -496,16 +647,20 @@ export function SolicitarWizard({
   }
 
   /* Chaves que `aceitar_quote` promove de `detalhes` para colunas de `jobs`.
-     Os nomes precisam bater com a função no banco — ver perguntas-orcamento.ts. */
+     Os nomes precisam bater com a função no banco — ver perguntas-orcamento.ts.
+     Com múltiplos ambientes estas chaves descrevem o PRIMEIRO; a lista completa
+     viaja em `itens`, e a RPC refaz esse espelho de qualquer forma. */
   function detalhesCompletos(): Record<string, string> {
     const base: Record<string, string> = {};
     if (equipmentInitial) base.equipment_id = equipmentInitial.id;
+    const primeiro = ambientes[0];
+    base.ambiente = primeiro.nome;
     if (comCatalogo) {
-      base.area_m2 = String(areaM2);
-      base.ambiente = ambiente;
-      base.num_pessoas = String(numPessoas);
-      base.insolacao_alta = String(insolacaoAlta);
-      base.andar_ou_telhado = String(andarOuTelhado);
+      base.area_m2 = String(primeiro.areaM2);
+      base.num_pessoas = String(primeiro.numPessoas);
+      base.eletronicos = String(primeiro.eletronicos);
+      base.insolacao_alta = String(primeiro.insolacaoAlta);
+      base.andar_ou_telhado = String(primeiro.andarOuTelhado);
     }
     return base;
   }
@@ -519,19 +674,29 @@ export function SolicitarWizard({
         cep,
         cidade: cidadeCep,
         bairro: bairro || undefined,
-        quantidade,
+        /* Um pedido, N ambientes. É isto que evita o cliente refazer a triagem
+           inteira para cada cômodo — e o que permite a proposta de pacote. */
+        itens: ambientes.map((a, i) => ({
+          ambiente: a.nome,
+          areaM2: comCatalogo ? a.areaM2 : null,
+          numPessoas: comCatalogo ? a.numPessoas : null,
+          eletronicos: comCatalogo ? a.eletronicos : null,
+          insolacaoAlta: comCatalogo ? a.insolacaoAlta : false,
+          andarOuTelhado: comCatalogo ? a.andarOuTelhado : false,
+          btuRecomendado: comCatalogo ? btus[i].btuRecomendado : null,
+          produtoId: comCatalogo ? a.produtoId : null,
+          quantidade: a.quantidade,
+        })),
         urgencia: URGENCIA_ID[urgencia],
         descricao: montarDescricao() || undefined,
         detalhes: detalhesCompletos(),
-        produtoId: comCatalogo ? produtoId : null,
-        btuRecomendado: comCatalogo ? btu.btuRecomendado : null,
         profissionaisIds,
         fotos: fotos.map((foto) => foto.path),
         latitude: coordenadasServico?.latitude,
         longitude: coordenadasServico?.longitude,
       });
       if (res.ok) {
-        captureAnalytics("request_created", { job_type: jobType, target_count: res.enviados, reused_equipment: Boolean(equipmentInitial), experience_version: ANALYTICS_VERSION });
+        captureAnalytics("request_created", { job_type: jobType, target_count: res.enviados, reused_equipment: Boolean(equipmentInitial), ambientes: ambientes.length, experience_version: ANALYTICS_VERSION });
         setSucessoId(res.pedidoId);
         setEnviados(res.enviados);
       } else setErro(res.error);
@@ -563,7 +728,7 @@ export function SolicitarWizard({
 
   return (
     <Shell geo={geo}>
-      <Progress steps={steps} current={idx} />
+      <Progress steps={steps} current={idx} onIr={irPara} podeIr={podeIrPara} />
 
       {/* ---------- TRIAGEM ---------- */}
       {stepAtual === "servico" && (
@@ -585,27 +750,14 @@ export function SolicitarWizard({
       {/* ---------- AMBIENTE (tipos com catálogo) ---------- */}
       {stepAtual === "ambiente" && (
         <>
-          <H titulo="Sobre o ambiente" sub="Cada resposta refina o cálculo de capacidade ao lado." />
-          <div style={grid2}>
+          <H titulo="Quais ambientes você quer climatizar?"
+            sub="Pode ser mais de um. Calculamos a capacidade de cada cômodo e você recebe uma proposta pelo conjunto." />
+
+          <div style={{ ...grid2, marginBottom: 8 }}>
             <Campo label="Tipo de imóvel">
               <select value={tipoImovel} onChange={(e) => setTipoImovel(e.target.value)} style={input}>
                 {TIPOS_IMOVEL.map((t) => <option key={t}>{t}</option>)}
               </select>
-            </Campo>
-            <Campo label="Cômodo">
-              <select value={ambiente} onChange={(e) => setAmbiente(e.target.value)} style={input}>
-                {AMBIENTES.map((a) => <option key={a}>{a}</option>)}
-              </select>
-            </Campo>
-            <Campo label={`Área: ${areaM2} m²`}>
-              <input type="range" min={6} max={120} value={areaM2} onChange={(e) => setAreaM2(+e.target.value)} style={{ width: "100%" }} />
-            </Campo>
-            <Campo label={`Pessoas no ambiente: ${numPessoas}`}>
-              <input type="range" min={1} max={20} value={numPessoas} onChange={(e) => setNumPessoas(+e.target.value)} style={{ width: "100%" }} />
-            </Campo>
-            <Campo label={`Eletrônicos que esquentam: ${eletronicos}`}>
-              <input type="range" min={0} max={10} value={eletronicos} onChange={(e) => setEletronicos(+e.target.value)} style={{ width: "100%" }} />
-              <span style={hint}>TV, computador, forno, geladeira no mesmo ambiente.</span>
             </Campo>
             <Campo label="Uso principal">
               <select value={periodo} onChange={(e) => setPeriodo(e.target.value)} style={input}>
@@ -613,12 +765,39 @@ export function SolicitarWizard({
               </select>
             </Campo>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10, margin: "4px 0 4px" }}>
-            <Check label="O ambiente pega muito sol" checked={insolacaoAlta} onChange={setInsolacaoAlta} />
-            <Check label="Último andar / laje exposta" checked={andarOuTelhado} onChange={setAndarOuTelhado} />
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {ambientes.map((a, i) => (
+              <CartaoAmbiente
+                key={a.chave}
+                indice={i}
+                ambiente={a}
+                btu={btus[i]}
+                podeRemover={ambientes.length > 1}
+                onAlterar={(mudanca) => alterarAmbiente(i, mudanca)}
+                onRemover={() => removerAmbiente(i)}
+              />
+            ))}
           </div>
 
-          <AnaliseBtu btu={btu} />
+          {ambientes.length < MAX_AMBIENTES ? (
+            <button type="button" onClick={adicionarAmbiente} style={btnAdicionar}>
+              + Adicionar outro ambiente
+            </button>
+          ) : (
+            <p style={{ ...hint, marginTop: 14 }}>
+              Limite de {MAX_AMBIENTES} ambientes por pedido atingido.
+            </p>
+          )}
+
+          {ambientes.length > 1 && (
+            <div style={{ ...avisoBox, background: "var(--cool-wash)", color: "var(--cool-deep)" }}>
+              <strong>{ambientes.length} ambientes neste pedido.</strong> O profissional atende todos
+              numa visita só e responde com um preço pelo pacote — costuma sair mais barato do que
+              pedir cada cômodo separado.
+            </div>
+          )}
+
           <Nav onBack={voltar} onNext={avancar} nextLabel="Continuar" />
         </>
       )}
@@ -653,17 +832,31 @@ export function SolicitarWizard({
               </div>
             </div>
           )}
-          <Nav onBack={voltar} onNext={avancar} nextLabel="Continuar" disabled={jaTemEquipamento === null} />
+          <Nav onBack={voltar} onNext={avancar} nextLabel="Continuar" disabled={!stepValido.equipamento} />
         </>
       )}
 
       {/* ---------- CATÁLOGO ---------- */}
       {stepAtual === "catalogo" && (
         <>
-          <H titulo="Escolha o aparelho"
+          <H titulo={ambientes.length > 1 ? `Aparelho para ${ambienteAtivo.nome || "este ambiente"}` : "Escolha o aparelho"}
             sub={qtdRecomendados > 0
               ? `${qtdRecomendados} modelo(s) na capacidade ideal de ${formatarBtu(btu.btuRecomendado)} — aparecem primeiro.`
               : `Nenhum modelo exatamente de ${formatarBtu(btu.btuRecomendado)}. Listamos do mais próximo ao mais distante.`} />
+
+          {/* Uma aba por cômodo: cada ambiente tem sua carga térmica, então cada
+              um tem seu catálogo filtrado. O ✓ mostra o que já foi resolvido. */}
+          {ambientes.length > 1 && (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18 }}>
+              {ambientes.map((a, i) => (
+                <button key={a.chave} type="button" onClick={() => setAmbienteFoco(i)}
+                  aria-pressed={i === focoSeguro}
+                  style={{ ...abaAmbiente, ...(i === focoSeguro ? abaAmbienteOn : {}) }}>
+                  {a.produtoId ? "✓ " : ""}{a.nome || `Ambiente ${i + 1}`} · {formatarBtu(btus[i].btuRecomendado)}
+                </button>
+              ))}
+            </div>
+          )}
 
           <div style={{ position: "relative", marginBottom: 18 }}>
             <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--ink-faint)", display: "flex" }}>
@@ -686,9 +879,9 @@ export function SolicitarWizard({
             <>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px,1fr))", gap: 14 }}>
                 {produtosOrdenados.map((p) => {
-                  const sel = p.id === produtoId;
+                  const sel = p.id === ambienteAtivo.produtoId;
                   return (
-                    <button key={p.id} onClick={() => { setProdutoId(p.id); setProdutoSelecionado(p); }} style={{ ...prodCard, ...(sel ? prodCardSel : {}) }}>
+                    <button key={p.id} onClick={() => escolherProduto(p)} style={{ ...prodCard, ...(sel ? prodCardSel : {}) }}>
                       {p.recomendado && <span style={badgeRec}>Ideal para seu ambiente</span>}
                       {p.imageUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
@@ -713,7 +906,7 @@ export function SolicitarWizard({
               )}
             </>
           )}
-          <Nav onBack={voltar} onNext={avancar} nextLabel="Escolher profissional" disabled={!produtoId} />
+          <Nav onBack={voltar} onNext={avancar} nextLabel="Escolher profissional" disabled={!stepValido.catalogo} />
         </>
       )}
 
@@ -731,10 +924,41 @@ export function SolicitarWizard({
             </Campo>
           )}
 
+          {/* Limpar o ar de três cômodos é UM chamado, não três. Aqui não há
+              carga térmica a calcular: basta onde está e quantos aparelhos. */}
           {jobType !== "outros" && (
-            <Campo label="Ambiente">
-              <input value={ambiente} onChange={(e) => setAmbiente(e.target.value)} placeholder="Ex.: Quarto do casal" style={input} />
-            </Campo>
+            <div style={{ marginBottom: 18 }}>
+              <span style={labelTxt}>Onde é o serviço?</span>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 8 }}>
+                {ambientes.map((a, i) => (
+                  <div key={a.chave} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <input
+                      value={a.nome}
+                      onChange={(e) => alterarAmbiente(i, { nome: e.target.value })}
+                      placeholder="Ex.: Quarto do casal"
+                      aria-label={`Ambiente ${i + 1}`}
+                      style={{ ...input, flex: 1 }}
+                    />
+                    <input
+                      type="number" min={1} max={20} value={a.quantidade}
+                      onChange={(e) => alterarAmbiente(i, { quantidade: Math.max(1, Math.min(20, Number(e.target.value) || 1)) })}
+                      aria-label={`Aparelhos em ${a.nome || `ambiente ${i + 1}`}`}
+                      title="Quantos aparelhos neste ambiente"
+                      style={{ ...input, width: 78, flexShrink: 0 }}
+                    />
+                    {ambientes.length > 1 && (
+                      <button type="button" onClick={() => removerAmbiente(i)}
+                        aria-label={`Remover ${a.nome || "ambiente"}`} style={btnRemover}>Remover</button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {ambientes.length < MAX_AMBIENTES && (
+                <button type="button" onClick={adicionarAmbiente} style={btnAdicionar}>
+                  + Adicionar outro ambiente
+                </button>
+              )}
+            </div>
           )}
 
           {PROBLEMAS[jobType!] && (
@@ -765,8 +989,7 @@ export function SolicitarWizard({
             <textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="Ex.: Split 12k da marca X, tem uns 3 anos, começou a pingar água por dentro."
               rows={4} style={{ ...input, height: "auto", padding: 12, resize: "vertical" }} />
           </Campo>
-          <Nav onBack={voltar} onNext={avancar} nextLabel="Escolher profissional"
-            disabled={jobType === "outros" && servicoOutro.trim().length < 10} />
+          <Nav onBack={voltar} onNext={avancar} nextLabel="Escolher profissional" disabled={!stepValido.detalhes} />
         </>
       )}
 
@@ -870,7 +1093,7 @@ export function SolicitarWizard({
               {profissionaisIds.length} de {MAX_DESTINATARIOS} selecionados.
             </p>
           )}
-          <Nav onBack={voltar} onNext={avancar} nextLabel="Continuar" disabled={profissionaisIds.length === 0} />
+          <Nav onBack={voltar} onNext={avancar} nextLabel="Continuar" disabled={!stepValido.profissional} />
         </>
       )}
 
@@ -910,7 +1133,7 @@ export function SolicitarWizard({
             </div>
           )}
           {foraDaArea && <Aviso>Este CEP fica em {ufCep}. No momento atendemos {CIDADE} — {ESTADO}. Você pode continuar, mas talvez não haja profissionais na região.</Aviso>}
-          <Nav onBack={voltar} onNext={avancar} nextLabel="Buscar profissionais" disabled={cepDigitos.length !== 8 || cepStatus !== "ok"} />
+          <Nav onBack={voltar} onNext={avancar} nextLabel="Buscar profissionais" disabled={!stepValido.endereco} />
         </>
       )}
 
@@ -919,12 +1142,9 @@ export function SolicitarWizard({
         <>
           <H titulo="Confirme o pedido de orçamento" sub="Revise antes de enviar. Você não se compromete com nada agora." />
 
-          {/* Só o que ainda falta e é barato de responder. Detalhe técnico do
-              local fica para a hora de fechar com alguém. */}
-          <Campo label="Quantos aparelhos">
-            <input value={quantidade} onChange={(e) => setQuantidade(Math.max(1, Number(e.target.value) || 1))}
-              type="number" min={1} max={100} style={input} />
-          </Campo>
+          {/* "Quantos aparelhos" saiu daqui: a quantidade agora vem de cada
+              ambiente, então perguntar de novo seria pedir a mesma informação
+              duas vezes — e deixar as duas respostas divergirem. */}
 
           {comCatalogo && (
             <div style={{ marginBottom: 18 }}>
@@ -943,10 +1163,27 @@ export function SolicitarWizard({
             <LinhaResumo k="Serviço" v={JOBS.find((j) => j.tipo === jobType)!.titulo} />
             {jobType === "outros" && servicoOutro && <LinhaResumo k="Descrição" v={servicoOutro} />}
             <LinhaResumo k="Enviar para" v={prosSel.map((p) => p.nome).join(", ") || "-"} />
-            {quantidade > 1 && <LinhaResumo k="Quantidade" v={`${quantidade} aparelhos`} />}
-            {comCatalogo && <LinhaResumo k="Ambiente" v={`${tipoImovel} · ${ambiente} · ${areaM2} m² · ${formatarBtu(btu.btuRecomendado)}`} />}
+            {comCatalogo && <LinhaResumo k="Imóvel" v={`${tipoImovel} · Uso: ${periodo}`} />}
+            {totalAparelhos > 1 && <LinhaResumo k="Total de aparelhos" v={`${totalAparelhos}`} />}
+
+            {/* Uma linha por ambiente: é o escopo que o profissional vai orçar,
+                e é aqui que o cliente confere antes de disparar. */}
+            <LinhaResumo
+              k={ambientes.length > 1 ? `Ambientes (${ambientes.length})` : "Ambiente"}
+              v={
+                <span style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  {ambientes.map((a, i) => (
+                    <span key={a.chave}>
+                      <strong>{a.nome || `Ambiente ${i + 1}`}</strong>
+                      {a.quantidade > 1 ? ` · ${a.quantidade} aparelhos` : ""}
+                      {comCatalogo ? ` · ${a.areaM2} m² · ${formatarBtu(btus[i].btuRecomendado)}` : ""}
+                      {a.produto ? ` · ${a.produto.modelo}` : ""}
+                    </span>
+                  ))}
+                </span>
+              }
+            />
             {comCatalogo && jaTemEquipamento === true && <LinhaResumo k="Aparelho" v="Cliente já possui" />}
-            {produtoSel && <LinhaResumo k="Aparelho" v={`${produtoSel.modelo}${produtoSel.distribuidora ? ` · ${produtoSel.distribuidora}` : ""}`} />}
             {!comCatalogo && problemas.length > 0 && <LinhaResumo k="Problemas" v={problemas.join(", ")} />}
             {urgencia && <LinhaResumo k="Urgência" v={urgencia} />}
             <LinhaResumo k="Região" v={`${bairro ? `${bairro} · ` : ""}${cep}`} />
@@ -956,7 +1193,12 @@ export function SolicitarWizard({
             <div style={{ borderTop: "1px solid var(--line)", margin: "8px 0", paddingTop: 10 }} />
             {/* O aparelho tem preço de catálogo; a mão de obra vem da proposta de
                 cada profissional. Mostrar "total" aqui seria inventar número. */}
-            {produtoSel && <LinhaResumo k="Aparelho (catálogo)" v={formatarBRL(produtoSel.precoVenda)} />}
+            {totalProdutosEscolhidos > 0 && (
+              <LinhaResumo
+                k={ambientes.length > 1 ? "Aparelhos (catálogo)" : "Aparelho (catálogo)"}
+                v={formatarBRL(totalProdutosEscolhidos)}
+              />
+            )}
             {comCatalogo && (
               <LinhaResumo k="Instalação (estimativa)" v={`a partir de ${formatarBRL(estimativaInstalacao)}`} />
             )}
@@ -1021,6 +1263,74 @@ function AnaliseBtu({ btu }: { btu: ReturnType<typeof calcularBtu> }) {
   );
 }
 
+/* Um cômodo do pedido. Cada cartão é auto-contido: nome, carga térmica e
+   quantidade. Manter tudo de um ambiente junto é o que permite o cliente
+   revisar a sala sem perder de vista o que respondeu para o quarto. */
+function CartaoAmbiente({ indice, ambiente, btu, podeRemover, onAlterar, onRemover }: {
+  indice: number;
+  ambiente: AmbienteForm;
+  btu: ReturnType<typeof calcularBtu>;
+  podeRemover: boolean;
+  onAlterar: (mudanca: Partial<AmbienteForm>) => void;
+  onRemover: () => void;
+}) {
+  return (
+    <div style={cartaoAmbiente}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+        <span style={selo}>{indice + 1}</span>
+        <input
+          value={ambiente.nome}
+          onChange={(e) => onAlterar({ nome: e.target.value })}
+          list={`comodos-${ambiente.chave}`}
+          placeholder="Ex.: Quarto do casal"
+          aria-label={`Nome do ambiente ${indice + 1}`}
+          style={{ ...input, flex: 1, fontWeight: 600 }}
+        />
+        <datalist id={`comodos-${ambiente.chave}`}>
+          {AMBIENTES.map((a) => <option key={a} value={a} />)}
+        </datalist>
+        {podeRemover && (
+          <button type="button" onClick={onRemover} aria-label={`Remover ${ambiente.nome || "ambiente"}`}
+            title="Remover este ambiente" style={btnRemover}>
+            Remover
+          </button>
+        )}
+      </div>
+
+      <div style={grid2}>
+        <Campo label={`Área: ${ambiente.areaM2} m²`}>
+          <input type="range" min={6} max={120} value={ambiente.areaM2}
+            onChange={(e) => onAlterar({ areaM2: +e.target.value })} style={{ width: "100%" }} />
+        </Campo>
+        <Campo label={`Pessoas no ambiente: ${ambiente.numPessoas}`}>
+          <input type="range" min={1} max={20} value={ambiente.numPessoas}
+            onChange={(e) => onAlterar({ numPessoas: +e.target.value })} style={{ width: "100%" }} />
+        </Campo>
+        <Campo label={`Eletrônicos que esquentam: ${ambiente.eletronicos}`}>
+          <input type="range" min={0} max={10} value={ambiente.eletronicos}
+            onChange={(e) => onAlterar({ eletronicos: +e.target.value })} style={{ width: "100%" }} />
+          <span style={hint}>TV, computador, forno, geladeira no mesmo ambiente.</span>
+        </Campo>
+        <Campo label="Aparelhos neste ambiente">
+          <input type="number" min={1} max={20} value={ambiente.quantidade}
+            onChange={(e) => onAlterar({ quantidade: Math.max(1, Math.min(20, Number(e.target.value) || 1)) })}
+            style={input} />
+          <span style={hint}>Salão grande às vezes pede dois aparelhos.</span>
+        </Campo>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 10, margin: "4px 0 14px" }}>
+        <Check label="O ambiente pega muito sol" checked={ambiente.insolacaoAlta}
+          onChange={(v) => onAlterar({ insolacaoAlta: v })} />
+        <Check label="Último andar / laje exposta" checked={ambiente.andarOuTelhado}
+          onChange={(v) => onAlterar({ andarOuTelhado: v })} />
+      </div>
+
+      <AnaliseBtu btu={btu} />
+    </div>
+  );
+}
+
 function EscolhaGrande({ titulo, desc, ativo, onClick }: { titulo: string; desc: string; ativo: boolean; onClick: () => void }) {
   return (
     <button onClick={onClick} style={{ ...cardBtn, ...(ativo ? prodCardSel : {}), gap: 4 }}>
@@ -1052,18 +1362,40 @@ function GeoBanner({ geo }: { geo: GeoState }) {
   );
 }
 
-function Progress({ steps, current }: { steps: StepId[]; current: number }) {
+function Progress({ steps, current, onIr, podeIr }: {
+  steps: StepId[];
+  current: number;
+  onIr: (i: number) => void;
+  podeIr: (i: number) => boolean;
+}) {
   return (
-    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 28 }}>
-      {steps.map((s, i) => (
-        <span key={s} style={{
-          fontFamily: mono, fontSize: 11.5, padding: "4px 10px", borderRadius: 100,
-          background: i === current ? "var(--cool)" : i < current ? "var(--cool-wash)" : "var(--surface-2)",
-          color: i === current ? "#fff" : i < current ? "var(--cool-deep)" : "var(--ink-faint)",
-          border: "1px solid var(--line)",
-        }}>{i + 1}. {STEP_LABEL[s]}</span>
-      ))}
-    </div>
+    <nav aria-label="Etapas do pedido" style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 28 }}>
+      {steps.map((s, i) => {
+        const ativo = i === current;
+        const concluido = i < current;
+        const habilitado = !ativo && podeIr(i);
+        return (
+          <button
+            key={s}
+            type="button"
+            onClick={() => onIr(i)}
+            disabled={!habilitado}
+            aria-current={ativo ? "step" : undefined}
+            title={habilitado
+              ? `Ir para ${STEP_LABEL[s]}`
+              : ativo ? undefined : "Responda as etapas anteriores para chegar aqui"}
+            style={{
+              fontFamily: mono, fontSize: 11.5, padding: "4px 10px", borderRadius: 100,
+              background: ativo ? "var(--cool)" : concluido ? "var(--cool-wash)" : "var(--surface-2)",
+              color: ativo ? "#fff" : concluido ? "var(--cool-deep)" : "var(--ink-faint)",
+              border: "1px solid var(--line)",
+              cursor: habilitado ? "pointer" : ativo ? "default" : "not-allowed",
+              opacity: habilitado || ativo ? 1 : 0.7,
+            }}
+          >{i + 1}. {STEP_LABEL[s]}</button>
+        );
+      })}
+    </nav>
   );
 }
 function H({ titulo, sub }: { titulo: string; sub: string }) {
@@ -1120,6 +1452,12 @@ const cardBtn: CSSProperties = { display: "flex", flexDirection: "column", gap: 
 const pill: CSSProperties = { fontSize: 10.5, fontFamily: mono, textTransform: "uppercase", letterSpacing: "0.06em", padding: "2px 8px", borderRadius: 100, background: "var(--warm-wash)", color: "var(--warm)" };
 const chip: CSSProperties = { padding: "8px 14px", borderRadius: 100, border: "1px solid var(--line)", background: "var(--surface)", color: "var(--ink-soft)", fontSize: 13.5, fontWeight: 500, cursor: "pointer" };
 const chipOn: CSSProperties = { border: "1px solid var(--cool)", background: "var(--cool-wash)", color: "var(--cool-deep)", fontWeight: 600 };
+const cartaoAmbiente: CSSProperties = { padding: "18px 20px", borderRadius: 14, border: "1px solid var(--line)", background: "var(--surface)" };
+const selo: CSSProperties = { display: "grid", placeItems: "center", width: 28, height: 28, borderRadius: "50%", background: "var(--cool)", color: "#fff", fontFamily: mono, fontSize: 13, fontWeight: 700, flexShrink: 0 };
+const btnRemover: CSSProperties = { height: 44, padding: "0 14px", borderRadius: 10, background: "transparent", color: "var(--ink-faint)", fontSize: 13.5, fontWeight: 500, border: "1px solid var(--line)", cursor: "pointer", flexShrink: 0 };
+const btnAdicionar: CSSProperties = { marginTop: 14, width: "100%", height: 48, borderRadius: 12, border: "1px dashed var(--cool)", background: "var(--cool-wash)", color: "var(--cool-deep)", fontSize: 14.5, fontWeight: 600, cursor: "pointer" };
+const abaAmbiente: CSSProperties = { padding: "8px 14px", borderRadius: 100, border: "1px solid var(--line)", background: "var(--surface)", color: "var(--ink-soft)", fontSize: 13.5, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap" };
+const abaAmbienteOn: CSSProperties = { border: "1px solid var(--cool)", background: "var(--cool-wash)", color: "var(--cool-deep)", fontWeight: 600 };
 const btuBox: CSSProperties = { marginTop: 20, padding: "18px 22px", borderRadius: 14, background: "var(--cool-wash)", border: "1px solid var(--line)" };
 const prodCard: CSSProperties = { position: "relative", display: "flex", flexDirection: "column", gap: 6, padding: 14, borderRadius: 14, border: "1px solid var(--line)", background: "var(--surface)", cursor: "pointer", textAlign: "left" };
 const prodCardSel: CSSProperties = { border: "1px solid var(--cool)", boxShadow: "inset 0 0 0 1px var(--cool)" };

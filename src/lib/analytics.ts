@@ -11,7 +11,10 @@ type Events = {
   proposal_comparison_opened: { proposal_count: number; experience_version: string };
   proposal_comparison_decision: { proposal_count: number; quote_type: "preco_fechado" | "visita_tecnica"; result: "accepted"; experience_version: string };
   follow_up_completed: { outcome: string; overdue: boolean; experience_version: string };
-  request_created: { job_type: string; target_count: number; reused_equipment: boolean; experience_version: string };
+  /* `ambientes` responde a pergunta que decide o roadmap: quantos clientes
+     pedem mais de um cômodo de uma vez? Antes do pedido multi-ambiente isso era
+     invisível — cada cômodo virava um pedido separado e indistinguível. */
+  request_created: { job_type: string; target_count: number; reused_equipment: boolean; ambientes: number; experience_version: string };
   execution_draft_saved: { evidence_count: number; experience_version: string };
   execution_finalized: { experience_version: string };
   analytics_consent_updated: { granted: boolean };

@@ -13,6 +13,13 @@ import { AbrirChatPedido } from "./AbrirChatPedido";
 import { ComparisonLink } from "./ComparisonLink";
 import { featureHabilitada } from "@/lib/feature-flags";
 
+/* Chaves que `detalhes` mantém espelhadas do primeiro ambiente por
+   compatibilidade. Quem as exibe é a lista de ambientes — ver
+   20260817120000_pedido_multi_ambiente.sql. */
+const CHAVES_DO_AMBIENTE = new Set([
+  "ambiente", "area_m2", "num_pessoas", "eletronicos", "insolacao_alta", "andar_ou_telhado",
+]);
+
 const URGENCIA: Record<string, string> = {
   sem_pressa: "Sem pressa",
   proximos_dias: "Nos próximos dias",
@@ -31,6 +38,9 @@ export default async function PedidoPage({ params }: { params: Promise<{ id: str
     .select(`id, cliente_id, job_type, status, created_at, cep, bairro, cidade, quantidade,
              urgencia, descricao, detalhes, btu_recomendado, expira_em,
              produto:products ( marca, modelo, btu, preco_venda ),
+             itens:quote_request_itens ( id, ordem, ambiente, area_m2, num_pessoas,
+                                         insolacao_alta, andar_ou_telhado, btu_recomendado,
+                                         quantidade, produto:products ( marca, modelo, btu, preco_venda ) ),
              fotos:quote_request_photos ( id, storage_path )`)
     .eq("id", id)
     .maybeSingle();
@@ -60,6 +70,22 @@ export default async function PedidoPage({ params }: { params: Promise<{ id: str
 
   const produto = one(pedido.produto) as { marca: string; modelo: string; btu: number; preco_venda: number } | null;
   const detalhes = (pedido.detalhes ?? {}) as Record<string, unknown>;
+
+  /* Os ambientes do pedido. É o escopo real que o profissional precisa
+     precificar: mostrar só as colunas singulares faria ele orçar um cômodo de
+     um pedido de três. Todo pedido tem ao menos um item — o backfill garantiu
+     isso para os antigos. */
+  type ItemPedido = {
+    id: string; ordem: number; ambiente: string;
+    area_m2: number | null; num_pessoas: number | null;
+    insolacao_alta: boolean; andar_ou_telhado: boolean;
+    btu_recomendado: number | null; quantidade: number;
+    produto: { marca: string; modelo: string; btu: number; preco_venda: number } | null;
+  };
+  const itens = ((pedido.itens ?? []) as unknown as ItemPedido[])
+    .map((item) => ({ ...item, produto: one(item.produto) }))
+    .sort((a, b) => a.ordem - b.ordem);
+  const multiAmbiente = itens.length > 1;
   const fotosPrivadas = (pedido.fotos ?? []) as { id: string; storage_path: string }[];
   const fotos = (await Promise.all(
     fotosPrivadas.map(async (foto) => {
@@ -124,19 +150,60 @@ export default async function PedidoPage({ params }: { params: Promise<{ id: str
           <div style={{ display: "grid", gap: 8, fontSize: 14.5 }}>
             {pedido.quantidade > 1 && <Linha k="Quantidade" v={`${pedido.quantidade} aparelhos`} />}
             {pedido.urgencia && <Linha k="Urgência" v={URGENCIA[pedido.urgencia] ?? pedido.urgencia} />}
-            {pedido.btu_recomendado ? <Linha k="Capacidade calculada" v={formatarBtu(pedido.btu_recomendado)} /> : null}
-            {produto && (
-              <Linha
-                k="Aparelho escolhido"
-                v={`${produto.marca} — ${produto.modelo} · ${formatarBRL(Number(produto.preco_venda))}`}
-              />
+
+            {/* Um bloco por ambiente. Com um só, mantém o formato de linha de
+                antes; com vários, vira lista — é o escopo a precificar. */}
+            {multiAmbiente ? (
+              <div style={{ display: "grid", gap: 10, margin: "4px 0" }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ink-soft)" }}>
+                  {itens.length} ambientes neste pedido
+                </span>
+                {itens.map((item, i) => (
+                  <div key={item.id} style={{ padding: "10px 14px", borderRadius: 10, background: "var(--surface-2)" }}>
+                    <div style={{ fontWeight: 600 }}>
+                      {i + 1}. {item.ambiente}
+                      {item.quantidade > 1 ? ` · ${item.quantidade} aparelhos` : ""}
+                    </div>
+                    <div style={{ fontSize: 13.5, color: "var(--ink-faint)", marginTop: 2 }}>
+                      {[
+                        item.area_m2 ? `${item.area_m2} m²` : null,
+                        item.num_pessoas ? `${item.num_pessoas} pessoa(s)` : null,
+                        item.btu_recomendado ? formatarBtu(item.btu_recomendado) : null,
+                        item.insolacao_alta ? "muito sol" : null,
+                        item.andar_ou_telhado ? "laje exposta" : null,
+                      ].filter(Boolean).join(" · ") || "Sem detalhes técnicos"}
+                    </div>
+                    {item.produto && (
+                      <div style={{ fontSize: 13.5, marginTop: 4 }}>
+                        {item.produto.marca} — {item.produto.modelo} · {formatarBRL(Number(item.produto.preco_venda))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <>
+                {itens[0]?.ambiente && <Linha k="Ambiente" v={itens[0].ambiente} />}
+                {pedido.btu_recomendado ? <Linha k="Capacidade calculada" v={formatarBtu(pedido.btu_recomendado)} /> : null}
+                {produto && (
+                  <Linha
+                    k="Aparelho escolhido"
+                    v={`${produto.marca} — ${produto.modelo} · ${formatarBRL(Number(produto.preco_venda))}`}
+                  />
+                )}
+              </>
             )}
             {/* Respostas do questionário técnico: é o que permite orçar sem visita. */}
-            {Object.entries(detalhes).map(([k, v]) =>
-              v === null || v === "" ? null : (
-                <Linha key={k} k={rotuloPergunta(jobType, k)} v={String(v)} />
-              ),
-            )}
+            {/* As chaves espelhadas do primeiro ambiente já foram exibidas na
+                lista acima — repeti-las aqui mostraria a sala duas vezes e
+                nenhum dos outros cômodos. */}
+            {Object.entries(detalhes)
+              .filter(([k]) => !CHAVES_DO_AMBIENTE.has(k))
+              .map(([k, v]) =>
+                v === null || v === "" ? null : (
+                  <Linha key={k} k={rotuloPergunta(jobType, k)} v={String(v)} />
+                ),
+              )}
             {pedido.descricao && <Linha k="Descrição" v={pedido.descricao} />}
           </div>
 
