@@ -116,7 +116,8 @@ export default async function PainelPage(props: PageProps<"/painel">) {
       .select("starts_at, status, proposed_by, job_id, job:jobs!inner(id, job_type, endereco, cep, cliente_id, profissional_id)")
       .eq("job.profissional_id", user.id).in("status", ["proposed", "confirmed"])
       .gte("starts_at", agora.toISOString()).lte("starts_at", emSeteDias.toISOString()).order("starts_at"),
-    supabase.from("messages").select("id", { count: "exact", head: true }).neq("sender_id", user.id).is("read_at", null),
+    // `or` e não `neq`: mensagem da equipe/automação tem sender_id nulo e `neq` a descartaria (ver painel/layout.tsx).
+    supabase.from("messages").select("id", { count: "exact", head: true }).or(`sender_id.is.null,sender_id.neq.${user.id}`).is("read_at", null),
     supabase.from("follow_up_tasks").select("id, quote_request_id, title, due_at")
       .eq("professional_id", user.id).eq("status", "pending").lte("due_at", emSeteDias.toISOString()).order("due_at").limit(10),
   ]);
