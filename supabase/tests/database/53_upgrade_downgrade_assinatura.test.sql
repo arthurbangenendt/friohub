@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
-select plan(16);
+select plan(19);
 
 select ok(
   not has_function_privilege('authenticated', 'public.preparar_upgrade_assinatura(uuid,uuid)', 'execute')
@@ -147,6 +147,44 @@ select is(
 );
 
 -- ---------------------------------------------------------------------------
+-- Bug real (20260818156000): upgrade de uma assinatura com cancelamento
+-- agendado (auto_renova=false) não religava a renovação — a tela continuava
+-- mostrando "cancelado" mesmo depois de pagar para trocar de plano.
+-- ---------------------------------------------------------------------------
+update public.plan_subscriptions
+   set auto_renova = false, cancelled_at = now()
+ where id = (select subscription_id from sub_ids);
+
+update sub_ids set upgrade_charge_id = public.preparar_upgrade_assinatura(
+  '60000000-0000-0000-0000-000000000001', (select plan_master from plan_ids)
+);
+select public.vincular_cobranca_gateway(
+  (select upgrade_charge_id from sub_ids), 'pay_upgrade_delta_002', 'https://sandbox.asaas.com/i/upgradedelta002', current_date + 3
+);
+update sub_ids set upgrade_event = public.registrar_evento_gateway(
+  'asaas', 'evt_upgrade_delta_received_2', 'PAYMENT_RECEIVED', 'pay_upgrade_delta_002',
+  (select amount from public.payment_charges where id = (select upgrade_charge_id from sub_ids)),
+  '{"event":"PAYMENT_RECEIVED"}'::jsonb, now()
+);
+select public.processar_evento_gateway((select upgrade_event from sub_ids));
+
+select is(
+  (select auto_renova from public.plan_subscriptions where id = (select subscription_id from sub_ids)),
+  true,
+  'upgrade desfaz um cancelamento agendado anterior — quem paga quer continuar'
+);
+select is(
+  (select cancelled_at from public.plan_subscriptions where id = (select subscription_id from sub_ids)),
+  null,
+  'cancelled_at é limpo junto'
+);
+select is(
+  (select plan_id from public.plan_subscriptions where id = (select subscription_id from sub_ids)),
+  (select plan_master from plan_ids),
+  'o plano também troca para o Master neste segundo upgrade'
+);
+
+-- ---------------------------------------------------------------------------
 -- Downgrade: Profissional (R$100) -> Essencial (R$50) — sem cobrança, só
 -- registra a intenção para o próximo vencimento.
 -- ---------------------------------------------------------------------------
@@ -169,7 +207,7 @@ select lives_ok(
 );
 select is(
   (select plan_id from public.plan_subscriptions where id = (select subscription_id from sub_ids)),
-  (select plan_profissional from plan_ids),
+  (select plan_master from plan_ids),
   'o plano vigente não muda na hora — downgrade só vale no próximo vencimento'
 );
 set local role authenticated;
