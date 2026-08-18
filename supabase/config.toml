@@ -412,6 +412,10 @@ verify_jwt = false
 [functions.asaas-assinar]
 verify_jwt = true
 
+# Recebe o JWT do profissional que está cancelando a própria assinatura.
+[functions.asaas-cancelar]
+verify_jwt = true
+
 [analytics]
 enabled = true
 port = 54327

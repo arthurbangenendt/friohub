@@ -87,3 +87,11 @@ export async function criarCobranca(params: {
     externalReference: params.externalReference,
   }) as AsaasPayment;
 }
+
+/* Cancela uma fatura ainda não paga no Asaas. `DELETE /payments/{id}` recusa
+ * cobrança já liquidada — nunca chame isto para uma fatura com status
+ * `received`/`confirmed` no gateway; é só para o rastro de faturas
+ * pendentes que a gente decidiu abandonar do nosso lado. */
+export async function cancelarCobranca(gatewayPaymentId: string): Promise<void> {
+  await asaas("DELETE", `/payments/${gatewayPaymentId}`);
+}

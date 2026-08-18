@@ -6,6 +6,7 @@ import { EXIGIR_VERIFICACAO } from "@/lib/config";
 import { PerfilForm } from "./PerfilForm";
 import { PortfolioEditor } from "./PortfolioEditor";
 import { MidiaEditor } from "../MidiaEditor";
+import { MinhaAssinatura, type AssinaturaDTO } from "./MinhaAssinatura";
 import type { PerfilInput } from "./actions";
 
 export default async function PerfilPage() {
@@ -47,6 +48,19 @@ export default async function PerfilPage() {
     .eq("professional_id", user.id)
     .eq("media_type", "foto")
     .order("position");
+
+  const { data: assinaturaRows } = await supabase.rpc("minha_assinatura_atual");
+  const assinaturaRow = Array.isArray(assinaturaRows) ? assinaturaRows[0] : null;
+  const assinatura: AssinaturaDTO | null = assinaturaRow
+    ? {
+        planoNome: assinaturaRow.plano_nome,
+        ciclo: assinaturaRow.ciclo as "mensal" | "anual",
+        valor: Number(assinaturaRow.valor),
+        status: assinaturaRow.status as AssinaturaDTO["status"],
+        autoRenova: assinaturaRow.auto_renova,
+        proximoVencimento: assinaturaRow.next_due_date,
+      }
+    : null;
 
   const inicial: PerfilInput = {
     tipo: (pro?.tipo as "autonomo" | "empresa") ?? "autonomo",
@@ -101,6 +115,8 @@ export default async function PerfilPage() {
       <div className="card" style={{ padding: 26, marginTop: 16 }}>
         <PerfilForm inicial={inicial} catalogo={catalogo ?? []} />
       </div>
+
+      {pro && <MinhaAssinatura assinatura={assinatura} />}
 
       <div className="card" style={{ padding: 26, marginTop: 16 }}>
         <div style={{ fontSize: 12.5, fontWeight: 650, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--ink-faint)", marginBottom: 4 }}>Portfólio</div>

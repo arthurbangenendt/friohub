@@ -4,6 +4,42 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { CIDADE, ESTADO } from "@/lib/regiao";
 
+export type ResultadoCancelamento = { ok: true } | { ok: false; erro: string };
+
+/* Aciona a Edge Function `asaas-cancelar`. Mesmo transporte de JWT que
+ * `iniciarAssinatura` (src/app/planos/actions.ts) — a decisão de negócio
+ * (cancelar na hora ou manter até next_due_date) vive inteira na RPC
+ * `cancelar_assinatura`, este action só carrega a sessão até lá. */
+export async function cancelarAssinatura(): Promise<ResultadoCancelamento> {
+  const supabase = await createClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session) {
+    return { ok: false, erro: "Sua sessão expirou. Entre novamente." };
+  }
+
+  const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/asaas-cancelar`;
+  let resposta: Response;
+  try {
+    resposta = await fetch(url, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    });
+  } catch {
+    return { ok: false, erro: "Não foi possível falar com o gateway de pagamento agora." };
+  }
+
+  const corpo = (await resposta.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+  if (!resposta.ok || !corpo.ok) {
+    return { ok: false, erro: corpo.error ?? "Não foi possível cancelar a assinatura." };
+  }
+
+  revalidatePath("/painel/perfil");
+  return { ok: true };
+}
+
 export type PerfilInput = {
   tipo: "autonomo" | "empresa";
   razaoSocial: string;

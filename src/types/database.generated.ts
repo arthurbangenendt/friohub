@@ -2224,6 +2224,7 @@ export type Database = {
       plan_subscriptions: {
         Row: {
           amount: number
+          auto_renova: boolean
           cancelled_at: string | null
           ciclo: string
           created_at: string
@@ -2236,6 +2237,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          auto_renova?: boolean
           cancelled_at?: string | null
           ciclo: string
           created_at?: string
@@ -2248,6 +2250,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          auto_renova?: boolean
           cancelled_at?: string | null
           ciclo?: string
           created_at?: string
@@ -4220,6 +4223,10 @@ export type Database = {
         Args: { p_job_final_quote_id: string }
         Returns: string
       }
+      assinatura_pendente_para_trocar: {
+        Args: { p_ciclo: string; p_plan_id: string; p_professional_id: string }
+        Returns: string
+      }
       atribuir_pmoc: {
         Args: { p_plan_id: string; p_professional_id: string }
         Returns: undefined
@@ -4309,6 +4316,10 @@ export type Database = {
       cancelar_agendamento: {
         Args: { p_appointment_id: string; p_reason: string }
         Returns: undefined
+      }
+      cancelar_assinatura: {
+        Args: { p_professional_id: string }
+        Returns: string
       }
       cancelar_pedido_orcamento: {
         Args: { p_quote_request_id: string; p_reason: string }
@@ -4492,6 +4503,19 @@ export type Database = {
         Returns: number
       }
       meu_cpf_cnpj_professional: { Args: never; Returns: string }
+      minha_assinatura_atual: {
+        Args: never
+        Returns: {
+          auto_renova: boolean
+          ciclo: string
+          next_due_date: string
+          plano_nome: string
+          plano_slug: string
+          status: string
+          subscription_id: string
+          valor: number
+        }[]
+      }
       obter_checkout_cobranca: {
         Args: { p_charge_id: string }
         Returns: {
@@ -4628,6 +4652,10 @@ export type Database = {
       recomendar_manutencao: {
         Args: { p_due_on: string; p_equipment_id: string; p_reason: string }
         Returns: string
+      }
+      reconciliar_assinatura_manual: {
+        Args: { p_subscription_id: string }
+        Returns: undefined
       }
       reconciliar_financeiro: { Args: never; Returns: string }
       recusar_orcamento_final: {

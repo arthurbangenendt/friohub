@@ -19,7 +19,7 @@
  */
 
 import { servico, json } from "../_shared/supabase.ts";
-import { criarCustomer, criarCobranca, AsaasError } from "../_shared/asaas.ts";
+import { criarCustomer, criarCobranca, cancelarCobranca, AsaasError } from "../_shared/asaas.ts";
 
 type Corpo = {
   plano_slug?: string;
@@ -75,6 +75,25 @@ Deno.serve(async (req) => {
   const { data: planos, error: erroPlano } = await db.rpc("obter_plano_publico", { p_slug: planoSlug });
   const plano = Array.isArray(planos) ? planos[0] : null;
   if (erroPlano || !plano) return json({ error: "Plano indisponível." }, 404);
+
+  /* Se o profissional já tem uma tentativa pendente de OUTRO plano, a fatura
+     dela pode já estar vinculada ao Asaas. `preparar_assinatura_plano` só
+     cancela do nosso lado — cancelar no Asaas também é o que fecha o furo de
+     20260818150000 (fatura órfã paga fora de hora, depois de já abandonada). */
+  const gatewayPaymentIdParaCancelar = await db.rpc("assinatura_pendente_para_trocar", {
+    p_professional_id: userId,
+    p_plan_id: plano.id,
+    p_ciclo: ciclo,
+  }).then((r) => r.data as string | null);
+  if (gatewayPaymentIdParaCancelar) {
+    try {
+      await cancelarCobranca(gatewayPaymentIdParaCancelar);
+    } catch (erro) {
+      // Best-effort: fatura já vencida/paga no meio-tempo não pode travar a
+      // troca de plano. O nosso lado já vai cancelar de qualquer forma.
+      console.error(`falha ao cancelar fatura antiga no Asaas: ${erro instanceof Error ? erro.message : erro}`);
+    }
+  }
 
   const { data: subscriptionId, error: erroSub } = await db.rpc("preparar_assinatura_plano", {
     p_professional_id: userId,
