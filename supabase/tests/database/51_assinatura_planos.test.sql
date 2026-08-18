@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
-select plan(19);
+select plan(22);
 
 select has_table('public', 'plan_subscriptions', 'compromisso de assinatura existe');
 select ok(
@@ -86,6 +86,50 @@ select is(
   ),
   (select subscription_id from sub_ids),
   'reassinar com pendência em aberto devolve a mesma assinatura'
+);
+
+-- Mudar de ideia antes de pagar (20260818149000): pedir outro plano não pode
+-- devolver a assinatura antiga com o valor errado — bug real encontrado
+-- testando em produção, onde clicar em qualquer cartão sempre levava para o
+-- checkout do primeiro plano escolhido.
+create temporary table plan_profissional_ids (
+  plan_profissional uuid
+) on commit drop;
+insert into plan_profissional_ids select id from public.subscription_plans where slug = 'profissional';
+
+create temporary table troca_ids (
+  nova_subscription uuid
+) on commit drop;
+insert into troca_ids default values;
+
+update troca_ids set nova_subscription = public.preparar_assinatura_plano(
+  '40000000-0000-0000-0000-000000000001',
+  (select plan_profissional from plan_profissional_ids),
+  'mensal'
+);
+
+select isnt(
+  (select nova_subscription from troca_ids),
+  (select subscription_id from sub_ids),
+  'trocar de plano antes de pagar abre uma assinatura nova'
+);
+select is(
+  (select status from public.plan_subscriptions where id = (select subscription_id from sub_ids)),
+  'cancelled',
+  'a tentativa antiga é cancelada ao trocar de plano'
+);
+select is(
+  (select amount from public.plan_subscriptions where id = (select nova_subscription from troca_ids)),
+  100.00::numeric,
+  'a assinatura nova reflete o valor do plano recém-escolhido'
+);
+
+-- Volta para o essencial — o resto do teste segue sobre esta terceira
+-- assinatura (a do profissional, criada acima, também fica cancelada).
+update sub_ids set subscription_id = public.preparar_assinatura_plano(
+  '40000000-0000-0000-0000-000000000001',
+  (select plan_essencial from plan_ids),
+  'mensal'
 );
 
 update sub_ids set first_charge = public.preparar_cobranca_assinatura(
