@@ -91,7 +91,7 @@ export default async function AdminPage() {
       <Link href="/painel" style={{ fontFamily: mono, fontSize: 13, color: "var(--ink-faint)" }}>← Painel</Link>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 18 }}>
         <Link href="/admin/saude" className="btn">Saúde operacional</Link>
-        <Link href="/admin/financeiro" className="btn">Ledger e conciliação</Link>
+        <Link href="/admin/financeiro" className="btn">Financeiro (ledger e conciliação)</Link>
         <Link href="/admin/pmoc" className="btn">Fila PMOC</Link>
         <Link href="/admin/assinaturas" className="btn">Assinaturas</Link>
         <Link href="/admin/rollout" className="btn">Rollout UX</Link>

@@ -44,12 +44,22 @@ export default async function AdminFinanceiroPage() {
   const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
   if (profile?.role !== "admin") redirect("/painel");
 
-  const [{ data: postings }, { data: cobrancas }, { data: corridas }, { data: divergencias }] = await Promise.all([
+  const [
+    { data: postings, error: erroPostings },
+    { data: cobrancas, error: erroCobrancas },
+    { data: corridas, error: erroCorridas },
+    { data: divergencias, error: erroDivergencias },
+  ] = await Promise.all([
     supabase.from("financial_postings").select("account_code, direction, amount").limit(5000),
     supabase.from("payment_charges").select("id, status, amount, created_at, order_id, subscription_id").order("created_at", { ascending: false }).limit(50),
     supabase.from("financial_reconciliation_runs").select("id, status, started_at, finished_at, checked_records, divergence_count, error_message").order("started_at", { ascending: false }).limit(5),
     supabase.from("financial_reconciliation_items").select("id, divergence_type, expected_value, actual_value, order_id, charge_id, created_at").is("resolved_at", null).order("created_at", { ascending: false }).limit(40),
   ]);
+
+  /* As quatro consultas acima já foram vistas devolvendo "vazio" quando na
+     verdade tinham falhado (RLS, sessão, coluna) — o `?? []` de cada uma
+     escondia o erro por completo. Erro aqui não pode virar EmptyState. */
+  const erro = erroPostings ?? erroCobrancas ?? erroCorridas ?? erroDivergencias;
 
   /* Débito e crédito têm sinais opostos por definição; qual deles aumenta o
      saldo depende da natureza da conta. Aqui o saldo é apresentado como
@@ -77,7 +87,13 @@ export default async function AdminFinanceiroPage() {
         Partidas dobradas, cobranças e as divergências apuradas pela rotina horária.
       </p>
 
-      {(postings ?? []).length === 0 && (
+      {erro && (
+        <Alert tipo="erro" titulo="Não foi possível carregar os dados financeiros">
+          {erro.message}
+        </Alert>
+      )}
+
+      {!erro && (postings ?? []).length === 0 && (
         <Alert tipo="aviso" titulo="Nenhum lançamento no ledger">
           Nenhuma cobrança foi criada até agora. As RPCs financeiras são
           exclusivas de <code>service_role</code> e o gateway não está conectado
