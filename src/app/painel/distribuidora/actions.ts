@@ -27,12 +27,17 @@ export async function salvarPerfilDistribuidora(input: PerfilDistribuidora) {
   const razao = input.razaoSocial.trim();
   if (razao.length < 3) return { ok: false as const, error: "Informe a razão social." };
 
-  const { error } = await supabase.from("distributors").upsert({
-    id: user.id,
-    razao_social: razao,
-    cnpj: input.cnpj.replace(/\D/g, "") || null,
-    cidade: input.cidade.trim() || "São Paulo",
-    prazo_entrega_dias: Math.min(90, Math.max(0, input.prazoEntregaDias || 5)),
+  /* Não dá pra usar `.upsert()` direto: `cnpj` não tem grant de SELECT (de
+     propósito, pra não vazar o documento pra terceiros), e `INSERT ... ON
+     CONFLICT DO UPDATE SET cnpj = ...` exige esse privilégio mesmo pra gravar
+     a própria linha — Postgres recusa com "permission denied for table
+     distributors". A RPC roda como definer e resolve isso. Ver
+     20260818120000_salvar_perfil_distribuidora. */
+  const { error } = await supabase.rpc("salvar_perfil_distribuidora", {
+    p_razao_social: razao,
+    p_cnpj: input.cnpj,
+    p_cidade: input.cidade,
+    p_prazo_entrega_dias: input.prazoEntregaDias,
   });
   if (error) return { ok: false as const, error: error.message };
 
@@ -125,14 +130,17 @@ export async function alternarEstoque(produtoId: string, disponivel: boolean) {
 export async function avancarRepasse(
   purchaseOrderId: string,
   para: string,
-  extra?: { codigoRastreio?: string; notaFiscalUrl?: string },
+  extra?: { codigoRastreio?: string; linkRastreio?: string; notaFiscalUrl?: string },
 ) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false as const, error: "Não autenticado." };
 
-  if (para === "enviado" && !extra?.codigoRastreio?.trim()) {
-    return { ok: false as const, error: "Informe o código de rastreio para marcar como enviado." };
+  if (para === "enviado" && !extra?.linkRastreio?.trim()) {
+    return { ok: false as const, error: "Cole o link de rastreio para marcar como enviado." };
+  }
+  if (extra?.linkRastreio?.trim() && !/^https?:\/\//i.test(extra.linkRastreio.trim())) {
+    return { ok: false as const, error: "Link de rastreio inválido — cole a URL completa (começando com http:// ou https://)." };
   }
 
   const { error } = await supabase.rpc("avancar_purchase_order", {
@@ -140,6 +148,7 @@ export async function avancarRepasse(
     p_status: para,
     p_codigo_rastreio: extra?.codigoRastreio?.trim() || undefined,
     p_nota_fiscal_url: extra?.notaFiscalUrl?.trim() || undefined,
+    p_link_rastreio: extra?.linkRastreio?.trim() || undefined,
   });
 
   if (error) return { ok: false as const, error: error.message };

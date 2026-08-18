@@ -12,7 +12,7 @@ import { TAG_LABEL } from "./tags-cliente";
 import { Star } from "@/components/icons";
 import { Agendamento, type AgendamentoView } from "./Agendamento";
 import { featureHabilitada } from "@/lib/feature-flags";
-import { STATUS_JOB, resolverMapa } from "@/lib/status";
+import { STATUS_JOB, STATUS_ENTREGA_CLIENTE, resolverMapa } from "@/lib/status";
 import { one } from "@/lib/relacional";
 import { Rastreio, type EtapaId } from "./Rastreio";
 import { Evidencias } from "./Evidencias";
@@ -21,16 +21,12 @@ import { OrcamentoFinal } from "./OrcamentoFinal";
 
 const mono = "var(--font-geist-mono), ui-monospace, monospace";
 const STATUS = resolverMapa(STATUS_JOB);
+const STATUS_ENTREGA = resolverMapa(STATUS_ENTREGA_CLIENTE);
 
-// Estados do repasse traduzidos para quem comprou — "faturado" e "a_repassar"
-// são vocabulário da distribuidora, não do cliente.
-const ENTREGA_LABEL: Record<string, string> = {
-  a_repassar: "Pedido enviado à distribuidora",
-  confirmado: "Confirmado pela distribuidora",
-  faturado: "Nota fiscal emitida",
-  enviado: "A caminho",
-  entregue: "Entregue",
-  cancelado: "Cancelado",
+// Ordem de avanço do repasse — usada para achar o status MENOS avançado entre
+// várias entregas do mesmo job (uma por distribuidora).
+const ORDEM_ENTREGA: Record<string, number> = {
+  a_repassar: 0, confirmado: 1, faturado: 2, enviado: 3, entregue: 4, cancelado: -1,
 };
 
 const PAGAMENTO_LABEL: Record<string, string> = {
@@ -181,14 +177,25 @@ export default async function ServicoPage({ params }: { params: Promise<{ id: st
   if (agendamento?.status === "confirmed") quandoPorEtapa.agendado = agendamento.starts_at;
   const execucaoHabilitada = isPro && (podeIniciarExecucao || Boolean(execucao));
 
-  /* Entrega do equipamento (dropship). Vem da view `entregas_cliente`, que não
-     expõe o custo da distribuidora — mesma razão de `orders_cliente`.
-     Ver 20260812260000_distribuidoras.sql. */
-  const { data: entrega } = await supabase
+  /* Entrega do equipamento (dropship). Vem da view `entregas_cliente`. Um job
+     pode ter mais de uma — uma por distribuidora envolvida (aparelhos de
+     fabricantes diferentes) —, por isso é lista, nunca `.maybeSingle()`. O
+     detalhe completo (itens, linha do tempo) mora em `/servico/[id]/aparelho`;
+     aqui só o resumo compacto. */
+  const { data: entregasData } = await supabase
     .from("entregas_cliente")
-    .select("status, codigo_rastreio, prazo_previsto, distribuidora")
-    .eq("job_id", job.id)
-    .maybeSingle();
+    .select("status")
+    .eq("job_id", job.id);
+  const entregas = entregasData ?? [];
+  /* O status exibido é o MENOS avançado entre as entregas: se uma
+     distribuidora já entregou e outra não, o pedido como um todo não está
+     entregue. */
+  const statusEntregaResumo: string | null = entregas.length
+    ? entregas.reduce((pior, e) => {
+        const status = e.status ?? "a_repassar";
+        return (ORDEM_ENTREGA[status] ?? 0) < (ORDEM_ENTREGA[pior] ?? 0) ? status : pior;
+      }, entregas[0].status ?? "a_repassar")
+    : null;
 
   /* Reputação do cliente: a RLS de `client_reviews` só entrega para profissional
      e admin, então esta consulta volta vazia para o próprio cliente. */
@@ -274,9 +281,14 @@ export default async function ServicoPage({ params }: { params: Promise<{ id: st
               </>
             ) : (
               <>
-                {o.preco_produto > 0 && <Linha k="Aparelho" v={formatarBRL(o.preco_produto)} />}
                 <Linha k={rotuloServicoOrder(o.origem, isVisitaTecnica)} v={formatarBRL(o.preco_servico)} />
-                <Linha k={<strong>Total</strong>} v={<strong>{formatarBRL(o.total)}</strong>} />
+                <Linha k={<strong>Total do serviço</strong>} v={<strong>{formatarBRL(o.preco_servico)}</strong>} />
+                {o.preco_produto > 0 && (
+                  <Linha
+                    k="Aparelho"
+                    v={<Link href={`/servico/${job.id}/aparelho`} style={{ color: "var(--cool)" }}>{formatarBRL(o.preco_produto)} — ver entrega</Link>}
+                  />
+                )}
                 <Linha k="Pagamento" v={PAGAMENTO_LABEL[o.payment_status] ?? o.payment_status} />
               </>
             )}
@@ -313,25 +325,49 @@ export default async function ServicoPage({ params }: { params: Promise<{ id: st
         )}
 
         {/* Pagamento fica em bloco próprio, e não dentro de "Valores": um é o
-            que foi combinado, o outro é o que aconteceu com o dinheiro. */}
+            que foi combinado, o outro é o que aconteceu com o dinheiro.
+
+            Quando a order tem aparelho junto (aceite_quote com produto), a
+            cobrança de hoje é uma só — não dá pra pagar visita e aparelho
+            separado sem redesenhar o pagamento. Por isso o valor total soma
+            os dois, mas a tela detalha as duas linhas antes do total, pra não
+            deixar a impressão de que a visita/serviço sozinha custou tudo
+            aquilo. */}
         {!isPro && orders.map((o) => (
           <div key={`pag-${o.id}`} className="card" style={{ padding: 22 }}>
-            <SecTitle>Pagamento — {rotuloOrigemOrder(o.origem, isVisitaTecnica)}</SecTitle>
+            <SecTitle>{rotuloPagamentoOrder(o, isVisitaTecnica)}</SecTitle>
+            {o.preco_produto > 0 && (
+              <div style={{ display: "grid", gap: 8, marginBottom: 16, paddingBottom: 16, borderBottom: "1px solid var(--line-soft)" }}>
+                <Linha k={rotuloServicoOrder(o.origem, isVisitaTecnica)} v={formatarBRL(o.preco_servico)} />
+                <Linha
+                  k="Aparelho"
+                  v={<Link href={`/servico/${job.id}/aparelho`} style={{ color: "var(--cool)" }}>{formatarBRL(o.preco_produto)} — ver entrega</Link>}
+                />
+              </div>
+            )}
             <Pagamento orderId={o.id} total={o.total} />
           </div>
         ))}
 
-        {/* entrega do equipamento */}
-        {entrega && (
-          <div className="card" style={{ padding: 22 }}>
-            <SecTitle>Entrega do aparelho</SecTitle>
-            <Linha k="Status" v={ENTREGA_LABEL[entrega.status as string] ?? (entrega.status as string)} />
-            <Linha k="Distribuidora" v={entrega.distribuidora as string} />
-            {entrega.prazo_previsto && (
-              <Linha k="Previsão" v={new Date(`${entrega.prazo_previsto}T12:00:00`).toLocaleDateString("pt-BR")} />
-            )}
-            {entrega.codigo_rastreio && <Linha k="Rastreio" v={entrega.codigo_rastreio as string} />}
-          </div>
+        {/* entrega do equipamento — resumo compacto; detalhe completo (itens de
+            cada distribuidora, linha do tempo) mora em tela própria, porque o
+            aparelho é uma relação comercial diferente da contratação do
+            profissional. */}
+        {statusEntregaResumo && (
+          <Link
+            href={`/servico/${job.id}/aparelho`}
+            className="card"
+            style={{ padding: 22, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, color: "inherit" }}
+          >
+            <div>
+              <SecTitle>Aparelho</SecTitle>
+              <span style={{ fontSize: 14.5 }}>
+                {(STATUS_ENTREGA[statusEntregaResumo] ?? STATUS_ENTREGA.a_repassar).label}
+                {entregas.length > 1 ? ` · ${entregas.length} entregas` : ""}
+              </span>
+            </div>
+            <span style={{ fontSize: 13, color: "var(--cool)", whiteSpace: "nowrap" }}>Ver detalhes →</span>
+          </Link>
         )}
 
         {/* ações do profissional */}
@@ -477,6 +513,11 @@ function rotuloOrigemOrder(origem: "aceite_quote" | "orcamento_final", isVisitaT
 function rotuloServicoOrder(origem: "aceite_quote" | "orcamento_final", isVisitaTecnica: boolean): string {
   if (origem === "orcamento_final") return "Serviço (pós-visita)";
   return isVisitaTecnica ? "Visita técnica" : "Mão de obra (instalação)";
+}
+
+function rotuloPagamentoOrder(o: OrderView, isVisitaTecnica: boolean): string {
+  const base = rotuloOrigemOrder(o.origem, isVisitaTecnica);
+  return o.preco_produto > 0 ? `Pagamento — ${base} + aparelho` : `Pagamento — ${base}`;
 }
 
 function rotuloEventoServico(evento: string, status: string | null) {

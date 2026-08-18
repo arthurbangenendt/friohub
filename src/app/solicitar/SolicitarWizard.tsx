@@ -161,10 +161,10 @@ type GeoState = {
 /* Passos são declarados por id, não por número. Com sete tipos de serviço e
    ramificações diferentes, indexar passo por `step === 3 && equip` é onde o bug
    nasce — aqui a lista é montada e a navegação anda sobre ela. */
-type StepId = "servico" | "ambiente" | "detalhes" | "equipamento" | "catalogo" | "profissional" | "endereco" | "confirmar";
+type StepId = "servico" | "ambiente" | "detalhes" | "equipamento" | "catalogo" | "carrinho" | "profissional" | "endereco" | "confirmar";
 const STEP_LABEL: Record<StepId, string> = {
   servico: "Serviço", ambiente: "Ambiente", detalhes: "Detalhes", equipamento: "Aparelho",
-  catalogo: "Escolher aparelho", endereco: "Região", profissional: "Profissionais",
+  catalogo: "Escolher aparelho", carrinho: "Carrinho", endereco: "Região", profissional: "Profissionais",
   confirmar: "Enviar",
 };
 
@@ -187,7 +187,7 @@ function montarSteps(jobType: JobType | null, jaTemEquipamento: boolean | null):
     // O catálogo só entra quando o cliente diz que ainda não tem o aparelho.
     return [
       "servico", "ambiente", "equipamento",
-      ...(jaTemEquipamento === false ? ["catalogo" as StepId] : []),
+      ...(jaTemEquipamento === false ? ["catalogo" as StepId, "carrinho" as StepId] : []),
       ...fim,
     ];
   }
@@ -508,6 +508,7 @@ export function SolicitarWizard({
       // Nenhum ambiente pode ficar sem aparelho: o pedido incompleto viraria
       // proposta incompleta e a diferença apareceria só na hora de pagar.
       catalogo: ambientes.every((a) => Boolean(a.produtoId)),
+      carrinho: ambientes.every((a) => Boolean(a.produtoId)),
       endereco: cepDigitos.length === 8 && cepStatus === "ok",
       profissional: profissionaisIds.length > 0,
       confirmar: true,
@@ -726,9 +727,30 @@ export function SolicitarWizard({
     );
   }
 
+  const idxCarrinho = steps.indexOf("carrinho");
+  const mostrarBarraCarrinho =
+    idxCarrinho >= 0 &&
+    steps[idx] !== "carrinho" &&
+    !["profissional", "endereco", "confirmar"].includes(stepAtual) &&
+    ambientes.some((a) => a.produto);
+
   return (
     <Shell geo={geo}>
       <Progress steps={steps} current={idx} onIr={irPara} podeIr={podeIrPara} />
+
+      {/* Barra de carrinho: fixa no rodapé, some assim que o cliente já
+          revisou (steps de endereço/profissional/confirmar em diante) — ali o
+          resumo completo já aparece no step de confirmação. */}
+      {mostrarBarraCarrinho && (
+        <div style={barraCarrinho}>
+          <button type="button" onClick={() => setIdx(idxCarrinho)} style={barraCarrinhoInner}>
+            <span style={{ fontSize: 14 }}>
+              {ambientes.filter((a) => a.produto).length} aparelho{ambientes.filter((a) => a.produto).length > 1 ? "s" : ""} selecionado{ambientes.filter((a) => a.produto).length > 1 ? "s" : ""}
+            </span>
+            <span style={{ fontSize: 15, fontWeight: 700 }}>{formatarBRL(totalProdutosEscolhidos)} · ver carrinho</span>
+          </button>
+        </div>
+      )}
 
       {/* ---------- TRIAGEM ---------- */}
       {stepAtual === "servico" && (
@@ -906,7 +928,48 @@ export function SolicitarWizard({
               )}
             </>
           )}
-          <Nav onBack={voltar} onNext={avancar} nextLabel="Escolher profissional" disabled={!stepValido.catalogo} />
+          <Nav onBack={voltar} onNext={avancar} nextLabel="Ver carrinho" disabled={!stepValido.catalogo} />
+        </>
+      )}
+
+      {/* ---------- CARRINHO ----------
+          Não é checkout: o aparelho continua amarrado ao pedido de orçamento,
+          a compra só se efetiva quando o cliente aceita a proposta de um
+          profissional. Esta tela é só a revisão do que foi escolhido, no
+          formato que todo cliente já reconhece de e-commerce. */}
+      {stepAtual === "carrinho" && (
+        <>
+          <H titulo="Confira o que você vai pedir" sub="Os aparelhos são vendidos pela distribuidora e só são comprados quando você aceitar uma proposta de instalação." />
+          <div style={{ display: "grid", gap: 12 }}>
+            {ambientes.map((a, i) => (
+              <div key={a.chave} style={carrinhoItem}>
+                {a.produto?.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={a.produto.imageUrl} alt={a.produto.modelo} style={{ width: 64, height: 64, objectFit: "contain", background: "#fff", borderRadius: 8, flexShrink: 0 }} />
+                ) : <div style={{ width: 64, height: 64, borderRadius: 8, background: "var(--surface-2)", flexShrink: 0 }} />}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12.5, color: "var(--ink-faint)" }}>{a.nome || `Ambiente ${i + 1}`} · {formatarBtu(btus[i].btuRecomendado)}</div>
+                  <div style={{ fontWeight: 700, fontSize: 14.5 }}>{a.produto ? `${a.produto.marca} ${a.produto.modelo}` : "Nenhum aparelho escolhido"}</div>
+                  {a.produto?.distribuidora && <div style={{ fontSize: 12, color: "var(--ink-faint)" }}>Distribuidora: {a.produto.distribuidora}</div>}
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
+                    <button type="button" onClick={() => setAmbienteFoco(i)} style={linkBtn}>Trocar aparelho</button>
+                    {ambientes.length > 1 && (
+                      <button type="button" onClick={() => removerAmbiente(i)} style={{ ...linkBtn, color: "var(--danger)" }}>Remover ambiente</button>
+                    )}
+                  </div>
+                </div>
+                <div style={{ textAlign: "right", flexShrink: 0 }}>
+                  <div style={{ fontSize: 13, color: "var(--ink-faint)" }}>{a.quantidade > 1 ? `${a.quantidade}x` : ""}</div>
+                  <strong style={{ fontSize: 15 }}>{a.produto ? formatarBRL(a.produto.precoVenda * a.quantidade) : "-"}</strong>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{ ...resumo, marginTop: 16 }}>
+            <LinhaResumo k={<strong>Total dos aparelhos</strong>} v={<strong>{formatarBRL(totalProdutosEscolhidos)}</strong>} />
+          </div>
+          {!stepValido.carrinho && <Aviso erro>Escolha um aparelho para cada ambiente antes de continuar.</Aviso>}
+          <Nav onBack={voltar} onNext={avancar} nextLabel="Escolher profissional" disabled={!stepValido.carrinho} />
         </>
       )}
 
@@ -1196,7 +1259,13 @@ export function SolicitarWizard({
             {totalProdutosEscolhidos > 0 && (
               <LinhaResumo
                 k={ambientes.length > 1 ? "Aparelhos (catálogo)" : "Aparelho (catálogo)"}
-                v={formatarBRL(totalProdutosEscolhidos)}
+                v={
+                  idxCarrinho >= 0 ? (
+                    <button type="button" onClick={() => setIdx(idxCarrinho)} style={{ ...linkBtn, fontSize: 14.5, color: "var(--ink)" }}>
+                      {formatarBRL(totalProdutosEscolhidos)} · ver carrinho
+                    </button>
+                  ) : formatarBRL(totalProdutosEscolhidos)
+                }
               />
             )}
             {comCatalogo && (
@@ -1463,5 +1532,9 @@ const prodCard: CSSProperties = { position: "relative", display: "flex", flexDir
 const prodCardSel: CSSProperties = { border: "1px solid var(--cool)", boxShadow: "inset 0 0 0 1px var(--cool)" };
 const badgeRec: CSSProperties = { position: "absolute", top: 10, right: 10, fontSize: 10, fontFamily: mono, textTransform: "uppercase", letterSpacing: "0.05em", padding: "3px 8px", borderRadius: 100, background: "var(--cool)", color: "#fff" };
 const resumo: CSSProperties = { padding: "18px 22px", borderRadius: 14, background: "var(--surface)", border: "1px solid var(--line)" };
+const carrinhoItem: CSSProperties = { display: "flex", gap: 14, padding: 16, borderRadius: 14, border: "1px solid var(--line)", background: "var(--surface)", alignItems: "center" };
+const linkBtn: CSSProperties = { background: "none", border: "none", padding: 0, color: "var(--cool)", fontSize: 12.5, fontWeight: 600, cursor: "pointer" };
+const barraCarrinho: CSSProperties = { position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 20, display: "flex", justifyContent: "center", padding: "0 16px 16px" };
+const barraCarrinhoInner: CSSProperties = { width: "100%", maxWidth: 760, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 14, padding: "14px 20px", borderRadius: 14, background: "var(--ink)", color: "#fff", boxShadow: "0 8px 24px rgba(0,0,0,0.25)", cursor: "pointer", border: "none" };
 const btnPrimary: CSSProperties = { height: 46, padding: "0 22px", borderRadius: 10, background: "var(--cool)", color: "#fff", fontWeight: 600, fontSize: 15, border: "none", cursor: "pointer", textDecoration: "none", display: "inline-flex", alignItems: "center", justifyContent: "center" };
 const btnGhost: CSSProperties = { height: 46, padding: "0 20px", borderRadius: 10, background: "var(--surface)", color: "var(--ink-soft)", fontWeight: 600, fontSize: 15, border: "1px solid var(--line)", cursor: "pointer" };

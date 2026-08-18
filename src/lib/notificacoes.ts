@@ -14,10 +14,11 @@ export type EventoNotificacao =
   | "quote_request_received" | "quote_received" | "quote_accepted"
   | "quote_cancelled" | "quote_declined" | "new_message" | "job_updated"
   | "appointment_proposed" | "appointment_confirmed" | "appointment_cancelled"
-  | "appointment_reminder" | "pmoc_offered" | "pmoc_activated" | "pmoc_visit_due";
+  | "appointment_reminder" | "pmoc_offered" | "pmoc_activated" | "pmoc_visit_due"
+  | "purchase_order_created" | "purchase_order_updated";
 
 export type CategoriaNotificacao =
-  | "quote_requests" | "quotes" | "messages" | "reminders" | "job_updates";
+  | "quote_requests" | "quotes" | "messages" | "reminders" | "job_updates" | "purchase_orders";
 
 /* ESPELHO de `public.categoria_notificacao(text)` — ver
  * supabase/migrations/20260814120000_inbox_notificacoes.sql.
@@ -33,6 +34,7 @@ export function categoriaNotificacao(evento: string): CategoriaNotificacao {
   if (["quote_received", "quote_accepted", "quote_cancelled", "quote_declined"].includes(evento)) return "quotes";
   if (evento === "new_message") return "messages";
   if (["appointment_proposed", "appointment_confirmed", "appointment_cancelled", "appointment_reminder", "pmoc_visit_due"].includes(evento)) return "reminders";
+  if (["purchase_order_created", "purchase_order_updated"].includes(evento)) return "purchase_orders";
   return "job_updates";
 }
 
@@ -82,6 +84,13 @@ function destino(n: NotificacaoBruta): string | null {
     case "appointment":   return jobDoPayload ? `/servico/${jobDoPayload}` : null;
     case "pmoc_plan":
     case "pmoc_visit":    return "/painel/pmoc";
+    /* Mesmo aggregate_type, destinos diferentes: quem cria o repasse
+       (distribuidora) precisa da lista de pedidos; quem acompanha a entrega
+       (cliente/profissional) precisa da linha do tempo do job específico. */
+    case "purchase_order":
+      return n.event_type === "purchase_order_created"
+        ? "/painel/distribuidora/pedidos"
+        : jobDoPayload ? `/servico/${jobDoPayload}/aparelho` : null;
     default:              return null;
   }
 }
@@ -144,6 +153,26 @@ function conteudo(n: NotificacaoBruta): Pick<NotificacaoView, "titulo" | "detalh
 
     case "pmoc_visit_due":
       return { titulo: "Visita de manutenção a vencer", detalhe: [texto(p, "site_name"), texto(p, "due_date")].filter(Boolean).join(" · ") || null, tom: "espera" };
+
+    case "purchase_order_created":
+      return { titulo: "Novo pedido para despachar", detalhe: "Confira o endereço e os itens antes de confirmar.", tom: "espera" };
+
+    case "purchase_order_updated": {
+      /* Mesmos rótulos de STATUS_ENTREGA_CLIENTE (src/lib/status.ts), pra não
+         inventar uma terceira redação do mesmo estado do repasse. */
+      const status = texto(p, "status_novo");
+      const dist = texto(p, "distribuidora");
+      const rotulo: Record<string, { t: string; tom: NotificacaoView["tom"] }> = {
+        a_repassar: { t: "Pedido enviado à distribuidora", tom: "espera" },
+        confirmado: { t: "Confirmado pela distribuidora", tom: "andamento" },
+        faturado:   { t: "Nota fiscal emitida", tom: "andamento" },
+        enviado:    { t: "Seu aparelho está a caminho", tom: "andamento" },
+        entregue:   { t: "Aparelho entregue", tom: "sucesso" },
+        cancelado:  { t: "Pedido de aparelho cancelado", tom: "erro" },
+      };
+      const r = (status && rotulo[status]) || { t: "Atualização no pedido do aparelho", tom: "andamento" as const };
+      return { titulo: r.t, detalhe: dist ? `Distribuidora: ${dist}` : null, tom: r.tom };
+    }
 
     default:
       /* Evento novo no banco que a interface ainda não conhece. Mostrar a chave

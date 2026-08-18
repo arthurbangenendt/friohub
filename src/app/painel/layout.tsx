@@ -78,9 +78,15 @@ export default async function PainelLayout({ children }: LayoutProps<"/painel">)
     const c = categoriaNotificacao(a.event_type);
     contagem.set(c, (contagem.get(c) ?? 0) + 1);
   }
+  /* O item "Pedidos" da distribuidora reaproveita o slot de badge de
+     "orcamentos" (mesmo `icone`, ver navegacao.ts) — ela nunca recebe evento
+     de quote_requests/quotes, então não há colisão real, só a troca do que
+     preenche esse número por papel. */
   const badges: Record<string, number> = {
     notificacoes: avisos?.length ?? 0,
-    orcamentos: (contagem.get("quote_requests") ?? 0) + (contagem.get("quotes") ?? 0),
+    orcamentos: papel === "distribuidora"
+      ? contagem.get("purchase_orders") ?? 0
+      : (contagem.get("quote_requests") ?? 0) + (contagem.get("quotes") ?? 0),
     agenda: contagem.get("reminders") ?? 0,
   };
 

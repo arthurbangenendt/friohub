@@ -58,6 +58,18 @@ export const STATUS_REPASSE: Record<string, Estado> = {
   cancelado: { label: "Cancelado", tom: "erro" },
 };
 
+/* Mesmo dado de `STATUS_REPASSE` (`purchase_orders.status`), rótulo diferente
+   de propósito: "a_repassar" e "faturado" são vocabulário interno da
+   distribuidora — o cliente não sabe o que é um repasse. */
+export const STATUS_ENTREGA_CLIENTE: Record<string, Estado> = {
+  a_repassar: { label: "Pedido enviado à distribuidora", tom: "espera" },
+  confirmado: { label: "Confirmado pela distribuidora", tom: "andamento" },
+  faturado: { label: "Nota fiscal emitida", tom: "andamento" },
+  enviado: { label: "A caminho", tom: "andamento" },
+  entregue: { label: "Entregue", tom: "sucesso" },
+  cancelado: { label: "Cancelado", tom: "erro" },
+};
+
 /** `professionals.verification_status` / `distributors.verification_status`. */
 export const STATUS_VERIFICACAO: Record<string, Estado> = {
   pendente: { label: "Pendente", tom: "espera" },
