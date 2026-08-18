@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
-select plan(27);
+select plan(34);
 
 select has_table('public', 'plan_subscriptions', 'compromisso de assinatura existe');
 select ok(
@@ -291,6 +291,45 @@ select is(
   ),
   1,
   'o dinheiro recebido entra no ledger mesmo sem promover ninguém'
+);
+
+-- Reconciliação manual (20260818151000): admin escolhe religar a assinatura
+-- cancelada que recebeu o dinheiro, mesmo havendo outra em jogo.
+select ok(
+  not has_function_privilege('authenticated', 'public.reconciliar_assinatura_manual(uuid)', 'execute')
+  and has_function_privilege('service_role', 'public.reconciliar_assinatura_manual(uuid)', 'execute'),
+  'somente backend confiável reconcilia assinatura manualmente'
+);
+select throws_ok(
+  format('select public.reconciliar_assinatura_manual(%L::uuid)', (select subscription_id from sub_ids)),
+  'P0001',
+  'Só é possível reconciliar assinatura cancelada; esta está em active.',
+  'recusa reconciliar assinatura que já está ativa'
+);
+
+select lives_ok(
+  format('select public.reconciliar_assinatura_manual(%L::uuid)', (select nova_subscription from troca_ids)),
+  'admin religa a assinatura cancelada que recebeu o dinheiro'
+);
+select is(
+  (select status from public.plan_subscriptions where id = (select nova_subscription from troca_ids)),
+  'active',
+  'a assinatura escolhida pelo admin vira active'
+);
+select is(
+  (select status from public.payment_charges where id = (select stale_charge from stale_ids)),
+  'received',
+  'a cobrança que sustentava a reconciliação vira received'
+);
+select is(
+  (select status from public.plan_subscriptions where id = (select subscription_id from sub_ids)),
+  'cancelled',
+  'a assinatura que estava ativa antes é superada pela decisão manual'
+);
+select is(
+  (select subscription_plan_id from public.professionals where id = '40000000-0000-0000-0000-000000000001'),
+  (select plan_profissional from plan_profissional_ids),
+  'o profissional passa a refletir o plano religado manualmente'
 );
 
 select * from finish();
