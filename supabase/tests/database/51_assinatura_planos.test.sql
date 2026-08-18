@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
-select plan(22);
+select plan(27);
 
 select has_table('public', 'plan_subscriptions', 'compromisso de assinatura existe');
 select ok(
@@ -232,6 +232,65 @@ select lives_ok(
     '40000000-0000-0000-0000-000000000002', (select plan_essencial from plan_ids), 'mensal'
   ),
   'estado ligado libera profissional de cidade sem linha própria'
+);
+
+-- Bug real (20260818150000): fatura de uma assinatura já CANCELADA localmente
+-- (trocada de plano antes de pagar) chega como paga no Asaas mesmo assim —
+-- cancelar aqui não cancela lá. Isso não pode derrubar o processamento nem
+-- ressuscitar o compromisso morto, mas o dinheiro recebido é fato e tem que
+-- entrar no ledger de qualquer forma.
+create temporary table stale_ids (
+  stale_charge uuid,
+  stale_event uuid
+) on commit drop;
+insert into stale_ids default values;
+
+-- `troca_ids.nova_subscription` é a assinatura do plano Profissional que foi
+-- cancelada mais cedo neste teste, ao voltar para o Essencial.
+update stale_ids set stale_charge = gen_random_uuid();
+insert into public.payment_charges (
+  id, subscription_id, customer_id, gateway, idempotency_key, external_reference,
+  billing_type, amount, status, gateway_payment_id
+) values (
+  (select stale_charge from stale_ids),
+  (select nova_subscription from troca_ids),
+  '40000000-0000-0000-0000-000000000001',
+  'asaas', 'sub-charge-stale', 'subscription:stale:teste',
+  'UNDEFINED', 100.00, 'pending', 'pay_stale_001'
+);
+insert into public.payment_allocations (charge_id, allocation_type, beneficiary_id, amount)
+values ((select stale_charge from stale_ids), 'platform_subscription_revenue', null, 100.00);
+
+update stale_ids set stale_event = public.registrar_evento_gateway(
+  'asaas', 'evt_stale_received_001', 'PAYMENT_RECEIVED', 'pay_stale_001', 100,
+  '{"event":"PAYMENT_RECEIVED"}'::jsonb, now()
+);
+select lives_ok(
+  format('select public.processar_evento_gateway(%L::uuid)', (select stale_event from stale_ids)),
+  'PAYMENT_RECEIVED de assinatura cancelada não derruba o processamento'
+);
+select is(
+  public.processar_evento_gateway((select stale_event from stale_ids)),
+  'processed',
+  'o evento termina processado, não travado em erro'
+);
+select is(
+  (select status from public.plan_subscriptions where id = (select nova_subscription from troca_ids)),
+  'cancelled',
+  'a assinatura cancelada não é ressuscitada'
+);
+select is(
+  (select subscription_plan_id from public.professionals where id = '40000000-0000-0000-0000-000000000001'),
+  (select plan_essencial from plan_ids),
+  'o profissional continua vinculado ao plano vigente, não ao cancelado'
+);
+select is(
+  (
+    select count(*)::integer from public.financial_journals
+     where charge_id = (select stale_charge from stale_ids) and journal_type = 'payment_received'
+  ),
+  1,
+  'o dinheiro recebido entra no ledger mesmo sem promover ninguém'
 );
 
 select * from finish();
