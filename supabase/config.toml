@@ -416,6 +416,10 @@ verify_jwt = true
 [functions.asaas-cancelar]
 verify_jwt = true
 
+# Recebe o JWT do profissional que já assina e está trocando de plano.
+[functions.asaas-trocar-plano]
+verify_jwt = true
+
 [analytics]
 enabled = true
 port = 54327

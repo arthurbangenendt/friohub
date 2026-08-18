@@ -2008,6 +2008,7 @@ export type Database = {
           idempotency_key: string
           last_gateway_event_at: string | null
           order_id: string | null
+          plano_alvo_id: string | null
           received_at: string | null
           refunded_at: string | null
           status: string
@@ -2030,6 +2031,7 @@ export type Database = {
           idempotency_key: string
           last_gateway_event_at?: string | null
           order_id?: string | null
+          plano_alvo_id?: string | null
           received_at?: string | null
           refunded_at?: string | null
           status?: string
@@ -2052,6 +2054,7 @@ export type Database = {
           idempotency_key?: string
           last_gateway_event_at?: string | null
           order_id?: string | null
+          plano_alvo_id?: string | null
           received_at?: string | null
           refunded_at?: string | null
           status?: string
@@ -2078,6 +2081,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders_cliente"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_charges_plano_alvo_id_fkey"
+            columns: ["plano_alvo_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
             referencedColumns: ["id"]
           },
           {
@@ -2232,6 +2242,7 @@ export type Database = {
           next_due_date: string | null
           plan_id: string
           professional_id: string
+          proximo_plano_id: string | null
           status: string
           updated_at: string
         }
@@ -2245,6 +2256,7 @@ export type Database = {
           next_due_date?: string | null
           plan_id: string
           professional_id: string
+          proximo_plano_id?: string | null
           status?: string
           updated_at?: string
         }
@@ -2258,6 +2270,7 @@ export type Database = {
           next_due_date?: string | null
           plan_id?: string
           professional_id?: string
+          proximo_plano_id?: string | null
           status?: string
           updated_at?: string
         }
@@ -2281,6 +2294,13 @@ export type Database = {
             columns: ["professional_id"]
             isOneToOne: false
             referencedRelation: "professionals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plan_subscriptions_proximo_plano_id_fkey"
+            columns: ["proximo_plano_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
             referencedColumns: ["id"]
           },
         ]
@@ -4511,6 +4531,8 @@ export type Database = {
           next_due_date: string
           plano_nome: string
           plano_slug: string
+          proximo_plano_nome: string
+          proximo_plano_slug: string
           status: string
           subscription_id: string
           valor: number
@@ -4519,6 +4541,7 @@ export type Database = {
       obter_checkout_cobranca: {
         Args: { p_charge_id: string }
         Returns: {
+          amount: number
           checkout_url: string
           status: string
         }[]
@@ -4599,6 +4622,10 @@ export type Database = {
           p_idempotency_key: string
           p_order_id: string
         }
+        Returns: string
+      }
+      preparar_upgrade_assinatura: {
+        Args: { p_novo_plano_id: string; p_professional_id: string }
         Returns: string
       }
       processar_evento_gateway: {
@@ -4813,6 +4840,10 @@ export type Database = {
           p_prazo_entrega_dias: number
           p_razao_social: string
         }
+        Returns: undefined
+      }
+      solicitar_downgrade_assinatura: {
+        Args: { p_novo_plano_id: string; p_professional_id: string }
         Returns: undefined
       }
       solicitar_pmoc: {

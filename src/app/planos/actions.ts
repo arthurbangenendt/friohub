@@ -55,6 +55,61 @@ export async function iniciarAssinatura(
   return { ok: true, checkoutUrl: corpo.checkout_url };
 }
 
+/* Upgrade/downgrade — aciona `asaas-trocar-plano`.
+ *
+ * Só chega até aqui quando o profissional JÁ tem assinatura active/overdue
+ * (ver `planoAtualSlug` em page.tsx) — para a primeira assinatura, o botão
+ * continua usando `iniciarAssinatura`. O backend decide sozinho se o plano
+ * pedido é upgrade (cobra a diferença agora) ou downgrade (agenda, sem
+ * cobrança) — este action só carrega a sessão até lá. */
+export type ResultadoTroca =
+  | { ok: true; tipo: "upgrade"; checkoutUrl: string }
+  | { ok: true; tipo: "downgrade"; aviso: string }
+  | { ok: false; erro: string };
+
+export async function trocarPlano(slug: string): Promise<ResultadoTroca> {
+  const supabase = await createClient();
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session) {
+    return { ok: false, erro: "Sua sessão expirou. Entre novamente." };
+  }
+
+  const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/asaas-trocar-plano`;
+  let resposta: Response;
+  try {
+    resposta = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ plano_slug: slug }),
+    });
+  } catch {
+    return { ok: false, erro: "Não foi possível falar com o gateway de pagamento agora." };
+  }
+
+  const corpo = (await resposta.json().catch(() => ({}))) as {
+    ok?: boolean;
+    tipo?: "upgrade" | "downgrade";
+    checkout_url?: string;
+    aviso?: string;
+    error?: string;
+  };
+
+  if (!resposta.ok || !corpo.ok) {
+    return { ok: false, erro: corpo.error ?? "Não foi possível trocar de plano." };
+  }
+  if (corpo.tipo === "upgrade" && corpo.checkout_url) {
+    return { ok: true, tipo: "upgrade", checkoutUrl: corpo.checkout_url };
+  }
+  return { ok: true, tipo: "downgrade", aviso: corpo.aviso ?? "Downgrade agendado." };
+}
+
 /* Assinatura de planos — registro de intenção.
  *
  * [RISCO 1] Não existe gateway de pagamento no sistema. `city_billing_config`

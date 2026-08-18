@@ -14,7 +14,7 @@ import {
 } from "framer-motion";
 import { Check, ArrowRight, Bolt, Shield, Star, Wrench } from "@/components/icons";
 import { formatarBRL } from "@/lib/pricing";
-import { registrarInteresse, iniciarAssinatura, type Ciclo } from "./actions";
+import { registrarInteresse, iniciarAssinatura, trocarPlano, type Ciclo } from "./actions";
 import "./planos.css";
 
 /* Vitrine de assinatura.
@@ -547,6 +547,83 @@ function ModalCheckout({
   );
 }
 
+/* Quem já assina troca de plano — não é o mesmo fluxo de assinar pela
+ * primeira vez: sem CPF (já cadastrado), sem valor fixo (upgrade cobra a
+ * diferença proporcional, calculada pelo backend; downgrade não cobra nada
+ * agora). Por isso não reaproveita o preço do cartão — o texto é deliberadamente
+ * menos específico até a confirmação. */
+function ModalTrocaPlano({
+  plano,
+  ehUpgrade,
+  enviando,
+  erro,
+  onFechar,
+  onConfirmar,
+}: {
+  plano: PlanoDTO;
+  ehUpgrade: boolean;
+  enviando: boolean;
+  erro: string | null;
+  onFechar: () => void;
+  onConfirmar: () => void;
+}) {
+  return (
+    <div
+      className="pl-modal-overlay"
+      role="presentation"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onFechar();
+      }}
+    >
+      <div className="pl-modal" role="dialog" aria-modal="true" aria-labelledby="pl-troca-titulo">
+        <button type="button" className="pl-modal-fechar" onClick={onFechar} aria-label="Fechar">
+          ×
+        </button>
+
+        <span className="pl-eyebrow" style={{ color: "var(--cool)" }}>
+          {ehUpgrade ? "Upgrade" : "Downgrade"} de plano
+        </span>
+        <h3 id="pl-troca-titulo" style={{ margin: "6px 0 14px", fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>
+          Trocar para o {plano.nome}
+        </h3>
+
+        {ehUpgrade ? (
+          <p style={{ margin: "0 0 20px", fontSize: 14, lineHeight: 1.55, color: "var(--ink-soft)" }}>
+            Você paga agora só a diferença proporcional aos dias que faltam do seu ciclo atual — não é o valor cheio
+            do plano novo. O <strong>Asaas</strong> mostra o valor exato antes de confirmar o pagamento.
+          </p>
+        ) : (
+          <p style={{ margin: "0 0 20px", fontSize: 14, lineHeight: 1.55, color: "var(--ink-soft)" }}>
+            Sem cobrança agora. Você continua no plano atual até o fim do ciclo já pago — o {plano.nome} passa a
+            valer a partir do próximo vencimento.
+          </p>
+        )}
+
+        {erro && (
+          <div
+            role="alert"
+            style={{
+              marginBottom: 16,
+              padding: "10px 14px",
+              borderRadius: 10,
+              fontSize: 13.5,
+              background: "var(--danger-wash)",
+              color: "var(--danger)",
+            }}
+          >
+            {erro}
+          </div>
+        )}
+
+        <button type="button" className="btn btn-primary btn-block" disabled={enviando} onClick={onConfirmar}>
+          {enviando ? "Confirmando…" : ehUpgrade ? "Ir para pagamento" : "Confirmar downgrade"}
+          {!enviando && <ArrowRight size={17} />}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /* Página                                                              */
 /* ------------------------------------------------------------------ */
@@ -567,6 +644,7 @@ export function PlanosView({
   logado,
   ehProfissional,
   precisaDocumento,
+  planoAtualSlug = null,
   cobrancaAtiva,
   boasVindas = false,
   hrefVitrine = null,
@@ -575,6 +653,7 @@ export function PlanosView({
   logado: boolean;
   ehProfissional: boolean;
   precisaDocumento: boolean;
+  planoAtualSlug?: string | null;
   cobrancaAtiva: boolean;
   boasVindas?: boolean;
   hrefVitrine?: string | null;
@@ -586,11 +665,28 @@ export function PlanosView({
   const [aviso, setAviso] = useState<{ tipo: "ok" | "erro"; texto: string } | null>(null);
   const [planoCheckout, setPlanoCheckout] = useState<PlanoDTO | null>(null);
   const [erroCheckout, setErroCheckout] = useState<string | null>(null);
+  const [planoTroca, setPlanoTroca] = useState<PlanoDTO | null>(null);
+  const [erroTroca, setErroTroca] = useState<string | null>(null);
   const [, startTransition] = useTransition();
+
+  const planoAtual = planoAtualSlug ? (planos.find((p) => p.slug === planoAtualSlug) ?? null) : null;
 
   function assinar(slug: string) {
     if (!logado) {
       router.push(`/signup?next=${encodeURIComponent("/planos")}`);
+      return;
+    }
+
+    if (planoAtualSlug === slug) {
+      setAviso({ tipo: "ok", texto: "Você já está neste plano." });
+      return;
+    }
+
+    // Já assina outro plano: é troca (upgrade/downgrade), não uma primeira
+    // assinatura — muda o modal e a Edge Function acionada.
+    if (cobrancaAtiva && ehProfissional && planoAtualSlug) {
+      setErroTroca(null);
+      setPlanoTroca(planos.find((p) => p.slug === slug) ?? null);
       return;
     }
 
@@ -615,6 +711,27 @@ export function PlanosView({
           texto:
             "Anotado. Seu interesse foi registrado e avisamos assim que a cobrança abrir na sua cidade — até lá o acesso continua liberado.",
         });
+      } else {
+        setAviso({ tipo: "erro", texto: r.erro });
+      }
+    });
+  }
+
+  function confirmarTroca() {
+    if (!planoTroca) return;
+    const slug = planoTroca.slug;
+    setEnviando(slug);
+    setErroTroca(null);
+    startTransition(async () => {
+      const r = await trocarPlano(slug);
+      if (r.ok && r.tipo === "upgrade") {
+        window.location.href = r.checkoutUrl;
+        return;
+      }
+      setEnviando(null);
+      setPlanoTroca(null);
+      if (r.ok) {
+        setAviso({ tipo: "ok", texto: r.aviso });
       } else {
         setAviso({ tipo: "erro", texto: r.erro });
       }
@@ -891,6 +1008,20 @@ export function PlanosView({
             setErroCheckout(null);
           }}
           onConfirmar={confirmarCheckout}
+        />
+      )}
+
+      {planoTroca && (
+        <ModalTrocaPlano
+          plano={planoTroca}
+          ehUpgrade={!planoAtual || planoTroca.precoMensal > planoAtual.precoMensal}
+          enviando={enviando === planoTroca.slug}
+          erro={erroTroca}
+          onFechar={() => {
+            setPlanoTroca(null);
+            setErroTroca(null);
+          }}
+          onConfirmar={confirmarTroca}
         />
       )}
     </main>

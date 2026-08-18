@@ -58,6 +58,19 @@ export default async function PlanosPage(props: PageProps<"/planos">) {
     }
   }
 
+  /* Quem já assina e clica em outro cartão está trocando de plano
+     (upgrade/downgrade), não assinando pela primeira vez — muda qual Edge
+     Function o botão aciona. Só interessa o slug: preço e ciclo atuais o
+     backend já sabe (é a fonte de verdade de quanto cobrar na troca). */
+  let planoAtualSlug: string | null = null;
+  if (ehProfissional) {
+    const { data: assinaturaRows } = await supabase.rpc("minha_assinatura_atual");
+    const atual = Array.isArray(assinaturaRows) ? assinaturaRows[0] : null;
+    if (atual && (atual.status === "active" || atual.status === "overdue")) {
+      planoAtualSlug = atual.plano_slug;
+    }
+  }
+
   /* [RISCO 1] O interruptor de cobrança é por cidade e entra desligado no
      piloto. A página precisa dizer isso na cara do usuário — anunciar preço
      sem avisar que ainda não cobramos seria vender o que não está ligado. */
@@ -84,6 +97,7 @@ export default async function PlanosPage(props: PageProps<"/planos">) {
         logado={!!user}
         ehProfissional={ehProfissional}
         precisaDocumento={precisaDocumento}
+        planoAtualSlug={planoAtualSlug}
         cobrancaAtiva={billing?.cobranca_ativa ?? false}
         boasVindas={boasVindas && ehProfissional}
         hrefVitrine={user ? `/profissional/${user.id}` : null}
