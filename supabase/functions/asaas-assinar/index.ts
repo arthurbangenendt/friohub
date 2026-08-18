@@ -19,7 +19,7 @@
  */
 
 import { servico, json } from "../_shared/supabase.ts";
-import { criarCustomer, criarCobranca, cancelarCobranca, AsaasError } from "../_shared/asaas.ts";
+import { criarCustomer, criarCobrancaComRecuperacao, cancelarCobranca, AsaasError } from "../_shared/asaas.ts";
 
 type Corpo = {
   plano_slug?: string;
@@ -154,8 +154,12 @@ Deno.serve(async (req) => {
     }
 
     const dueDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-    const pagamento = await criarCobranca({
-      customerId,
+    const { pagamento } = await criarCobrancaComRecuperacao(db, {
+      userId,
+      customerIdAtual: customerId,
+      nome: (nomePerfil as string | null) ?? "Profissional FrioHub",
+      email: authUser?.user?.email ?? "",
+      cpfCnpj,
       billingType: "UNDEFINED",
       value: ciclo === "mensal" ? plano.preco_mensal : plano.preco_anual,
       dueDate,

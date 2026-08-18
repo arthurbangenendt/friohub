@@ -13,7 +13,7 @@
  */
 
 import { servico, json } from "../_shared/supabase.ts";
-import { criarCobranca, AsaasError } from "../_shared/asaas.ts";
+import { criarCobrancaComRecuperacao, AsaasError } from "../_shared/asaas.ts";
 
 type Corpo = { plano_slug?: string };
 
@@ -63,9 +63,19 @@ Deno.serve(async (req) => {
         return json({ ok: true, tipo: "upgrade", checkout_url: chargeExistente.checkout_url });
       }
 
+      const [{ data: nomePerfil }, { data: cpfCnpj }, { data: authUser }] = await Promise.all([
+        db.rpc("obter_nome_perfil", { p_user_id: userId }),
+        db.rpc("obter_cpf_cnpj_professional", { p_user_id: userId }),
+        db.auth.admin.getUserById(userId),
+      ]);
+
       const dueDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-      const pagamento = await criarCobranca({
-        customerId: gatewayCustomerId as string,
+      const { pagamento } = await criarCobrancaComRecuperacao(db, {
+        userId,
+        customerIdAtual: gatewayCustomerId as string,
+        nome: (nomePerfil as string | null) ?? "Profissional FrioHub",
+        email: authUser?.user?.email ?? "",
+        cpfCnpj: (cpfCnpj as string | null) ?? "",
         billingType: "UNDEFINED",
         value: chargeExistente?.amount ?? plano.preco_mensal,
         dueDate,
