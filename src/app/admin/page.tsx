@@ -55,6 +55,7 @@ export default async function AdminPage() {
     return { ...dist, cnpj };
   }));
   const distPendentes = distribuidoras.filter((d) => d.verification_status === "pendente" || d.verification_status === "em_analise");
+  const distOutros = distribuidoras.filter((d) => d.verification_status === "verificado" || d.verification_status === "rejeitado");
 
   const { data: casosOperacionais } = await supabase
     .from("operational_cases")
@@ -145,9 +146,15 @@ export default async function AdminPage() {
       </p>
 
       <Secao titulo={`Aguardando análise (${distPendentes.length})`}>
-        {distribuidoras.length === 0
-          ? <Vazio texto="Nenhuma distribuidora cadastrada." />
-          : distribuidoras.map((d) => <CardDist key={d.id} d={d} />)}
+        {distPendentes.length === 0
+          ? <Vazio texto="Nenhuma distribuidora aguardando." />
+          : distPendentes.map((d) => <CardDist key={d.id} d={d} />)}
+      </Secao>
+
+      <Secao titulo={`Já revisadas (${distOutros.length})`}>
+        {distOutros.length === 0
+          ? <Vazio texto="Nenhuma revisada ainda." />
+          : distOutros.map((d) => <CardDist key={d.id} d={d} />)}
       </Secao>
     </main>
   );

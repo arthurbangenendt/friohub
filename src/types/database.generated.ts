@@ -192,6 +192,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "client_reviews_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "pedidos_distribuidora"
+            referencedColumns: ["job_id"]
+          },
+          {
             foreignKeyName: "client_reviews_professional_id_fkey"
             columns: ["professional_id"]
             isOneToOne: false
@@ -278,6 +285,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "conversation_contexts_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos_distribuidora"
+            referencedColumns: ["job_id"]
+          },
+          {
             foreignKeyName: "conversation_contexts_quote_request_id_fkey"
             columns: ["quote_request_id"]
             isOneToOne: false
@@ -337,6 +351,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "jobs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos_distribuidora"
+            referencedColumns: ["job_id"]
           },
           {
             foreignKeyName: "conversations_professional_id_fkey"
@@ -592,6 +613,13 @@ export type Database = {
             referencedRelation: "jobs"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "equipment_service_links_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "pedidos_distribuidora"
+            referencedColumns: ["job_id"]
+          },
         ]
       }
       expenses: {
@@ -632,6 +660,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "jobs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos_distribuidora"
+            referencedColumns: ["job_id"]
           },
           {
             foreignKeyName: "expenses_professional_id_fkey"
@@ -1162,6 +1197,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "job_appointments_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos_distribuidora"
+            referencedColumns: ["job_id"]
+          },
+          {
             foreignKeyName: "job_appointments_proposed_by_fkey"
             columns: ["proposed_by"]
             isOneToOne: false
@@ -1219,6 +1261,13 @@ export type Database = {
             referencedRelation: "jobs"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "job_events_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos_distribuidora"
+            referencedColumns: ["job_id"]
+          },
         ]
       }
       job_final_quotes: {
@@ -1269,6 +1318,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "jobs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_final_quotes_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos_distribuidora"
+            referencedColumns: ["job_id"]
           },
         ]
       }
@@ -1341,6 +1397,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "jobs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_itens_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos_distribuidora"
+            referencedColumns: ["job_id"]
           },
           {
             foreignKeyName: "job_itens_produto_id_fkey"
@@ -1859,6 +1922,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "jobs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos_distribuidora"
+            referencedColumns: ["job_id"]
           },
         ]
       }
@@ -2896,6 +2966,13 @@ export type Database = {
             foreignKeyName: "purchase_order_events_purchase_order_id_fkey"
             columns: ["purchase_order_id"]
             isOneToOne: false
+            referencedRelation: "pedidos_distribuidora"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_order_events_purchase_order_id_fkey"
+            columns: ["purchase_order_id"]
+            isOneToOne: false
             referencedRelation: "purchase_orders"
             referencedColumns: ["id"]
           },
@@ -2908,6 +2985,7 @@ export type Database = {
           custo_snapshot: number
           distributor_id: string
           id: string
+          link_rastreio: string | null
           nota_fiscal_url: string | null
           order_id: string
           prazo_previsto: string | null
@@ -2920,6 +2998,7 @@ export type Database = {
           custo_snapshot?: number
           distributor_id: string
           id?: string
+          link_rastreio?: string | null
           nota_fiscal_url?: string | null
           order_id: string
           prazo_previsto?: string | null
@@ -2932,6 +3011,7 @@ export type Database = {
           custo_snapshot?: number
           distributor_id?: string
           id?: string
+          link_rastreio?: string | null
           nota_fiscal_url?: string | null
           order_id?: string
           prazo_previsto?: string | null
@@ -3304,6 +3384,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "quotes_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos_distribuidora"
+            referencedColumns: ["job_id"]
+          },
+          {
             foreignKeyName: "quotes_professional_id_fkey"
             columns: ["professional_id"]
             isOneToOne: false
@@ -3398,6 +3485,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "jobs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "pedidos_distribuidora"
+            referencedColumns: ["job_id"]
           },
           {
             foreignKeyName: "reviews_professional_id_fkey"
@@ -3546,6 +3640,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "jobs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_executions_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "pedidos_distribuidora"
+            referencedColumns: ["job_id"]
           },
           {
             foreignKeyName: "service_executions_professional_id_fkey"
@@ -3780,8 +3881,13 @@ export type Database = {
           codigo_rastreio: string | null
           created_at: string | null
           distribuidora: string | null
+          distributor_id: string | null
+          eventos: Json | null
           id: string | null
+          itens: Json | null
           job_id: string | null
+          link_rastreio: string | null
+          nota_fiscal_url: string | null
           order_id: string | null
           prazo_previsto: string | null
           status: string | null
@@ -3793,6 +3899,20 @@ export type Database = {
             columns: ["job_id"]
             isOneToOne: false
             referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos_distribuidora"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_distributor_id_fkey"
+            columns: ["distributor_id"]
+            isOneToOne: false
+            referencedRelation: "distributors"
             referencedColumns: ["id"]
           },
           {
@@ -3886,6 +4006,13 @@ export type Database = {
             referencedRelation: "jobs"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "orders_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos_distribuidora"
+            referencedColumns: ["job_id"]
+          },
         ]
       }
       payment_status_cliente: {
@@ -3948,6 +4075,26 @@ export type Database = {
           },
         ]
       }
+      pedidos_distribuidora: {
+        Row: {
+          cep: string | null
+          cidade: string | null
+          cliente_nome: string | null
+          codigo_rastreio: string | null
+          created_at: string | null
+          custo_snapshot: number | null
+          endereco: string | null
+          eventos: Json | null
+          id: string | null
+          itens: Json | null
+          job_id: string | null
+          link_rastreio: string | null
+          nota_fiscal_url: string | null
+          prazo_previsto: string | null
+          status: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       abrir_conversa: { Args: { p_professional_id: string }; Returns: string }
@@ -3983,6 +4130,7 @@ export type Database = {
       avancar_purchase_order: {
         Args: {
           p_codigo_rastreio?: string
+          p_link_rastreio?: string
           p_nota_fiscal_url?: string
           p_purchase_order_id: string
           p_status: string
@@ -3993,6 +4141,7 @@ export type Database = {
           custo_snapshot: number
           distributor_id: string
           id: string
+          link_rastreio: string | null
           nota_fiscal_url: string | null
           order_id: string
           prazo_previsto: string | null
@@ -4458,6 +4607,15 @@ export type Database = {
           p_warranty_until: string
         }
         Returns: string
+      }
+      salvar_perfil_distribuidora: {
+        Args: {
+          p_cidade: string
+          p_cnpj: string
+          p_prazo_entrega_dias: number
+          p_razao_social: string
+        }
+        Returns: undefined
       }
       solicitar_pmoc: {
         Args: {

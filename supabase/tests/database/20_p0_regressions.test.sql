@@ -42,7 +42,7 @@ select ok(
     join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public'
       and p.proname = 'avancar_purchase_order'
-      and pg_get_function_identity_arguments(p.oid) = 'p_purchase_order_id uuid, p_status text, p_codigo_rastreio text, p_nota_fiscal_url text'
+      and pg_get_function_identity_arguments(p.oid) = 'p_purchase_order_id uuid, p_status text, p_codigo_rastreio text, p_nota_fiscal_url text, p_link_rastreio text'
   ),
   'repasse possui RPC transacional explícita'
 );

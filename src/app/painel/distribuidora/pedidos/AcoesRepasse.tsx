@@ -20,6 +20,7 @@ const PROXIMO: Record<string, { para: string; label: string } | null> = {
 export function AcoesRepasse({ id, status }: { id: string; status: string }) {
   const router = useRouter();
   const [rastreio, setRastreio] = useState("");
+  const [link, setLink] = useState("");
   const [nf, setNf] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -27,8 +28,9 @@ export function AcoesRepasse({ id, status }: { id: string; status: string }) {
   const proximo = PROXIMO[status];
   if (!proximo) return null;
 
-  // Rastreio é obrigatório no envio: sem ele o cliente fica no escuro, e é a
-  // pergunta que mais chega no suporte.
+  // Link de rastreio é obrigatório no envio: sem ele o cliente fica no
+  // escuro, e é a pergunta que mais chega no suporte. Vira link clicável nas
+  // duas pontas — por isso pede a URL da transportadora, não só um código.
   const precisaRastreio = proximo.para === "enviado";
   const pedeNf = proximo.para === "faturado";
 
@@ -37,6 +39,7 @@ export function AcoesRepasse({ id, status }: { id: string; status: string }) {
     startTransition(async () => {
       const r = await avancarRepasse(id, proximo!.para, {
         codigoRastreio: rastreio || undefined,
+        linkRastreio: link || undefined,
         notaFiscalUrl: nf || undefined,
       });
       if (!r.ok) return setErro(r.error);
@@ -56,8 +59,12 @@ export function AcoesRepasse({ id, status }: { id: string; status: string }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 14 }}>
       {precisaRastreio && (
-        <input value={rastreio} onChange={(e) => setRastreio(e.target.value)}
-          placeholder="Código de rastreio" style={campo} />
+        <>
+          <input value={link} onChange={(e) => setLink(e.target.value)}
+            placeholder="Link de rastreio (ex.: rastreamento.correios.com.br/...)" style={campo} />
+          <input value={rastreio} onChange={(e) => setRastreio(e.target.value)}
+            placeholder="Código de rastreio (opcional)" style={campo} />
+        </>
       )}
       {pedeNf && (
         <input value={nf} onChange={(e) => setNf(e.target.value)}

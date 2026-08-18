@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { CIDADE } from "@/lib/regiao";
 import { Cabecalho, mono, wrap } from "../../shared";
 import { comoPapel } from "../../navegacao";
+import { MidiaEditor } from "../../MidiaEditor";
 import { PerfilDistribuidoraForm } from "./PerfilDistribuidoraForm";
 import { STATUS_VERIFICACAO, resolverMapa } from "@/lib/status";
 
@@ -13,7 +14,7 @@ export default async function PerfilDistribuidoraPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+  const { data: profile } = await supabase.from("profiles").select("role, nome, avatar_url").eq("id", user.id).single();
   if (comoPapel(profile?.role) !== "distribuidora") redirect("/painel");
 
   const { data: dist } = await supabase
@@ -46,6 +47,11 @@ export default async function PerfilDistribuidoraPage() {
             ? "Seus produtos estão visíveis no catálogo."
             : "Seus produtos só aparecem para os clientes depois da aprovação."}
         </span>
+      </div>
+
+      <div className="card" style={{ padding: 26, marginBottom: 16 }}>
+        <MidiaEditor uid={user.id} nome={profile?.nome ?? dist?.razao_social ?? "Distribuidora"}
+          avatarUrl={profile?.avatar_url ?? null} bannerUrl={null} mostrarBanner={false} />
       </div>
 
       <PerfilDistribuidoraForm

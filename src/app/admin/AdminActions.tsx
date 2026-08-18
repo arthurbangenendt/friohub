@@ -46,11 +46,18 @@ export function AdminActions({
         )}
         {status !== "rejeitado" && (
           <button disabled={pending || motivo.trim().length < 5} onClick={() => run(rejeitar)}
-            style={{ height: 36, padding: "0 14px", fontSize: 13.5, fontWeight: 600, borderRadius: 9, border: "1px solid var(--line)", background: "var(--surface)", color: "var(--danger)", cursor: "pointer" }}>
+            style={{
+              height: 36, padding: "0 14px", fontSize: 13.5, fontWeight: 600, borderRadius: 9, border: "1px solid var(--line)", background: "var(--surface)", color: "var(--danger)",
+              cursor: pending || motivo.trim().length < 5 ? "not-allowed" : "pointer",
+              opacity: pending || motivo.trim().length < 5 ? .45 : 1,
+            }}>
             {status === "verificado" ? "Revogar" : "Rejeitar"}
           </button>
         )}
       </div>
+      {motivo.trim().length > 0 && motivo.trim().length < 5 && (
+        <span style={{ color: "var(--ink-faint)", fontSize: 12 }}>Mínimo de 5 caracteres na justificativa.</span>
+      )}
       {erro && <span style={{ color: "var(--danger)", fontSize: 12.5 }}>{erro}</span>}
     </div>
   );
