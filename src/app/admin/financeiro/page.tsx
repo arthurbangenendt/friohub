@@ -24,6 +24,7 @@ const CONTA_LABEL: Record<string, string> = {
   distributor_payable: "A pagar a distribuidoras",
   platform_commission: "Receita de comissão",
   platform_product_margin: "Receita de margem",
+  platform_subscription_revenue: "Receita de assinatura",
 };
 
 const DIVERGENCIA_LABEL: Record<string, string> = {
@@ -45,7 +46,7 @@ export default async function AdminFinanceiroPage() {
 
   const [{ data: postings }, { data: cobrancas }, { data: corridas }, { data: divergencias }] = await Promise.all([
     supabase.from("financial_postings").select("account_code, direction, amount").limit(5000),
-    supabase.from("payment_charges").select("id, status, amount, created_at, order_id").order("created_at", { ascending: false }).limit(50),
+    supabase.from("payment_charges").select("id, status, amount, created_at, order_id, subscription_id").order("created_at", { ascending: false }).limit(50),
     supabase.from("financial_reconciliation_runs").select("id, status, started_at, finished_at, checked_records, divergence_count, error_message").order("started_at", { ascending: false }).limit(5),
     supabase.from("financial_reconciliation_items").select("id, divergence_type, expected_value, actual_value, order_id, charge_id, created_at").is("resolved_at", null).order("created_at", { ascending: false }).limit(40),
   ]);
@@ -160,7 +161,7 @@ export default async function AdminFinanceiroPage() {
             return (
               <div key={c.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "10px 0", borderBottom: "1px solid var(--line-soft)" }}>
                 <span style={{ fontSize: 13.5 }}>
-                  Order {c.order_id.slice(0, 8)}
+                  {c.order_id ? `Order ${c.order_id.slice(0, 8)}` : `Assinatura ${c.subscription_id?.slice(0, 8) ?? ""}`}
                   <span style={{ display: "block", fontSize: 12, color: "var(--ink-soft)" }}>
                     {new Date(c.created_at).toLocaleString("pt-BR")}
                   </span>

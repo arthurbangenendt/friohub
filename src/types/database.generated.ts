@@ -804,9 +804,10 @@ export type Database = {
           idempotency_key: string
           journal_type: string
           occurred_at: string
-          order_id: string
+          order_id: string | null
           posted_at: string
           reversal_of: string | null
+          subscription_id: string | null
         }
         Insert: {
           charge_id?: string | null
@@ -817,9 +818,10 @@ export type Database = {
           idempotency_key: string
           journal_type: string
           occurred_at: string
-          order_id: string
+          order_id?: string | null
           posted_at?: string
           reversal_of?: string | null
+          subscription_id?: string | null
         }
         Update: {
           charge_id?: string | null
@@ -830,9 +832,10 @@ export type Database = {
           idempotency_key?: string
           journal_type?: string
           occurred_at?: string
-          order_id?: string
+          order_id?: string | null
           posted_at?: string
           reversal_of?: string | null
+          subscription_id?: string | null
         }
         Relationships: [
           {
@@ -868,6 +871,13 @@ export type Database = {
             columns: ["reversal_of"]
             isOneToOne: true
             referencedRelation: "financial_journals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "financial_journals_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "plan_subscriptions"
             referencedColumns: ["id"]
           },
         ]
@@ -1997,10 +2007,11 @@ export type Database = {
           id: string
           idempotency_key: string
           last_gateway_event_at: string | null
-          order_id: string
+          order_id: string | null
           received_at: string | null
           refunded_at: string | null
           status: string
+          subscription_id: string | null
           updated_at: string
         }
         Insert: {
@@ -2018,10 +2029,11 @@ export type Database = {
           id?: string
           idempotency_key: string
           last_gateway_event_at?: string | null
-          order_id: string
+          order_id?: string | null
           received_at?: string | null
           refunded_at?: string | null
           status?: string
+          subscription_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -2039,10 +2051,11 @@ export type Database = {
           id?: string
           idempotency_key?: string
           last_gateway_event_at?: string | null
-          order_id?: string
+          order_id?: string | null
           received_at?: string | null
           refunded_at?: string | null
           status?: string
+          subscription_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -2065,6 +2078,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders_cliente"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_charges_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "plan_subscriptions"
             referencedColumns: ["id"]
           },
         ]
@@ -2194,6 +2214,67 @@ export type Database = {
           },
           {
             foreignKeyName: "plan_interest_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
+            referencedRelation: "professionals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plan_subscriptions: {
+        Row: {
+          amount: number
+          cancelled_at: string | null
+          ciclo: string
+          created_at: string
+          id: string
+          next_due_date: string | null
+          plan_id: string
+          professional_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          cancelled_at?: string | null
+          ciclo: string
+          created_at?: string
+          id?: string
+          next_due_date?: string | null
+          plan_id: string
+          professional_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          cancelled_at?: string | null
+          ciclo?: string
+          created_at?: string
+          id?: string
+          next_due_date?: string | null
+          plan_id?: string
+          professional_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plan_subscriptions_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
+            referencedRelation: "diretorio_profissionais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plan_subscriptions_professional_id_fkey"
             columns: ["professional_id"]
             isOneToOne: false
             referencedRelation: "professionals"
@@ -2792,6 +2873,7 @@ export type Database = {
           bio: string | null
           cidade: string
           cnpj: string | null
+          cpf_cnpj: string | null
           created_at: string
           estado: string
           id: string
@@ -2809,6 +2891,7 @@ export type Database = {
           bio?: string | null
           cidade: string
           cnpj?: string | null
+          cpf_cnpj?: string | null
           created_at?: string
           estado?: string
           id: string
@@ -2826,6 +2909,7 @@ export type Database = {
           bio?: string | null
           cidade?: string
           cnpj?: string | null
+          cpf_cnpj?: string | null
           created_at?: string
           estado?: string
           id?: string
@@ -3737,6 +3821,24 @@ export type Database = {
         }
         Relationships: []
       }
+      state_billing_config: {
+        Row: {
+          cobranca_ativa: boolean
+          estado: string
+          updated_at: string
+        }
+        Insert: {
+          cobranca_ativa?: boolean
+          estado: string
+          updated_at?: string
+        }
+        Update: {
+          cobranca_ativa?: boolean
+          estado?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       subscription_plans: {
         Row: {
           ativo: boolean
@@ -4288,6 +4390,10 @@ export type Database = {
         }
         Returns: string
       }
+      definir_cpf_cnpj_professional: {
+        Args: { p_cpf_cnpj: string; p_user_id: string }
+        Returns: undefined
+      }
       definir_verificacao: {
         Args: {
           p_entity_id: string
@@ -4385,8 +4491,20 @@ export type Database = {
         Args: { p_profile_ids: string[] }
         Returns: number
       }
+      meu_cpf_cnpj_professional: { Args: never; Returns: string }
+      obter_checkout_cobranca: {
+        Args: { p_charge_id: string }
+        Returns: {
+          checkout_url: string
+          status: string
+        }[]
+      }
       obter_cnpj_distribuidora: {
         Args: { p_distributor_id: string }
+        Returns: string
+      }
+      obter_cpf_cnpj_professional: {
+        Args: { p_user_id: string }
         Returns: string
       }
       obter_funil_marketplace: {
@@ -4401,6 +4519,20 @@ export type Database = {
           requested: number
           responded: number
           started: number
+        }[]
+      }
+      obter_nome_perfil: { Args: { p_user_id: string }; Returns: string }
+      obter_payment_customer: {
+        Args: { p_gateway: string; p_user_id: string }
+        Returns: string
+      }
+      obter_plano_publico: {
+        Args: { p_slug: string }
+        Returns: {
+          id: string
+          nome: string
+          preco_anual: number
+          preco_mensal: number
         }[]
       }
       obter_saude_publica: {
@@ -4423,6 +4555,19 @@ export type Database = {
         Returns: boolean
       }
       pode_propor: { Args: { p_quote_request_id: string }; Returns: boolean }
+      preparar_assinatura_plano: {
+        Args: { p_ciclo: string; p_plan_id: string; p_professional_id: string }
+        Returns: string
+      }
+      preparar_cobranca_assinatura: {
+        Args: {
+          p_billing_type: string
+          p_gateway: string
+          p_idempotency_key: string
+          p_subscription_id: string
+        }
+        Returns: string
+      }
       preparar_cobranca_order: {
         Args: {
           p_billing_type: string
@@ -4544,19 +4689,44 @@ export type Database = {
         Args: { p_ciclo: string; p_slug: string }
         Returns: string
       }
-      registrar_lancamento_financeiro: {
+      registrar_lancamento_financeiro:
+        | {
+            Args: {
+              p_charge_id: string
+              p_description: string
+              p_external_event_id: string
+              p_idempotency_key: string
+              p_journal_type: string
+              p_lines: Json
+              p_occurred_at: string
+              p_order_id: string
+              p_reversal_of?: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_charge_id: string
+              p_description: string
+              p_external_event_id: string
+              p_idempotency_key: string
+              p_journal_type: string
+              p_lines: Json
+              p_occurred_at: string
+              p_order_id: string
+              p_reversal_of?: string
+              p_subscription_id?: string
+            }
+            Returns: string
+          }
+      registrar_payment_customer: {
         Args: {
-          p_charge_id: string
-          p_description: string
-          p_external_event_id: string
-          p_idempotency_key: string
-          p_journal_type: string
-          p_lines: Json
-          p_occurred_at: string
-          p_order_id: string
-          p_reversal_of?: string
+          p_external_reference: string
+          p_gateway: string
+          p_gateway_customer_id: string
+          p_user_id: string
         }
-        Returns: string
+        Returns: undefined
       }
       reservar_notificacoes_whatsapp: {
         Args: { p_limite?: number }

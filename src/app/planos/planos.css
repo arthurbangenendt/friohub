@@ -289,3 +289,56 @@
   .pl-spot { display: none; }
   .pl-sticky { position: static; min-height: 0; padding: 56px 0; }
 }
+
+/* ---------- modal de checkout (Asaas) ---------- */
+.pl-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: color-mix(in srgb, var(--brand-ink) 62%, transparent);
+  backdrop-filter: blur(3px);
+}
+.pl-modal {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  padding: 28px 26px 26px;
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-lg);
+}
+.pl-modal-fechar {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--bg-subtle);
+  color: var(--ink-soft);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.pl-modal-fechar:hover { color: var(--ink); }
+.pl-modal-input {
+  width: 100%;
+  padding: 11px 13px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 14.5px;
+}
+.pl-modal-input:focus {
+  outline: none;
+  border-color: var(--cool);
+  box-shadow: 0 0 0 3px var(--cool-wash);
+}

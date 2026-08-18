@@ -2,6 +2,59 @@
 
 import { createClient } from "@/lib/supabase/server";
 
+/* Cobrança de verdade — aciona a Edge Function `asaas-assinar`.
+ *
+ * Só chega até aqui quando `city_billing_config.cobranca_ativa` está ligado
+ * (hoje só em São Paulo, para o teste de sandbox). A trava de negócio de
+ * verdade vive no banco (`preparar_assinatura_plano`, 20260818144000) — este
+ * server action é só o transporte do JWT até a função, nunca a decisão. */
+export type ResultadoAssinatura =
+  | { ok: true; checkoutUrl: string }
+  | { ok: false; erro: string };
+
+export async function iniciarAssinatura(
+  slug: string,
+  ciclo: Ciclo,
+  cpfCnpj: string,
+): Promise<ResultadoAssinatura> {
+  const supabase = await createClient();
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session) {
+    return { ok: false, erro: "Sua sessão expirou. Entre novamente." };
+  }
+
+  const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/asaas-assinar`;
+  let resposta: Response;
+  try {
+    resposta = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ plano_slug: slug, ciclo, cpf_cnpj: cpfCnpj }),
+    });
+  } catch {
+    return { ok: false, erro: "Não foi possível falar com o gateway de pagamento agora." };
+  }
+
+  const corpo = (await resposta.json().catch(() => ({}))) as {
+    ok?: boolean;
+    checkout_url?: string;
+    error?: string;
+  };
+
+  if (!resposta.ok || !corpo.ok || !corpo.checkout_url) {
+    return { ok: false, erro: corpo.error ?? "Não foi possível iniciar a assinatura." };
+  }
+
+  return { ok: true, checkoutUrl: corpo.checkout_url };
+}
+
 /* Assinatura de planos — registro de intenção.
  *
  * [RISCO 1] Não existe gateway de pagamento no sistema. `city_billing_config`

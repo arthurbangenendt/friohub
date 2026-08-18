@@ -14,7 +14,7 @@ import {
 } from "framer-motion";
 import { Check, ArrowRight, Bolt, Shield, Star, Wrench } from "@/components/icons";
 import { formatarBRL } from "@/lib/pricing";
-import { registrarInteresse, type Ciclo } from "./actions";
+import { registrarInteresse, iniciarAssinatura, type Ciclo } from "./actions";
 import "./planos.css";
 
 /* Vitrine de assinatura.
@@ -432,6 +432,122 @@ function CartaoPlano({
 }
 
 /* ------------------------------------------------------------------ */
+/* Checkout — a hora em que o Asaas entra em cena                      */
+/* ------------------------------------------------------------------ */
+
+/** Só dígitos, e só aceita 11 (CPF) ou 14 (CNPJ) — o Asaas recusa qualquer
+ *  outra coisa na criação do customer, então validar aqui evita ida e volta
+ *  ao servidor por um erro que dava para pegar na hora. */
+function formatarDocumento(v: string): string {
+  const d = v.replace(/\D/g, "").slice(0, 14);
+  if (d.length <= 11) {
+    return d.replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+  }
+  return d
+    .replace(/(\d{2})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d)/, "$1/$2")
+    .replace(/(\d{4})(\d{1,2})$/, "$1-$2");
+}
+
+function ModalCheckout({
+  plano,
+  ciclo,
+  valor,
+  precisaDocumento,
+  enviando,
+  erro,
+  onFechar,
+  onConfirmar,
+}: {
+  plano: PlanoDTO;
+  ciclo: Ciclo;
+  valor: number;
+  precisaDocumento: boolean;
+  enviando: boolean;
+  erro: string | null;
+  onFechar: () => void;
+  onConfirmar: (documento: string) => void;
+}) {
+  const [documento, setDocumento] = useState("");
+  const digitos = documento.replace(/\D/g, "");
+  const documentoValido = !precisaDocumento || digitos.length === 11 || digitos.length === 14;
+
+  return (
+    <div
+      className="pl-modal-overlay"
+      role="presentation"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onFechar();
+      }}
+    >
+      <div className="pl-modal" role="dialog" aria-modal="true" aria-labelledby="pl-modal-titulo">
+        <button type="button" className="pl-modal-fechar" onClick={onFechar} aria-label="Fechar">
+          ×
+        </button>
+
+        <span className="pl-eyebrow" style={{ color: "var(--cool)" }}>
+          Plano {plano.nome} · {ciclo === "mensal" ? "mensal" : "anual"}
+        </span>
+        <h3 id="pl-modal-titulo" style={{ margin: "6px 0 4px", fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>
+          {formatarBRL(valor)} {ciclo === "mensal" ? "/mês" : "/ano"}
+        </h3>
+        <p style={{ margin: "0 0 20px", fontSize: 14, lineHeight: 1.55, color: "var(--ink-soft)" }}>
+          Você será redirecionado para o <strong>Asaas</strong>, nosso parceiro de pagamentos, para
+          concluir com Pix, boleto ou cartão. O FrioHub não guarda dado de cartão.
+        </p>
+
+        {precisaDocumento && (
+          <label style={{ display: "block", marginBottom: 18 }}>
+            <span style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6, color: "var(--ink)" }}>
+              CPF ou CNPJ
+            </span>
+            <input
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              value={formatarDocumento(documento)}
+              onChange={(e) => setDocumento(e.target.value)}
+              placeholder="000.000.000-00"
+              className="pl-modal-input"
+            />
+            <span style={{ display: "block", fontSize: 12, marginTop: 6, color: "var(--ink-faint)" }}>
+              Pedimos isso só na primeira assinatura — é exigido pelo gateway de pagamento.
+            </span>
+          </label>
+        )}
+
+        {erro && (
+          <div
+            role="alert"
+            style={{
+              marginBottom: 16,
+              padding: "10px 14px",
+              borderRadius: 10,
+              fontSize: 13.5,
+              background: "var(--danger-wash)",
+              color: "var(--danger)",
+            }}
+          >
+            {erro}
+          </div>
+        )}
+
+        <button
+          type="button"
+          className="btn btn-primary btn-block"
+          disabled={enviando || !documentoValido}
+          onClick={() => onConfirmar(digitos)}
+        >
+          {enviando ? "Abrindo pagamento…" : "Ir para pagamento"}
+          {!enviando && <ArrowRight size={17} />}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* Página                                                              */
 /* ------------------------------------------------------------------ */
 
@@ -450,6 +566,7 @@ export function PlanosView({
   planos,
   logado,
   ehProfissional,
+  precisaDocumento,
   cobrancaAtiva,
   boasVindas = false,
   hrefVitrine = null,
@@ -457,6 +574,7 @@ export function PlanosView({
   planos: PlanoDTO[];
   logado: boolean;
   ehProfissional: boolean;
+  precisaDocumento: boolean;
   cobrancaAtiva: boolean;
   boasVindas?: boolean;
   hrefVitrine?: string | null;
@@ -466,6 +584,8 @@ export function PlanosView({
   const [ciclo, setCiclo] = useState<Ciclo>("mensal");
   const [enviando, setEnviando] = useState<string | null>(null);
   const [aviso, setAviso] = useState<{ tipo: "ok" | "erro"; texto: string } | null>(null);
+  const [planoCheckout, setPlanoCheckout] = useState<PlanoDTO | null>(null);
+  const [erroCheckout, setErroCheckout] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
   function assinar(slug: string) {
@@ -473,6 +593,17 @@ export function PlanosView({
       router.push(`/signup?next=${encodeURIComponent("/planos")}`);
       return;
     }
+
+    // Cobrança de verdade só existe para profissional com a cidade ligada.
+    // Nos outros casos (cliente avaliando, ou cidade sem cobrança) o clique
+    // continua só registrando interesse — o RPC devolve a mensagem certa
+    // para quem não é profissional.
+    if (cobrancaAtiva && ehProfissional) {
+      setErroCheckout(null);
+      setPlanoCheckout(planos.find((p) => p.slug === slug) ?? null);
+      return;
+    }
+
     setEnviando(slug);
     setAviso(null);
     startTransition(async () => {
@@ -487,6 +618,22 @@ export function PlanosView({
       } else {
         setAviso({ tipo: "erro", texto: r.erro });
       }
+    });
+  }
+
+  function confirmarCheckout(documento: string) {
+    if (!planoCheckout) return;
+    const slug = planoCheckout.slug;
+    setEnviando(slug);
+    setErroCheckout(null);
+    startTransition(async () => {
+      const r = await iniciarAssinatura(slug, ciclo, documento);
+      if (r.ok) {
+        window.location.href = r.checkoutUrl;
+        return;
+      }
+      setEnviando(null);
+      setErroCheckout(r.erro);
     });
   }
 
@@ -730,6 +877,22 @@ export function PlanosView({
           </div>
         </section>
       </div>
+
+      {planoCheckout && (
+        <ModalCheckout
+          plano={planoCheckout}
+          ciclo={ciclo}
+          valor={ciclo === "anual" ? (planoCheckout.precoAnual ?? planoCheckout.precoMensal * 10) : planoCheckout.precoMensal}
+          precisaDocumento={precisaDocumento}
+          enviando={enviando === planoCheckout.slug}
+          erro={erroCheckout}
+          onFechar={() => {
+            setPlanoCheckout(null);
+            setErroCheckout(null);
+          }}
+          onConfirmar={confirmarCheckout}
+        />
+      )}
     </main>
   );
 }

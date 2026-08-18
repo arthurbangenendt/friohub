@@ -403,6 +403,15 @@ verify_jwt = true
 [functions.chatwoot-provision]
 verify_jwt = true
 
+# O Asaas não manda JWT do Supabase no webhook — autenticação é o header
+# asaas-access-token conferido em index.ts (mesmo raciocínio do chatwoot-webhook).
+[functions.asaas-webhook]
+verify_jwt = false
+
+# Recebe o JWT do profissional que está assinando um plano.
+[functions.asaas-assinar]
+verify_jwt = true
+
 [analytics]
 enabled = true
 port = 54327

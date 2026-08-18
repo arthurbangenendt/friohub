@@ -40,6 +40,7 @@ export default async function PlanosPage(props: PageProps<"/planos">) {
      é cliente vê a página normalmente (pode estar avaliando virar parceiro),
      mas recebe o caminho certo em vez de um erro do banco. */
   let ehProfissional = false;
+  let precisaDocumento = false;
   if (user) {
     const { data: pro } = await supabase
       .from("professionals")
@@ -47,6 +48,14 @@ export default async function PlanosPage(props: PageProps<"/planos">) {
       .eq("id", user.id)
       .maybeSingle();
     ehProfissional = !!pro;
+
+    /* `professionals.cpf_cnpj` fica fora do GRANT genérico da tabela — é
+       documento fiscal, mesma classe de sigilo de `cnpj` (20260814114010).
+       Só a própria pessoa lê o próprio via RPC (20260818146000). */
+    if (ehProfissional) {
+      const { data: cpfCnpj } = await supabase.rpc("meu_cpf_cnpj_professional");
+      precisaDocumento = !cpfCnpj;
+    }
   }
 
   /* [RISCO 1] O interruptor de cobrança é por cidade e entra desligado no
@@ -74,6 +83,7 @@ export default async function PlanosPage(props: PageProps<"/planos">) {
         planos={dto}
         logado={!!user}
         ehProfissional={ehProfissional}
+        precisaDocumento={precisaDocumento}
         cobrancaAtiva={billing?.cobranca_ativa ?? false}
         boasVindas={boasVindas && ehProfissional}
         hrefVitrine={user ? `/profissional/${user.id}` : null}
