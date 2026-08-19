@@ -30,11 +30,17 @@ type PagamentoAsaas = {
   subscription?: string | null;
 };
 
+type TransferenciaAsaas = {
+  id?: string;
+  status?: string;
+};
+
 type EventoAsaas = {
   id?: string;
   event?: string;
   dateCreated?: string;
   payment?: PagamentoAsaas;
+  transfer?: TransferenciaAsaas;
 };
 
 Deno.serve(async (req) => {
@@ -56,16 +62,49 @@ Deno.serve(async (req) => {
 
   const tipo = evento.event ?? "";
   const gatewayPaymentId = evento.payment?.id ?? "";
-  if (!tipo || !gatewayPaymentId) return json({ error: "Evento incompleto." }, 400);
+  const gatewayTransferId = evento.transfer?.id ?? "";
+  /* Evento de transferência (TRANSFER_*) vem com `transfer`, nunca `payment` —
+     os dois nomes de campo não coexistem no mesmo evento. */
+  const ehTransferencia = !gatewayPaymentId && !!gatewayTransferId;
+  const idExterno = gatewayPaymentId || gatewayTransferId;
+  if (!tipo || !idExterno) return json({ error: "Evento incompleto." }, 400);
 
-  /* O Asaas não manda um id de entrega dedicado — `payment.id` só identifica
-     a cobrança, não o evento (PAYMENT_CONFIRMED e PAYMENT_RECEIVED da mesma
-     cobrança têm o mesmo payment.id). Compor com o tipo e o timestamp de
-     criação é o mesmo fallback determinístico do webhook do Chatwoot: repete
-     na reentrega do mesmo evento, difere entre eventos distintos. */
-  const eventoId = evento.id || `${tipo}:${gatewayPaymentId}:${evento.dateCreated ?? ""}`;
+  /* O Asaas não manda um id de entrega dedicado — `payment.id`/`transfer.id`
+     só identificam a cobrança/transferência, não o evento (PAYMENT_CONFIRMED
+     e PAYMENT_RECEIVED da mesma cobrança têm o mesmo payment.id). Compor com
+     o tipo e o timestamp de criação é o mesmo fallback determinístico do
+     webhook do Chatwoot: repete na reentrega do mesmo evento, difere entre
+     eventos distintos. */
+  const eventoId = evento.id || `${tipo}:${idExterno}:${evento.dateCreated ?? ""}`;
+  const ocorridoEm = evento.dateCreated ? new Date(evento.dateCreated).toISOString() : new Date().toISOString();
 
   const db = servico();
+
+  if (ehTransferencia) {
+    const { data: registeredId, error: erroRegistro } = await db.rpc("registrar_evento_gateway_transferencia", {
+      p_gateway: "asaas",
+      p_gateway_event_id: eventoId,
+      p_event_type: tipo,
+      p_gateway_transfer_id: gatewayTransferId,
+      p_payload: evento,
+      p_occurred_at: ocorridoEm,
+    });
+    if (erroRegistro || !registeredId) {
+      console.error(`asaas-webhook: falha ao registrar evento de transferência: ${erroRegistro?.message}`);
+      return json({ error: "Não foi possível registrar o evento." }, 500);
+    }
+    try {
+      const { data: resultado, error: erroProcessar } = await db.rpc("processar_evento_gateway_transferencia", {
+        p_event_id: registeredId,
+      });
+      if (erroProcessar) throw new Error(erroProcessar.message);
+      return json({ ok: true, resultado });
+    } catch (erro) {
+      const mensagem = erro instanceof Error ? erro.message : String(erro);
+      console.error(`asaas-webhook: falha ao processar transferência ${tipo}: ${mensagem}`);
+      return json({ ok: false, erro: mensagem });
+    }
+  }
 
   const { data: registeredId, error: erroRegistro } = await db.rpc("registrar_evento_gateway", {
     p_gateway: "asaas",
@@ -74,7 +113,7 @@ Deno.serve(async (req) => {
     p_gateway_payment_id: gatewayPaymentId,
     p_amount: evento.payment?.value ?? null,
     p_payload: evento,
-    p_occurred_at: evento.dateCreated ? new Date(evento.dateCreated).toISOString() : new Date().toISOString(),
+    p_occurred_at: ocorridoEm,
   });
 
   if (erroRegistro || !registeredId) {

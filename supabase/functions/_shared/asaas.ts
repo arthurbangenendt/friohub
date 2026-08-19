@@ -58,6 +58,31 @@ export type AsaasPayment = {
   dueDate: string;
 };
 
+export type AsaasTransfer = {
+  id: string;
+  status: string;
+  failReason: string | null;
+};
+
+/* Confirmado em sandbox (19/08/2026): POST /transfers com pixAddressKey de
+ * terceiro (fora da conta de origem) é aceito e devolve 200 com
+ * operationType "PIX" — não exige Wallet ID nem subconta do destinatário. */
+export async function criarTransferencia(params: {
+  value: number;
+  pixAddressKey: string;
+  pixAddressKeyType: "CPF" | "CNPJ" | "EMAIL" | "PHONE" | "EVP";
+  description: string;
+  externalReference: string;
+}): Promise<AsaasTransfer> {
+  return await asaas("POST", "/transfers", {
+    value: params.value,
+    pixAddressKey: params.pixAddressKey,
+    pixAddressKeyType: params.pixAddressKeyType,
+    description: params.description,
+    externalReference: params.externalReference,
+  }) as AsaasTransfer;
+}
+
 export async function criarCustomer(params: {
   externalReference: string;
   name: string;

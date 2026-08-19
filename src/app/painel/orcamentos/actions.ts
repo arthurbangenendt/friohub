@@ -25,6 +25,9 @@ export type ItemPedido = {
   andarOuTelhado?: boolean;
   btuRecomendado?: number | null;
   produtoId?: string | null;
+  /* Só quando o cliente não sabia qual aparelho queria: categoria escolhida,
+     sem produto exato — quem completa isso é o profissional, na proposta. */
+  categoriaDesejada?: string | null;
   quantidade: number;
 };
 
@@ -44,6 +47,10 @@ export type NovoPedido = {
   fotos?: string[];
   latitude?: number | null;
   longitude?: number | null;
+  /* true = cliente escolheu o produto exato (preço de catálogo travado).
+     false = cliente só informou a categoria; o profissional escolhe o
+     produto e o preço na proposta. Ver 20260819100000_pedido_aparelho_conhecido.sql. */
+  sabeAparelho: boolean;
 };
 
 export async function criarPedidoOrcamento(input: NovoPedido) {
@@ -116,8 +123,10 @@ export async function criarPedidoOrcamento(input: NovoPedido) {
       andar_ou_telhado: item.andarOuTelhado ?? false,
       btu_recomendado: item.btuRecomendado ?? null,
       produto_id: item.produtoId ?? null,
+      categoria_desejada: item.categoriaDesejada ?? null,
       quantidade: Math.max(1, item.quantidade),
     })),
+    p_sabe_aparelho: input.sabeAparelho,
   });
 
   if (error || !pedidoId) {
@@ -146,6 +155,12 @@ export type PropostaInput = {
   garantiaDias: number;
   validadeAte: string;
   observacoes?: string;
+  /* Só quando o cliente não sabia qual aparelho queria: o produto que o
+     profissional escolheu da distribuidora, e o preço que vai cobrar por ele.
+     Quando o cliente já escolheu o produto, o banco rejeita estes dois campos —
+     o preço do aparelho é 100% do catálogo. */
+  produtoId?: string | null;
+  valorEquipamento?: number;
 };
 
 export async function enviarProposta(input: PropostaInput) {
@@ -157,6 +172,7 @@ export async function enviarProposta(input: PropostaInput) {
   const maoObra = naoNeg(input.valorMaoObra);
   const materiais = naoNeg(input.valorMateriais);
   const visita = naoNeg(input.valorVisita);
+  const equipamento = naoNeg(input.valorEquipamento ?? 0);
 
   // Mesma regra do CHECK no banco, verificada aqui para virar mensagem legível.
   if (input.tipo === "preco_fechado" && maoObra + materiais <= 0) {
@@ -177,6 +193,8 @@ export async function enviarProposta(input: PropostaInput) {
     garantia_dias: Math.max(0, input.garantiaDias || 0),
     validade_ate: input.validadeAte,
     observacoes: input.observacoes?.trim() || null,
+    produto_id: input.produtoId ?? null,
+    valor_equipamento: equipamento,
   });
 
   if (error) {
@@ -201,6 +219,9 @@ export async function aceitarProposta(
   quoteId: string,
   endereco: string,
   detalhes: Record<string, string>,
+  /* Só vem preenchido quando a cobrança real está ligada pra esta região e o
+     cliente ainda não tinha documento salvo — ver Propostas.tsx. */
+  cpfCnpj?: string,
 ) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -209,6 +230,22 @@ export async function aceitarProposta(
   const end = endereco.trim();
   if (end.length < 5) return { ok: false as const, error: "Informe o endereço completo do serviço." };
 
+  if (cpfCnpj) {
+    const digitos = cpfCnpj.replace(/\D/g, "");
+    if (digitos.length !== 11 && digitos.length !== 14) {
+      return { ok: false as const, error: "Informe um CPF ou CNPJ válido." };
+    }
+    /* Coleta única, mesmo padrão do CPF/CNPJ do profissional na assinatura
+       (20260818141000): só grava se ainda não houver documento salvo — não
+       sobrescreve o que já existe. */
+    const { error: erroDocumento } = await supabase
+      .from("profile_private")
+      .update({ cpf_cnpj: digitos })
+      .eq("id", user.id)
+      .is("cpf_cnpj", null);
+    if (erroDocumento) return { ok: false as const, error: "Não foi possível salvar o CPF/CNPJ." };
+  }
+
   const { data, error } = await supabase.rpc("aceitar_quote", {
     p_quote_id: quoteId,
     p_endereco: end,
@@ -216,9 +253,33 @@ export async function aceitarProposta(
   });
   if (error) return { ok: false as const, error: error.message };
 
+  const jobId = data as string;
+
+  /* Best-effort: job e order já existem, são a fonte de verdade. Se a
+     cobrança falhar (gateway fora do ar, flag desligada, cliente sem
+     documento), o aceite não é desfeito — fica pendente para a reconciliação
+     resolver depois. Ver supabase/functions/asaas-cobrar-servico. */
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session) {
+    /* Aguardado de propósito: em ambiente serverless, uma promise disparada
+       sem `await` pode ser encerrada junto com a function antes do fetch
+       terminar. O erro é engolido — best-effort não pode virar falha do
+       aceite, que já está commitado no banco. */
+    try {
+      const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/asaas-cobrar-servico`;
+      await fetch(url, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ job_id: jobId }),
+      });
+    } catch (erro) {
+      console.error(`falha ao acionar cobrança do serviço ${jobId}:`, erro);
+    }
+  }
+
   revalidatePath("/painel/orcamentos");
   revalidatePath("/painel");
-  return { ok: true as const, jobId: data as string };
+  return { ok: true as const, jobId };
 }
 
 /** O profissional declina o pedido. Sinaliza ao cliente sem deixá-lo esperando

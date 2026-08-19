@@ -51,3 +51,10 @@ export const SPECIALTY_OF: Record<JobType, string | null> = {
 export function rotuloJob(t: string): string {
   return JOB_LABEL[t as JobType] ?? t;
 }
+
+// Mesmo enum de `products.categoria` no banco — ver
+// 20260819100000_pedido_aparelho_conhecido.sql.
+export const CATEGORIA_LABEL: Record<string, string> = {
+  split: "Split", inverter: "Inverter", multi_split: "Multi Split",
+  piso_teto: "Piso teto", janela: "Janela",
+};

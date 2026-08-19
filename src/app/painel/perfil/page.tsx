@@ -7,7 +7,8 @@ import { PerfilForm } from "./PerfilForm";
 import { PortfolioEditor } from "./PortfolioEditor";
 import { MidiaEditor } from "../MidiaEditor";
 import { MinhaAssinatura, type AssinaturaDTO } from "./MinhaAssinatura";
-import type { PerfilInput } from "./actions";
+import { ChavePix } from "./ChavePix";
+import type { PerfilInput, TipoChavePix } from "./actions";
 
 export default async function PerfilPage() {
   const supabase = await createClient();
@@ -48,6 +49,12 @@ export default async function PerfilPage() {
     .eq("professional_id", user.id)
     .eq("media_type", "foto")
     .order("position");
+
+  const { data: chavePixRows } = await supabase.rpc("minha_chave_pix");
+  const chavePixRow = Array.isArray(chavePixRows) ? chavePixRows[0] : null;
+  const chavePix = chavePixRow?.chave_pix && chavePixRow?.chave_pix_tipo
+    ? { chavePix: chavePixRow.chave_pix, chavePixTipo: chavePixRow.chave_pix_tipo as TipoChavePix }
+    : null;
 
   const { data: assinaturaRows } = await supabase.rpc("minha_assinatura_atual");
   const assinaturaRow = Array.isArray(assinaturaRows) ? assinaturaRows[0] : null;
@@ -117,6 +124,7 @@ export default async function PerfilPage() {
       </div>
 
       {pro && <MinhaAssinatura assinatura={assinatura} />}
+      {pro && <ChavePix inicial={chavePix} />}
 
       <div className="card" style={{ padding: 26, marginTop: 16 }}>
         <div style={{ fontSize: 12.5, fontWeight: 650, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--ink-faint)", marginBottom: 4 }}>Portfólio</div>

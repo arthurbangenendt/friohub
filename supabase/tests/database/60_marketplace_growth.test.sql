@@ -9,7 +9,7 @@ select has_function(
   'regra territorial existe no banco'
 );
 select has_function(
-  'public', 'buscar_produtos_marketplace', array['integer', 'text', 'integer', 'integer'],
+  'public', 'buscar_produtos_marketplace', array['integer', 'text', 'integer', 'integer', 'text'],
   'catálogo possui busca paginada'
 );
 select has_function(
@@ -54,7 +54,7 @@ select ok(
 );
 select ok(
   has_function_privilege(
-    'anon', 'public.buscar_produtos_marketplace(integer,text,integer,integer)', 'execute'
+    'anon', 'public.buscar_produtos_marketplace(integer,text,integer,integer,text)', 'execute'
   ),
   'catálogo de produtos permanece público'
 );

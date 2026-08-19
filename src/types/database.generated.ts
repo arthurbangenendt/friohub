@@ -1344,6 +1344,7 @@ export type Database = {
           andar_ou_telhado: boolean
           area_m2: number | null
           btu_recomendado: number | null
+          categoria_desejada: string | null
           created_at: string
           custo_snapshot: number
           distributor_id: string | null
@@ -1362,6 +1363,7 @@ export type Database = {
           andar_ou_telhado?: boolean
           area_m2?: number | null
           btu_recomendado?: number | null
+          categoria_desejada?: string | null
           created_at?: string
           custo_snapshot?: number
           distributor_id?: string | null
@@ -1380,6 +1382,7 @@ export type Database = {
           andar_ou_telhado?: boolean
           area_m2?: number | null
           btu_recomendado?: number | null
+          categoria_desejada?: string | null
           created_at?: string
           custo_snapshot?: number
           distributor_id?: string | null
@@ -2142,7 +2145,9 @@ export type Database = {
           gateway: string
           gateway_event_id: string
           gateway_payment_id: string | null
+          gateway_transfer_id: string | null
           id: string
+          kind: string
           last_error: string | null
           occurred_at: string
           payload: Json
@@ -2157,7 +2162,9 @@ export type Database = {
           gateway: string
           gateway_event_id: string
           gateway_payment_id?: string | null
+          gateway_transfer_id?: string | null
           id?: string
+          kind?: string
           last_error?: string | null
           occurred_at: string
           payload: Json
@@ -2172,7 +2179,9 @@ export type Database = {
           gateway?: string
           gateway_event_id?: string
           gateway_payment_id?: string | null
+          gateway_transfer_id?: string | null
           id?: string
+          kind?: string
           last_error?: string | null
           occurred_at?: string
           payload?: Json
@@ -2181,6 +2190,121 @@ export type Database = {
           received_at?: string
         }
         Relationships: []
+      }
+      payment_transfers: {
+        Row: {
+          allocation_id: string
+          amount: number
+          beneficiary_id: string
+          confirmed_at: string | null
+          contestado_em: string | null
+          contestado_motivo: string | null
+          external_reference: string
+          failed_at: string | null
+          gateway: string
+          gateway_transfer_id: string | null
+          id: string
+          idempotency_key: string
+          job_id: string
+          last_error: string | null
+          order_id: string
+          pix_key: string
+          pix_key_type: string
+          requested_at: string
+          scheduled_for: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          allocation_id: string
+          amount: number
+          beneficiary_id: string
+          confirmed_at?: string | null
+          contestado_em?: string | null
+          contestado_motivo?: string | null
+          external_reference: string
+          failed_at?: string | null
+          gateway: string
+          gateway_transfer_id?: string | null
+          id?: string
+          idempotency_key: string
+          job_id: string
+          last_error?: string | null
+          order_id: string
+          pix_key: string
+          pix_key_type: string
+          requested_at?: string
+          scheduled_for: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          allocation_id?: string
+          amount?: number
+          beneficiary_id?: string
+          confirmed_at?: string | null
+          contestado_em?: string | null
+          contestado_motivo?: string | null
+          external_reference?: string
+          failed_at?: string | null
+          gateway?: string
+          gateway_transfer_id?: string | null
+          id?: string
+          idempotency_key?: string
+          job_id?: string
+          last_error?: string | null
+          order_id?: string
+          pix_key?: string
+          pix_key_type?: string
+          requested_at?: string
+          scheduled_for?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_transfers_allocation_id_fkey"
+            columns: ["allocation_id"]
+            isOneToOne: true
+            referencedRelation: "payment_allocations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_transfers_beneficiary_id_fkey"
+            columns: ["beneficiary_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_transfers_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_transfers_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos_distribuidora"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "payment_transfers_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_transfers_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders_cliente"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       plan_interest: {
         Row: {
@@ -2310,18 +2434,21 @@ export type Database = {
           comissao_servico_pct: number
           id: boolean
           markup_produto_pct: number
+          repasse_janela_contencao_horas: number
           updated_at: string
         }
         Insert: {
           comissao_servico_pct?: number
           id?: boolean
           markup_produto_pct?: number
+          repasse_janela_contencao_horas?: number
           updated_at?: string
         }
         Update: {
           comissao_servico_pct?: number
           id?: boolean
           markup_produto_pct?: number
+          repasse_janela_contencao_horas?: number
           updated_at?: string
         }
         Relationships: []
@@ -2894,6 +3021,8 @@ export type Database = {
           anos_experiencia: number
           banner_url: string | null
           bio: string | null
+          chave_pix: string | null
+          chave_pix_tipo: string | null
           cidade: string
           cnpj: string | null
           cpf_cnpj: string | null
@@ -2912,6 +3041,8 @@ export type Database = {
           anos_experiencia?: number
           banner_url?: string | null
           bio?: string | null
+          chave_pix?: string | null
+          chave_pix_tipo?: string | null
           cidade: string
           cnpj?: string | null
           cpf_cnpj?: string | null
@@ -2930,6 +3061,8 @@ export type Database = {
           anos_experiencia?: number
           banner_url?: string | null
           bio?: string | null
+          chave_pix?: string | null
+          chave_pix_tipo?: string | null
           cidade?: string
           cnpj?: string | null
           cpf_cnpj?: string | null
@@ -3200,6 +3333,7 @@ export type Database = {
           andar_ou_telhado: boolean
           area_m2: number | null
           btu_recomendado: number | null
+          categoria_desejada: string | null
           created_at: string
           eletronicos: number | null
           id: string
@@ -3215,6 +3349,7 @@ export type Database = {
           andar_ou_telhado?: boolean
           area_m2?: number | null
           btu_recomendado?: number | null
+          categoria_desejada?: string | null
           created_at?: string
           eletronicos?: number | null
           id?: string
@@ -3230,6 +3365,7 @@ export type Database = {
           andar_ou_telhado?: boolean
           area_m2?: number | null
           btu_recomendado?: number | null
+          categoria_desejada?: string | null
           created_at?: string
           eletronicos?: number | null
           id?: string
@@ -3357,6 +3493,7 @@ export type Database = {
           job_type: string
           produto_id: string | null
           quantidade: number
+          sabe_aparelho: boolean
           status: string
           updated_at: string
           urgencia: string | null
@@ -3375,6 +3512,7 @@ export type Database = {
           job_type: string
           produto_id?: string | null
           quantidade?: number
+          sabe_aparelho?: boolean
           status?: string
           updated_at?: string
           urgencia?: string | null
@@ -3393,6 +3531,7 @@ export type Database = {
           job_type?: string
           produto_id?: string | null
           quantidade?: number
+          sabe_aparelho?: boolean
           status?: string
           updated_at?: string
           urgencia?: string | null
@@ -3431,12 +3570,14 @@ export type Database = {
           nao_inclui: string | null
           observacoes: string | null
           prazo_execucao: string | null
+          produto_id: string | null
           professional_id: string
           quote_request_id: string
           status: string
           tipo: string
           updated_at: string
           validade_ate: string
+          valor_equipamento: number
           valor_mao_obra: number
           valor_materiais: number
           valor_visita: number
@@ -3451,12 +3592,14 @@ export type Database = {
           nao_inclui?: string | null
           observacoes?: string | null
           prazo_execucao?: string | null
+          produto_id?: string | null
           professional_id: string
           quote_request_id: string
           status?: string
           tipo?: string
           updated_at?: string
           validade_ate?: string
+          valor_equipamento?: number
           valor_mao_obra?: number
           valor_materiais?: number
           valor_visita?: number
@@ -3471,12 +3614,14 @@ export type Database = {
           nao_inclui?: string | null
           observacoes?: string | null
           prazo_execucao?: string | null
+          produto_id?: string | null
           professional_id?: string
           quote_request_id?: string
           status?: string
           tipo?: string
           updated_at?: string
           validade_ate?: string
+          valor_equipamento?: number
           valor_mao_obra?: number
           valor_materiais?: number
           valor_visita?: number
@@ -3496,6 +3641,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "pedidos_distribuidora"
             referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "quotes_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "meus_produtos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "quotes_professional_id_fkey"
@@ -4287,6 +4446,7 @@ export type Database = {
       buscar_produtos_marketplace: {
         Args: {
           p_btu?: number
+          p_categoria?: string
           p_limit?: number
           p_offset?: number
           p_query?: string
@@ -4299,6 +4459,25 @@ export type Database = {
           marca: string
           modelo: string
           preco_venda: number
+          product_id: string
+          total_count: number
+        }[]
+      }
+      buscar_produtos_marketplace_sem_preco: {
+        Args: {
+          p_btu?: number
+          p_categoria?: string
+          p_limit?: number
+          p_offset?: number
+          p_query?: string
+        }
+        Returns: {
+          btu: number
+          categoria: string
+          distribuidora: string
+          image_url: string
+          marca: string
+          modelo: string
           product_id: string
           total_count: number
         }[]
@@ -4393,6 +4572,10 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: undefined
       }
+      contestar_execucao_job: {
+        Args: { p_job_id: string; p_motivo: string }
+        Returns: undefined
+      }
       criar_follow_up: {
         Args: { p_due_at: string; p_quote_request_id: string; p_title?: string }
         Returns: string
@@ -4417,9 +4600,14 @@ export type Database = {
           p_produto_id: string
           p_profissionais_ids: string[]
           p_quantidade: number
+          p_sabe_aparelho?: boolean
           p_urgencia: string
         }
         Returns: string
+      }
+      definir_cpf_cnpj_cliente: {
+        Args: { p_cpf_cnpj: string; p_user_id: string }
+        Returns: undefined
       }
       definir_cpf_cnpj_professional: {
         Args: { p_cpf_cnpj: string; p_user_id: string }
@@ -4439,6 +4627,7 @@ export type Database = {
         Returns: boolean
       }
       destravar_notificacoes_presas: { Args: never; Returns: number }
+      disparar_processador_repasses: { Args: never; Returns: undefined }
       disparar_worker_chatwoot: { Args: never; Returns: undefined }
       distancia_coordenadas_km: {
         Args: {
@@ -4512,6 +4701,16 @@ export type Database = {
         }
         Returns: boolean
       }
+      listar_repasses_prontos: {
+        Args: { p_limit?: number }
+        Returns: {
+          amount: number
+          id: string
+          job_id: string
+          pix_key: string
+          pix_key_type: string
+        }[]
+      }
       marcar_conversa_lida: {
         Args: { p_conversation_id: string }
         Returns: undefined
@@ -4521,6 +4720,10 @@ export type Database = {
       marcar_pii_sincronizado_chatwoot: {
         Args: { p_profile_ids: string[] }
         Returns: number
+      }
+      marcar_repasse_falho: {
+        Args: { p_erro: string; p_transfer_id: string }
+        Returns: undefined
       }
       meu_cpf_cnpj_professional: { Args: never; Returns: string }
       minha_assinatura_atual: {
@@ -4538,6 +4741,13 @@ export type Database = {
           valor: number
         }[]
       }
+      minha_chave_pix: {
+        Args: never
+        Returns: {
+          chave_pix: string
+          chave_pix_tipo: string
+        }[]
+      }
       obter_checkout_cobranca: {
         Args: { p_charge_id: string }
         Returns: {
@@ -4550,6 +4760,7 @@ export type Database = {
         Args: { p_distributor_id: string }
         Returns: string
       }
+      obter_cpf_cnpj_cliente: { Args: { p_user_id: string }; Returns: string }
       obter_cpf_cnpj_professional: {
         Args: { p_user_id: string }
         Returns: string
@@ -4624,11 +4835,23 @@ export type Database = {
         }
         Returns: string
       }
+      preparar_cobranca_servico: {
+        Args: { p_cliente_id: string; p_job_id: string }
+        Returns: string
+      }
+      preparar_repasse_profissional: {
+        Args: { p_job_id: string }
+        Returns: undefined
+      }
       preparar_upgrade_assinatura: {
         Args: { p_novo_plano_id: string; p_professional_id: string }
         Returns: string
       }
       processar_evento_gateway: {
+        Args: { p_event_id: string }
+        Returns: string
+      }
+      processar_evento_gateway_transferencia: {
         Args: { p_event_id: string }
         Returns: string
       }
@@ -4713,6 +4936,17 @@ export type Database = {
           p_gateway: string
           p_gateway_event_id: string
           p_gateway_payment_id: string
+          p_occurred_at: string
+          p_payload: Json
+        }
+        Returns: string
+      }
+      registrar_evento_gateway_transferencia: {
+        Args: {
+          p_event_type: string
+          p_gateway: string
+          p_gateway_event_id: string
+          p_gateway_transfer_id: string
           p_occurred_at: string
           p_payload: Json
         }
@@ -4820,6 +5054,10 @@ export type Database = {
           whatsapp_url: string
         }[]
       }
+      salvar_chave_pix: {
+        Args: { p_chave: string; p_tipo: string }
+        Returns: undefined
+      }
       salvar_execucao_servico: {
         Args: {
           p_checklist: Json
@@ -4877,6 +5115,14 @@ export type Database = {
       }
       vincular_equipamento_pmoc: {
         Args: { p_equipment_id: string; p_plan_id: string }
+        Returns: undefined
+      }
+      vincular_transferencia_gateway: {
+        Args: {
+          p_gateway_transfer_id: string
+          p_status: string
+          p_transfer_id: string
+        }
         Returns: undefined
       }
     }

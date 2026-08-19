@@ -10,6 +10,7 @@ import type {
 
 const SPECIALTIES = new Set(["instalacao", "manutencao", "remanejamento", "limpeza", "conserto"]);
 const SORTS = new Set(["relevancia", "nota", "servicos", "resposta", "disponibilidade"]);
+const CATEGORIAS = new Set(["split", "inverter", "multi_split", "piso_teto", "janela"]);
 const PAGE_SIZE = 12;
 
 function inteiroLimitado(value: string | null, fallback: number, min: number, max: number) {
@@ -51,11 +52,43 @@ export async function GET(request: NextRequest) {
 
   if (kind === "produtos") {
     const btu = inteiroLimitado(request.nextUrl.searchParams.get("btu"), 0, 0, 200000) || null;
+    const categoriaParam = request.nextUrl.searchParams.get("categoria");
+    const categoria = categoriaParam && CATEGORIAS.has(categoriaParam) ? categoriaParam : null;
+    /* `sem_preco` é o catálogo do cliente que ainda não sabe qual aparelho
+       quer: a RPC nem tem a coluna de preço no retorno — não tem o que
+       esconder no frontend, o valor nunca sai do banco. */
+    const semPreco = request.nextUrl.searchParams.get("modo") === "sem_preco";
+
+    if (semPreco) {
+      const { data, error } = await supabase.rpc("buscar_produtos_marketplace_sem_preco", {
+        p_btu: btu ?? undefined,
+        p_categoria: categoria ?? undefined,
+        p_query: query ?? undefined,
+        p_limit: PAGE_SIZE,
+        p_offset: offset,
+      });
+      if (error) return NextResponse.json({ error: "Não foi possível buscar o catálogo." }, { status: 500 });
+
+      const items: ProdutoDTO[] = (data ?? []).map((p) => ({
+        id: p.product_id,
+        marca: p.marca,
+        modelo: p.modelo,
+        btu: p.btu,
+        categoria: p.categoria,
+        precoVenda: null,
+        imageUrl: p.image_url,
+        distribuidora: p.distribuidora,
+      }));
+      const total = Number(data?.[0]?.total_count ?? 0);
+      return resposta({ items, total, page, hasMore: offset + items.length < total });
+    }
+
     const { data, error } = await supabase.rpc("buscar_produtos_marketplace", {
       p_btu: btu ?? undefined,
       p_query: query ?? undefined,
       p_limit: PAGE_SIZE,
       p_offset: offset,
+      p_categoria: categoria ?? undefined,
     });
     if (error) return NextResponse.json({ error: "Não foi possível buscar o catálogo." }, { status: 500 });
 

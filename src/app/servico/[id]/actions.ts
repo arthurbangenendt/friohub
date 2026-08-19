@@ -28,6 +28,26 @@ async function avancar(jobId: string, de: string, para: string) {
   return { ok: true as const };
 }
 
+/* Trava o repasse automático dentro da janela de contenção — não desfaz a
+ * conclusão do job, só bloqueia o pagamento até o financeiro resolver
+ * manualmente. Ver 20260819140000_payment_transfers.sql. Hoje só tem efeito
+ * quando existe um repasse pendente preparado, o que só acontece depois que
+ * a cobrança real do cliente estiver ligada (asaas_payments). */
+export async function contestarExecucao(jobId: string, motivo: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false as const, error: "Não autenticado." };
+
+  const { error } = await supabase.rpc("contestar_execucao_job", {
+    p_job_id: jobId,
+    p_motivo: motivo,
+  });
+  if (error) return { ok: false as const, error: error.message };
+
+  revalidatePath(`/servico/${jobId}`);
+  return { ok: true as const };
+}
+
 export async function aceitarJob(jobId: string) {
   return avancar(jobId, "aguardando_profissional", "aceito");
 }

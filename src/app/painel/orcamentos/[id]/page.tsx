@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatarBRL, TAXA_COMISSAO } from "@/lib/pricing";
 import { formatarBtu } from "@/lib/btu";
-import { rotuloJob, type JobType } from "@/app/solicitar/tipos";
+import { rotuloJob, CATEGORIA_LABEL, type JobType } from "@/app/solicitar/tipos";
 import { rotuloPergunta } from "@/app/solicitar/perguntas-orcamento";
 import { dataCurta, mono, one, wrap } from "../../shared";
 import { PropostaForm } from "./PropostaForm";
@@ -12,6 +12,7 @@ import { CancelarPedido } from "./CancelarPedido";
 import { AbrirChatPedido } from "./AbrirChatPedido";
 import { ComparisonLink } from "./ComparisonLink";
 import { featureHabilitada } from "@/lib/feature-flags";
+import { REGIAO_SLUG } from "@/lib/regiao";
 
 /* Chaves que `detalhes` mantém espelhadas do primeiro ambiente por
    compatibilidade. Quem as exibe é a lista de ambientes — ver
@@ -36,11 +37,12 @@ export default async function PedidoPage({ params }: { params: Promise<{ id: str
   const { data: pedido } = await supabase
     .from("quote_requests")
     .select(`id, cliente_id, job_type, status, created_at, cep, bairro, cidade, quantidade,
-             urgencia, descricao, detalhes, btu_recomendado, expira_em,
+             urgencia, descricao, detalhes, btu_recomendado, expira_em, sabe_aparelho,
              produto:products ( marca, modelo, btu, preco_venda ),
              itens:quote_request_itens ( id, ordem, ambiente, area_m2, num_pessoas,
                                          insolacao_alta, andar_ou_telhado, btu_recomendado,
-                                         quantidade, produto:products ( marca, modelo, btu, preco_venda ) ),
+                                         quantidade, categoria_desejada,
+                                         produto:products ( marca, modelo, btu, preco_venda ) ),
              fotos:quote_request_photos ( id, storage_path )`)
     .eq("id", id)
     .maybeSingle();
@@ -68,6 +70,28 @@ export default async function PedidoPage({ params }: { params: Promise<{ id: str
   const souDestinatario = !!alvo;
   if (!souCliente && !souDestinatario) redirect("/painel/orcamentos");
 
+  /* CPF/CNPJ do cliente só é pedido quando a cobrança real está ligada pra
+     essa região (asaas_payments) e ele ainda não tem documento salvo — coleta
+     just-in-time, mesmo padrão já usado pro CPF/CNPJ do profissional na
+     assinatura (20260818141000). Enquanto a flag estiver desligada em toda
+     região, isto nunca aparece. */
+  let precisaCpfCnpj = false;
+  if (souCliente) {
+    const { data: cobrancaHabilitada } = await supabase.rpc("feature_enabled", {
+      p_flag_key: "asaas_payments",
+      p_region_slug: REGIAO_SLUG,
+      p_subject_id: user.id,
+    });
+    if (cobrancaHabilitada === true) {
+      const { data: privado } = await supabase
+        .from("profile_private")
+        .select("cpf_cnpj")
+        .eq("id", user.id)
+        .maybeSingle();
+      precisaCpfCnpj = !privado?.cpf_cnpj;
+    }
+  }
+
   const produto = one(pedido.produto) as { marca: string; modelo: string; btu: number; preco_venda: number } | null;
   const detalhes = (pedido.detalhes ?? {}) as Record<string, unknown>;
 
@@ -80,12 +104,19 @@ export default async function PedidoPage({ params }: { params: Promise<{ id: str
     area_m2: number | null; num_pessoas: number | null;
     insolacao_alta: boolean; andar_ou_telhado: boolean;
     btu_recomendado: number | null; quantidade: number;
+    categoria_desejada: string | null;
     produto: { marca: string; modelo: string; btu: number; preco_venda: number } | null;
   };
   const itens = ((pedido.itens ?? []) as unknown as ItemPedido[])
     .map((item) => ({ ...item, produto: one(item.produto) }))
     .sort((a, b) => a.ordem - b.ordem);
   const multiAmbiente = itens.length > 1;
+  const sabeAparelho = pedido.sabe_aparelho !== false;
+  /* Categorias que faltam produto — é o que o profissional escolhe na
+     proposta quando o cliente não sabia o aparelho exato. */
+  const categoriasDesejadas = [...new Set(
+    itens.map((item) => item.categoria_desejada).filter((c): c is string => Boolean(c)),
+  )];
   const fotosPrivadas = (pedido.fotos ?? []) as { id: string; storage_path: string }[];
   const fotos = (await Promise.all(
     fotosPrivadas.map(async (foto) => {
@@ -104,22 +135,29 @@ export default async function PedidoPage({ params }: { params: Promise<{ id: str
     .from("quotes")
     .select(`id, professional_id, tipo, valor_mao_obra, valor_materiais, valor_visita, visita_abatida,
              inclui, nao_inclui, prazo_execucao, garantia_dias, validade_ate, observacoes, status,
+             valor_equipamento, produto_escolhido:products ( marca, modelo ),
              profissional:professionals ( profiles ( nome, avatar_url ),
                                           professional_skills ( rating_avg, rating_count, jobs_completed ) )`)
     .eq("quote_request_id", id);
 
-  type QuoteRow = Omit<PropostaView, "nome" | "avatarUrl" | "nota" | "servicos"> & { profissional: unknown };
+  type QuoteRow = Omit<PropostaView, "nome" | "avatarUrl" | "nota" | "servicos" | "produtoEscolhido"> & {
+    profissional: unknown;
+    produto_escolhido: unknown;
+  };
 
   const propostas: PropostaView[] = ((quotesData ?? []) as QuoteRow[]).map((q) => {
     const pro = one(q.profissional as { profiles: unknown; professional_skills: unknown } | null);
     const perfil = one(pro?.profiles) as { nome: string; avatar_url: string | null } | null;
     const skills = (pro?.professional_skills ?? []) as { rating_avg: number; rating_count: number; jobs_completed: number }[];
     const totalAval = skills.reduce((s, k) => s + (k.rating_count ?? 0), 0);
+    const produtoEscolhido = one(q.produto_escolhido) as { marca: string; modelo: string } | null;
     return {
       ...q,
       valor_mao_obra: Number(q.valor_mao_obra),
       valor_materiais: Number(q.valor_materiais),
       valor_visita: Number(q.valor_visita),
+      valor_equipamento: Number(q.valor_equipamento),
+      produtoEscolhido,
       nome: perfil?.nome ?? "Profissional",
       avatarUrl: perfil?.avatar_url ?? null,
       nota: totalAval > 0
@@ -173,9 +211,13 @@ export default async function PedidoPage({ params }: { params: Promise<{ id: str
                         item.andar_ou_telhado ? "laje exposta" : null,
                       ].filter(Boolean).join(" · ") || "Sem detalhes técnicos"}
                     </div>
-                    {item.produto && (
+                    {item.produto ? (
                       <div style={{ fontSize: 13.5, marginTop: 4 }}>
                         {item.produto.marca} — {item.produto.modelo} · {formatarBRL(Number(item.produto.preco_venda))}
+                      </div>
+                    ) : item.categoria_desejada && (
+                      <div style={{ fontSize: 13.5, marginTop: 4, color: "var(--ink-faint)" }}>
+                        Categoria desejada: {CATEGORIA_LABEL[item.categoria_desejada] ?? item.categoria_desejada}
                       </div>
                     )}
                   </div>
@@ -190,6 +232,9 @@ export default async function PedidoPage({ params }: { params: Promise<{ id: str
                     k="Aparelho escolhido"
                     v={`${produto.marca} — ${produto.modelo} · ${formatarBRL(Number(produto.preco_venda))}`}
                   />
+                )}
+                {!produto && itens[0]?.categoria_desejada && (
+                  <Linha k="Categoria desejada" v={CATEGORIA_LABEL[itens[0].categoria_desejada] ?? itens[0].categoria_desejada} />
                 )}
               </>
             )}
@@ -210,6 +255,11 @@ export default async function PedidoPage({ params }: { params: Promise<{ id: str
           {produto && (
             <p style={{ fontSize: 12.5, color: "var(--ink-faint)", margin: "14px 0 0" }}>
               O aparelho tem preço de catálogo. A proposta cobre apenas a mão de obra da instalação.
+            </p>
+          )}
+          {categoriasDesejadas.length > 0 && (
+            <p style={{ fontSize: 12.5, color: "var(--ink-faint)", margin: "14px 0 0" }}>
+              O cliente ainda não escolheu o modelo exato — o profissional escolhe o aparelho da categoria pedida e define o preço na proposta.
             </p>
           )}
         </div>
@@ -266,7 +316,10 @@ export default async function PedidoPage({ params }: { params: Promise<{ id: str
                 jobType={jobType} detalhesAtuais={{}}
               />
             ) : aberto ? (
-              <PropostaForm pedidoId={pedido.id} taxaComissao={TAXA_COMISSAO} />
+              <PropostaForm
+                pedidoId={pedido.id} taxaComissao={TAXA_COMISSAO}
+                sabeAparelho={sabeAparelho} categoriasDesejadas={categoriasDesejadas}
+              />
             ) : (
               <p style={{ color: "var(--ink-faint)", fontSize: 14.5, margin: 0 }}>
                 Este pedido não está mais aberto para propostas.
@@ -288,6 +341,7 @@ export default async function PedidoPage({ params }: { params: Promise<{ id: str
               enderecoSugerido=""
               produtoPreco={Number(produto?.preco_venda ?? 0)}
               jobType={jobType}
+              precisaCpfCnpj={precisaCpfCnpj}
               detalhesAtuais={Object.fromEntries(
                 Object.entries(detalhes).map(([k, v]) => [k, v == null ? "" : String(v)]),
               )}

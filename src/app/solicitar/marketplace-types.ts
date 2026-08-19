@@ -4,7 +4,9 @@ export type ProdutoDTO = {
   modelo: string;
   btu: number;
   categoria: string;
-  precoVenda: number;
+  /** Nulo no catálogo sem preço — cliente que ainda não sabe o aparelho não
+   *  pode ver valor nenhum. Ver `modo=sem_preco` em /api/marketplace/catalogo. */
+  precoVenda: number | null;
   imageUrl: string | null;
   distribuidora: string | null;
 };

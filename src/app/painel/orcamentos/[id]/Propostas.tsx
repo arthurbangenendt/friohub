@@ -30,6 +30,11 @@ export type PropostaView = {
   avatarUrl: string | null;
   nota: number | null;
   servicos: number;
+  /* Só preenchido quando o cliente não sabia o aparelho: o produto que o
+     profissional escolheu e o preço que decidiu cobrar por ele. Ver
+     20260819100000_pedido_aparelho_conhecido.sql. */
+  valor_equipamento: number;
+  produtoEscolhido: { marca: string; modelo: string } | null;
 };
 
 const dataBR = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString("pt-BR");
@@ -48,6 +53,7 @@ const campoAceite: React.CSSProperties = {
  * à corrida para o fundo, e o cliente ao serviço malfeito. */
 export function Propostas({
   propostas, podeAceitar, enderecoSugerido, produtoPreco, jobType, detalhesAtuais,
+  precisaCpfCnpj = false,
 }: {
   propostas: PropostaView[];
   podeAceitar: boolean;
@@ -55,10 +61,15 @@ export function Propostas({
   produtoPreco: number;
   jobType: JobType;
   detalhesAtuais: Record<string, string>;
+  /* true = cobrança real está ligada pra esta região e o cliente ainda não
+     tem CPF/CNPJ salvo — precisamos dele pra abrir o customer no Asaas.
+     Coleta just-in-time: nunca aparece com a flag desligada. */
+  precisaCpfCnpj?: boolean;
 }) {
   const router = useRouter();
   const [aceitando, setAceitando] = useState<string | null>(null);
   const [endereco, setEndereco] = useState(enderecoSugerido);
+  const [cpfCnpj, setCpfCnpj] = useState("");
   const [respostas, setRespostas] = useState<Record<string, string>>(detalhesAtuais);
   const [erro, setErro] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -67,10 +78,17 @@ export function Propostas({
      triagem já respondeu não entram na lista — ver perguntas-orcamento.ts. */
   const perguntas = perguntasDe(jobType);
 
+  const cpfCnpjDigitos = cpfCnpj.replace(/\D/g, "");
+  const cpfCnpjValido = cpfCnpjDigitos.length === 11 || cpfCnpjDigitos.length === 14;
+
   function confirmar(quoteId: string) {
     setErro(null);
+    if (precisaCpfCnpj && !cpfCnpjValido) {
+      setErro("Informe um CPF ou CNPJ válido.");
+      return;
+    }
     startTransition(async () => {
-      const r = await aceitarProposta(quoteId, endereco, respostas);
+      const r = await aceitarProposta(quoteId, endereco, respostas, precisaCpfCnpj ? cpfCnpjDigitos : undefined);
       if (!r.ok) return setErro(r.error);
       const escolhida = propostas.find((proposta) => proposta.id === quoteId);
       if (escolhida) captureAnalytics("proposal_comparison_decision", { proposal_count: propostas.length, quote_type: escolhida.tipo, result: "accepted", experience_version: ANALYTICS_VERSION });
@@ -93,8 +111,12 @@ export function Propostas({
         /* Em visita técnica, o total exibido é só o que é cobrado agora (a
            visita) — a mão de obra ainda não existe, e o aparelho é uma compra
            à parte, detalhada como linha própria abaixo. Somar o catálogo aqui
-           inflava o número e o rótulo "visita técnica" escondia isso. */
-        const total = p.tipo === "visita_tecnica" ? servico : servico + produtoPreco;
+           inflava o número e o rótulo "visita técnica" escondia isso.
+           `valor_equipamento` só existe quando o cliente não sabia o aparelho —
+           nesse caso `produtoPreco` (catálogo) é sempre 0, os dois nunca somam
+           juntos. */
+        const precoAparelho = produtoPreco > 0 ? produtoPreco : p.valor_equipamento;
+        const total = p.tipo === "visita_tecnica" ? servico : servico + precoAparelho;
         const vencida = new Date(`${p.validade_ate}T23:59:59`) < new Date();
         const aceita = p.status === "aceita";
 
@@ -123,7 +145,7 @@ export function Propostas({
                 <div style={{ fontSize: 12, color: "var(--ink-faint)" }}>
                   {p.tipo === "visita_tecnica"
                     ? (p.valor_visita === 0 ? "visita gratuita" : "visita técnica")
-                    : produtoPreco > 0 ? "aparelho + instalação" : "serviço completo"}
+                    : precoAparelho > 0 ? "aparelho + instalação" : "serviço completo"}
                 </div>
               </div>
             </div>
@@ -141,11 +163,23 @@ export function Propostas({
                   <Linha k="Mão de obra" v={formatarBRL(p.valor_mao_obra)} />
                   {p.valor_materiais > 0 && <Linha k="Materiais" v={formatarBRL(p.valor_materiais)} />}
                   {produtoPreco > 0 && <Linha k="Aparelho (catálogo)" v={formatarBRL(produtoPreco)} />}
+                  {p.valor_equipamento > 0 && (
+                    <Linha
+                      k={p.produtoEscolhido ? `Aparelho (${p.produtoEscolhido.marca} ${p.produtoEscolhido.modelo})` : "Aparelho"}
+                      v={formatarBRL(p.valor_equipamento)}
+                    />
+                  )}
                 </>
               ) : (
-                produtoPreco > 0 && (
-                  <Linha k="Aparelho (catálogo, à parte)" v={formatarBRL(produtoPreco)} />
-                )
+                <>
+                  {produtoPreco > 0 && <Linha k="Aparelho (catálogo, à parte)" v={formatarBRL(produtoPreco)} />}
+                  {p.valor_equipamento > 0 && (
+                    <Linha
+                      k={p.produtoEscolhido ? `Aparelho (${p.produtoEscolhido.marca} ${p.produtoEscolhido.modelo}, à parte)` : "Aparelho (à parte)"}
+                      v={formatarBRL(p.valor_equipamento)}
+                    />
+                  )}
+                </>
               )}
               {p.inclui && <Linha k="Inclui" v={p.inclui} />}
               {p.nao_inclui && <Linha k="Não inclui" v={p.nao_inclui} destaque />}
@@ -176,6 +210,26 @@ export function Propostas({
                         style={campoAceite}
                       />
                     </label>
+
+                    {/* CPF/CNPJ só aparece quando a cobrança real está ligada
+                        pra esta região e o cliente ainda não tem documento
+                        salvo — coleta just-in-time, o Asaas exige isso pra
+                        abrir o pagador. */}
+                    {precisaCpfCnpj && (
+                      <label style={{ fontSize: 13, fontWeight: 650, color: "var(--ink-soft)" }}>
+                        CPF ou CNPJ
+                        <input
+                          value={cpfCnpj}
+                          onChange={(e) => setCpfCnpj(e.target.value)}
+                          placeholder="Só números"
+                          inputMode="numeric"
+                          style={campoAceite}
+                        />
+                        <span style={{ fontSize: 12, color: "var(--ink-faint)", display: "block", marginTop: 5, fontWeight: 500 }}>
+                          Necessário para processar o pagamento do serviço pela plataforma.
+                        </span>
+                      </label>
+                    )}
 
                     {/* Questionário técnico: só nesta hora. No pedido inicial
                         seria atrito antes de existir alguém interessado; aqui é

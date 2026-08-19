@@ -161,6 +161,23 @@ export async function removerMidiaPerfil(alvo: AlvoMidiaPerfil) {
   return { ok: true as const };
 }
 
+export type TipoChavePix = "cpf" | "cnpj" | "email" | "telefone" | "aleatoria";
+
+/* Destino do repasse automático quando um job é concluído — ver
+   20260819120000_pix_profissional.sql. Ao contrário do CPF/CNPJ do gateway
+   (coleta única), a chave PIX pode ser trocada quando o profissional quiser. */
+export async function salvarChavePix(chave: string, tipo: TipoChavePix) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false as const, error: "Não autenticado." };
+
+  const { error } = await supabase.rpc("salvar_chave_pix", { p_chave: chave.trim(), p_tipo: tipo });
+  if (error) return { ok: false as const, error: error.message };
+
+  revalidatePath("/painel/perfil");
+  return { ok: true as const };
+}
+
 export async function salvarPerfil(input: PerfilInput) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();

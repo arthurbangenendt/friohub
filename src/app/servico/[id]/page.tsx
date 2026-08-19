@@ -17,6 +17,7 @@ import { one } from "@/lib/relacional";
 import { Rastreio, type EtapaId } from "./Rastreio";
 import { Evidencias } from "./Evidencias";
 import { Pagamento } from "./Pagamento";
+import { ContestarExecucao } from "./ContestarExecucao";
 import { OrcamentoFinal } from "./OrcamentoFinal";
 
 const mono = "var(--font-geist-mono), ui-monospace, monospace";
@@ -346,6 +347,7 @@ export default async function ServicoPage({ params }: { params: Promise<{ id: st
               </div>
             )}
             <Pagamento orderId={o.id} total={o.total} />
+            {isCliente && job.status === "concluido" && <ContestarExecucao jobId={job.id} />}
           </div>
         ))}
 

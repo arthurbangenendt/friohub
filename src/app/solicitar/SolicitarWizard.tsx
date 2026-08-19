@@ -161,9 +161,10 @@ type GeoState = {
 /* Passos são declarados por id, não por número. Com sete tipos de serviço e
    ramificações diferentes, indexar passo por `step === 3 && equip` é onde o bug
    nasce — aqui a lista é montada e a navegação anda sobre ela. */
-type StepId = "servico" | "ambiente" | "detalhes" | "equipamento" | "catalogo" | "carrinho" | "profissional" | "endereco" | "confirmar";
+type StepId = "servico" | "ambiente" | "detalhes" | "equipamento" | "aparelho_conhecido" | "catalogo" | "carrinho" | "profissional" | "endereco" | "confirmar";
 const STEP_LABEL: Record<StepId, string> = {
   servico: "Serviço", ambiente: "Ambiente", detalhes: "Detalhes", equipamento: "Aparelho",
+  aparelho_conhecido: "Modelo do aparelho",
   catalogo: "Escolher aparelho", carrinho: "Carrinho", endereco: "Região", profissional: "Profissionais",
   confirmar: "Enviar",
 };
@@ -185,9 +186,12 @@ function montarSteps(jobType: JobType | null, jaTemEquipamento: boolean | null):
   const fim: StepId[] = ["endereco", "profissional", "confirmar"];
   if (aceitaCatalogo(jobType)) {
     // O catálogo só entra quando o cliente diz que ainda não tem o aparelho.
+    // Antes dele, uma pergunta à parte decide se o preço aparece ou não —
+    // não é a mesma pergunta de "já tem o aparelho?", é sobre SABER QUAL
+    // modelo comprar.
     return [
       "servico", "ambiente", "equipamento",
-      ...(jaTemEquipamento === false ? ["catalogo" as StepId, "carrinho" as StepId] : []),
+      ...(jaTemEquipamento === false ? ["aparelho_conhecido" as StepId, "catalogo" as StepId, "carrinho" as StepId] : []),
       ...fim,
     ];
   }
@@ -222,6 +226,11 @@ export function SolicitarWizard({
 
   // já tem equipamento?
   const [jaTemEquipamento, setJaTemEquipamento] = useState<boolean | null>(() => equipmentInitial ? true : null);
+  /* Já sabe qual MODELO quer comprar? Pergunta separada de "já tem o
+     aparelho": aqui o cliente ainda vai comprar, a dúvida é se ele sabe o
+     produto exato ou só o tipo. true = catálogo com preço, produto travado.
+     false = catálogo sem preço, o profissional decide produto e preço. */
+  const [sabeAparelho, setSabeAparelho] = useState<boolean | null>(null);
 
   // serviço (não-catálogo)
   const [problemas, setProblemas] = useState<string[]>([]);
@@ -368,6 +377,9 @@ export function SolicitarWizard({
           page: "1",
           btu: String(btu.btuRecomendado),
           q: produtoBusca,
+          /* Sem preço: o cliente ainda não sabe o modelo, só navega por tipo.
+             A RPC por trás nem tem a coluna de preço no retorno. */
+          ...(sabeAparelho === false ? { modo: "sem_preco" } : {}),
         });
         const pagina = await carregarPagina<ProdutoDTO>(params, controller.signal);
         setProdutosLista(pagina.items);
@@ -385,7 +397,7 @@ export function SolicitarWizard({
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [stepAtual, btu.btuRecomendado, produtoBusca]);
+  }, [stepAtual, btu.btuRecomendado, produtoBusca, sabeAparelho]);
 
   useEffect(() => {
     if (stepAtual !== "profissional") return;
@@ -452,9 +464,12 @@ export function SolicitarWizard({
     ? ambientes.reduce((total, a, i) => total + precoInstalacao(btus[i].btuRecomendado) * a.quantidade, 0)
     : 0;
   const totalAparelhos = ambientes.reduce((total, a) => total + a.quantidade, 0);
-  // Soma do catálogo: só os ambientes em que o cliente já escolheu o aparelho.
-  const totalProdutosEscolhidos = ambientes.reduce(
-    (total, a) => total + (a.produto ? a.produto.precoVenda * a.quantidade : 0),
+  /* Soma do catálogo: só os ambientes em que o cliente já escolheu o aparelho
+     COM preço. No modo sem preço (sabeAparelho === false) `precoVenda` vem
+     nulo do catálogo — não tem valor nenhum para somar, o profissional é
+     quem vai definir isso na proposta. */
+  const totalProdutosEscolhidos = sabeAparelho === false ? 0 : ambientes.reduce(
+    (total, a) => total + (a.produto?.precoVenda ? a.produto.precoVenda * a.quantidade : 0),
     0,
   );
   const foraDaArea = cepStatus === "ok" && ufCep && ufCep !== ESTADO;
@@ -505,8 +520,11 @@ export function SolicitarWizard({
       ambiente: true,
       detalhes: jobType !== "outros" || servicoOutro.trim().length >= 10,
       equipamento: jaTemEquipamento !== null,
+      aparelho_conhecido: sabeAparelho !== null,
       // Nenhum ambiente pode ficar sem aparelho: o pedido incompleto viraria
-      // proposta incompleta e a diferença apareceria só na hora de pagar.
+      // proposta incompleta e a diferença apareceria só na hora de pagar. No
+      // modo sem preço, "escolher" também é clicar num card — só que ele vira
+      // categoria, não produto travado (ver `confirmar()`).
       catalogo: ambientes.every((a) => Boolean(a.produtoId)),
       carrinho: ambientes.every((a) => Boolean(a.produtoId)),
       endereco: cepDigitos.length === 8 && cepStatus === "ok",
@@ -514,7 +532,7 @@ export function SolicitarWizard({
       confirmar: true,
     };
     return mapa;
-  }, [jobType, servicoOutro, jaTemEquipamento, ambientes, cepDigitos, cepStatus, profissionaisIds.length]);
+  }, [jobType, servicoOutro, jaTemEquipamento, sabeAparelho, ambientes, cepDigitos, cepStatus, profissionaisIds.length]);
 
   // Voltar é sempre livre. Avançar pela barra só até onde tudo antes está pronto.
   function podeIrPara(destino: number) {
@@ -535,6 +553,7 @@ export function SolicitarWizard({
     if (t === jobType) { setIdx(1); return; }
     setJobType(t); setProfissionaisSelecionados([]);
     setProblemas([]); setUrgencia(""); setServicoOutro(""); setJaTemEquipamento(null);
+    setSabeAparelho(null);
     setFotos([]);
     setAmbientes([novoAmbiente("Sala")]);
     setAmbienteFoco(0);
@@ -557,6 +576,7 @@ export function SolicitarWizard({
       const proxima = produtosPagina + 1;
       const params = new URLSearchParams({
         kind: "produtos", page: String(proxima), btu: String(btu.btuRecomendado), q: produtoBusca,
+        ...(sabeAparelho === false ? { modo: "sem_preco" } : {}),
       });
       const pagina = await carregarPagina<ProdutoDTO>(params);
       setProdutosLista((atuais) => [...atuais, ...pagina.items.filter((p) => !atuais.some((a) => a.id === p.id))]);
@@ -685,13 +705,20 @@ export function SolicitarWizard({
           insolacaoAlta: comCatalogo ? a.insolacaoAlta : false,
           andarOuTelhado: comCatalogo ? a.andarOuTelhado : false,
           btuRecomendado: comCatalogo ? btus[i].btuRecomendado : null,
-          produtoId: comCatalogo ? a.produtoId : null,
+          /* Sem preço, o card clicado vira só uma REFERÊNCIA visual — o que
+             viaja pro banco é a categoria, nunca um produto travado. É o
+             profissional quem escolhe o modelo exato na proposta. */
+          produtoId: comCatalogo && sabeAparelho !== false ? a.produtoId : null,
+          categoriaDesejada: comCatalogo && sabeAparelho === false ? a.produto?.categoria ?? null : null,
           quantidade: a.quantidade,
         })),
         urgencia: URGENCIA_ID[urgencia],
         descricao: montarDescricao() || undefined,
         detalhes: detalhesCompletos(),
         profissionaisIds,
+        // Sem catálogo (manutenção etc.) ou cliente que já tem o aparelho:
+        // a pergunta nunca apareceu — mantém o comportamento de sempre.
+        sabeAparelho: comCatalogo ? sabeAparelho ?? true : true,
         fotos: fotos.map((foto) => foto.path),
         latitude: coordenadasServico?.latitude,
         longitude: coordenadasServico?.longitude,
@@ -747,7 +774,9 @@ export function SolicitarWizard({
             <span style={{ fontSize: 14 }}>
               {ambientes.filter((a) => a.produto).length} aparelho{ambientes.filter((a) => a.produto).length > 1 ? "s" : ""} selecionado{ambientes.filter((a) => a.produto).length > 1 ? "s" : ""}
             </span>
-            <span style={{ fontSize: 15, fontWeight: 700 }}>{formatarBRL(totalProdutosEscolhidos)} · ver carrinho</span>
+            <span style={{ fontSize: 15, fontWeight: 700 }}>
+              {sabeAparelho === false ? "Ver carrinho" : `${formatarBRL(totalProdutosEscolhidos)} · ver carrinho`}
+            </span>
           </button>
         </div>
       )}
@@ -858,11 +887,39 @@ export function SolicitarWizard({
         </>
       )}
 
+      {/* ---------- MODELO DO APARELHO CONHECIDO? ----------
+          Pergunta formal e deliberadamente distinta da anterior ("já tem o
+          aparelho?"): aqui o cliente vai comprar de qualquer forma, a dúvida é
+          se ele sabe o modelo exato ou só o tipo que precisa. */}
+      {stepAtual === "aparelho_conhecido" && (
+        <>
+          <H titulo="Você já sabe qual modelo de aparelho vai comprar?"
+            sub="É diferente da pergunta anterior: aqui é sobre saber a marca e o modelo exatos, não sobre já possuir um." />
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px,1fr))", gap: 12 }}>
+            <EscolhaGrande
+              titulo="Sim, já sei o modelo"
+              desc="Mostramos o catálogo com preço. Você escolhe o aparelho exato e o valor fica fechado no pedido."
+              ativo={sabeAparelho === true}
+              onClick={() => setSabeAparelho(true)}
+            />
+            <EscolhaGrande
+              titulo="Não, quero comparar antes"
+              desc="Mostramos os tipos disponíveis sem preço. O profissional escolhe o modelo certo e monta o orçamento completo, aparelho incluso."
+              ativo={sabeAparelho === false}
+              onClick={() => setSabeAparelho(false)}
+            />
+          </div>
+          <Nav onBack={voltar} onNext={avancar} nextLabel="Continuar" disabled={!stepValido.aparelho_conhecido} />
+        </>
+      )}
+
       {/* ---------- CATÁLOGO ---------- */}
       {stepAtual === "catalogo" && (
         <>
           <H titulo={ambientes.length > 1 ? `Aparelho para ${ambienteAtivo.nome || "este ambiente"}` : "Escolha o aparelho"}
-            sub={qtdRecomendados > 0
+            sub={sabeAparelho === false
+              ? "Sem preço por aqui: navegue pelos tipos disponíveis. O profissional escolhe o modelo exato e o valor na proposta."
+              : qtdRecomendados > 0
               ? `${qtdRecomendados} modelo(s) na capacidade ideal de ${formatarBtu(btu.btuRecomendado)} — aparecem primeiro.`
               : `Nenhum modelo exatamente de ${formatarBtu(btu.btuRecomendado)}. Listamos do mais próximo ao mais distante.`} />
 
@@ -912,7 +969,9 @@ export function SolicitarWizard({
                       <span style={{ fontSize: 11, fontFamily: mono, color: "var(--cool)", textTransform: "uppercase" }}>{p.marca}</span>
                       <span style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.3 }}>{p.modelo}</span>
                       <span style={{ fontSize: 12, color: "var(--ink-faint)" }}>{formatarBtu(p.btu)}</span>
-                      <span style={{ fontSize: "1.05rem", fontWeight: 800 }}>{formatarBRL(p.precoVenda)}</span>
+                      {p.precoVenda !== null && (
+                        <span style={{ fontSize: "1.05rem", fontWeight: 800 }}>{formatarBRL(p.precoVenda)}</span>
+                      )}
                       <span style={{ fontSize: 11.5, color: "var(--ink-faint)" }}>
                         {p.distribuidora ? `Distribuidora: ${p.distribuidora}` : "Distribuidora não informada"}
                       </span>
@@ -939,7 +998,10 @@ export function SolicitarWizard({
           formato que todo cliente já reconhece de e-commerce. */}
       {stepAtual === "carrinho" && (
         <>
-          <H titulo="Confira o que você vai pedir" sub="Os aparelhos são vendidos pela distribuidora e só são comprados quando você aceitar uma proposta de instalação." />
+          <H titulo="Confira o que você vai pedir"
+            sub={sabeAparelho === false
+              ? "Sem preço fechado ainda: o profissional escolhe o modelo exato dessa categoria e propõe o valor junto com o serviço."
+              : "Os aparelhos são vendidos pela distribuidora e só são comprados quando você aceitar uma proposta de instalação."} />
           <div style={{ display: "grid", gap: 12 }}>
             {ambientes.map((a, i) => (
               <div key={a.chave} style={carrinhoItem}>
@@ -949,7 +1011,10 @@ export function SolicitarWizard({
                 ) : <div style={{ width: 64, height: 64, borderRadius: 8, background: "var(--surface-2)", flexShrink: 0 }} />}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 12.5, color: "var(--ink-faint)" }}>{a.nome || `Ambiente ${i + 1}`} · {formatarBtu(btus[i].btuRecomendado)}</div>
-                  <div style={{ fontWeight: 700, fontSize: 14.5 }}>{a.produto ? `${a.produto.marca} ${a.produto.modelo}` : "Nenhum aparelho escolhido"}</div>
+                  <div style={{ fontWeight: 700, fontSize: 14.5 }}>
+                    {a.produto ? `${a.produto.marca} ${a.produto.modelo}` : "Nenhum aparelho escolhido"}
+                    {sabeAparelho === false && a.produto && <span style={{ fontWeight: 500, color: "var(--ink-faint)" }}> (referência)</span>}
+                  </div>
                   {a.produto?.distribuidora && <div style={{ fontSize: 12, color: "var(--ink-faint)" }}>Distribuidora: {a.produto.distribuidora}</div>}
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
                     <button type="button" onClick={() => setAmbienteFoco(i)} style={linkBtn}>Trocar aparelho</button>
@@ -960,15 +1025,23 @@ export function SolicitarWizard({
                 </div>
                 <div style={{ textAlign: "right", flexShrink: 0 }}>
                   <div style={{ fontSize: 13, color: "var(--ink-faint)" }}>{a.quantidade > 1 ? `${a.quantidade}x` : ""}</div>
-                  <strong style={{ fontSize: 15 }}>{a.produto ? formatarBRL(a.produto.precoVenda * a.quantidade) : "-"}</strong>
+                  <strong style={{ fontSize: 15 }}>
+                    {sabeAparelho === false ? "A definir" : a.produto?.precoVenda != null ? formatarBRL(a.produto.precoVenda * a.quantidade) : "-"}
+                  </strong>
                 </div>
               </div>
             ))}
           </div>
-          <div style={{ ...resumo, marginTop: 16 }}>
-            <LinhaResumo k={<strong>Total dos aparelhos</strong>} v={<strong>{formatarBRL(totalProdutosEscolhidos)}</strong>} />
-          </div>
-          {!stepValido.carrinho && <Aviso erro>Escolha um aparelho para cada ambiente antes de continuar.</Aviso>}
+          {sabeAparelho === false ? (
+            <div style={{ ...avisoBox, background: "var(--cool-wash)", color: "var(--cool-deep)" }}>
+              O valor do aparelho entra na proposta que o profissional te enviar — compare o pacote completo (aparelho + instalação) antes de aceitar.
+            </div>
+          ) : (
+            <div style={{ ...resumo, marginTop: 16 }}>
+              <LinhaResumo k={<strong>Total dos aparelhos</strong>} v={<strong>{formatarBRL(totalProdutosEscolhidos)}</strong>} />
+            </div>
+          )}
+          {!stepValido.carrinho && <Aviso erro>Escolha um tipo de aparelho para cada ambiente antes de continuar.</Aviso>}
           <Nav onBack={voltar} onNext={avancar} nextLabel="Escolher profissional" disabled={!stepValido.carrinho} />
         </>
       )}
@@ -1247,6 +1320,9 @@ export function SolicitarWizard({
               }
             />
             {comCatalogo && jaTemEquipamento === true && <LinhaResumo k="Aparelho" v="Cliente já possui" />}
+            {comCatalogo && sabeAparelho === false && (
+              <LinhaResumo k="Aparelho" v="Sem preço fechado — o profissional escolhe o modelo e propõe o valor" />
+            )}
             {!comCatalogo && problemas.length > 0 && <LinhaResumo k="Problemas" v={problemas.join(", ")} />}
             {urgencia && <LinhaResumo k="Urgência" v={urgencia} />}
             <LinhaResumo k="Região" v={`${bairro ? `${bairro} · ` : ""}${cep}`} />
