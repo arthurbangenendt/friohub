@@ -420,6 +420,16 @@ verify_jwt = true
 [functions.asaas-trocar-plano]
 verify_jwt = true
 
+# Recebe o JWT do cliente que acabou de aceitar uma proposta.
+[functions.asaas-cobrar-servico]
+verify_jwt = true
+
+# Acordado pelo pg_cron via pg_net — não manda JWT do Supabase, só o token
+# guardado em vault.repasses_worker_key, conferido em index.ts (mesmo
+# raciocínio do asaas-webhook/chatwoot-webhook).
+[functions.asaas-processar-repasses]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327
