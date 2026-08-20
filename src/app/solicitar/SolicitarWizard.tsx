@@ -545,6 +545,18 @@ export function SolicitarWizard({
     setIdx(Math.max(0, Math.min(destino, steps.length - 1)));
   }
 
+  /* Responder essa pergunta troca o modo do catálogo (com/sem preço) — a
+     lista carregada até aqui é do modo ERRADO e não pode aparecer nem por um
+     instante na tela seguinte. Limpar aqui, no mesmo clique, garante que o
+     step de catálogo já nasce mostrando "carregando" em vez de piscar o
+     preço antigo enquanto a busca nova (com debounce) ainda não voltou. */
+  function escolherSabeAparelho(valor: boolean) {
+    setSabeAparelho(valor);
+    setProdutosLista([]);
+    setProdutosTotal(0);
+    setProdutosCarregando(true);
+  }
+
   function goTriagem(t: JobType) {
     /* Voltar à etapa 1 só para conferir não pode custar as respostas: se o cliente
        reconfirma o mesmo serviço, seguimos em frente sem limpar nada. A limpeza só
@@ -898,15 +910,15 @@ export function SolicitarWizard({
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px,1fr))", gap: 12 }}>
             <EscolhaGrande
               titulo="Sim, já sei o modelo"
-              desc="Mostramos o catálogo com preço. Você escolhe o aparelho exato e o valor fica fechado no pedido."
+              desc=""
               ativo={sabeAparelho === true}
-              onClick={() => setSabeAparelho(true)}
+              onClick={() => escolherSabeAparelho(true)}
             />
             <EscolhaGrande
               titulo="Não, quero comparar antes"
-              desc="Mostramos os tipos disponíveis sem preço. O profissional escolhe o modelo certo e monta o orçamento completo, aparelho incluso."
+              desc=""
               ativo={sabeAparelho === false}
-              onClick={() => setSabeAparelho(false)}
+              onClick={() => escolherSabeAparelho(false)}
             />
           </div>
           <Nav onBack={voltar} onNext={avancar} nextLabel="Continuar" disabled={!stepValido.aparelho_conhecido} />
