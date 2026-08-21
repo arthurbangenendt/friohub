@@ -1,8 +1,7 @@
 "use client";
 
-import { MeshGradient } from "@paper-design/shaders-react";
 import { motion, type Variants } from "framer-motion";
-import { ThermalField } from "@/components/ui/thermal-field";
+import { WavyCanvas } from "@/components/ui/wavy-background";
 import { CIDADE } from "@/lib/regiao";
 import { MapPin, Search, Shield, Star, Bolt } from "@/components/icons";
 
@@ -27,28 +26,7 @@ export function Hero() {
         background: "#050f16",
       }}
     >
-      <MeshGradient
-        style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
-        colors={["#050f16", "#0a3648", "#0d6e8f", "#57c3da", "#eef7fa"]}
-        speed={0.25}
-        distortion={0.9}
-        swirl={0.3}
-      />
-
-      <div
-        aria-hidden
-        style={{
-          position: "absolute",
-          inset: 0,
-          zIndex: 1,
-          opacity: 0.22,
-          pointerEvents: "none",
-          maskImage: "radial-gradient(120% 90% at 24% 15%, black 0%, transparent 68%)",
-          WebkitMaskImage: "radial-gradient(120% 90% at 24% 15%, black 0%, transparent 68%)",
-        }}
-      >
-        <ThermalField />
-      </div>
+      <WavyCanvas />
 
       <div aria-hidden className="hero-scrim" />
 
