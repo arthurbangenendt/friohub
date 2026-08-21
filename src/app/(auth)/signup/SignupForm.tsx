@@ -13,8 +13,11 @@ const SENHA_MINIMA = 8;
    Ver validação equivalente em (auth)/actions.ts. */
 export type PapelCadastro = "cliente" | "profissional" | "distribuidora";
 
-export function SignupForm({ roleInicial, proximo }: { roleInicial: PapelCadastro; proximo?: string }) {
-  const [role, setRole] = useState(roleInicial);
+export function SignupForm({ role, onRoleChange, proximo }: {
+  role: PapelCadastro;
+  onRoleChange: (role: PapelCadastro) => void;
+  proximo?: string;
+}) {
   const [nome, setNome] = useState("");
   const [telefone, setTelefone] = useState("");
   const [documento, setDocumento] = useState("");
@@ -45,16 +48,15 @@ export function SignupForm({ roleInicial, proximo }: { roleInicial: PapelCadastr
 
       <div style={{ marginBottom: 18 }}>
         <span style={{ ...labelStyle, display: "block", marginBottom: 8 }}>Eu sou</span>
-        {/* Três lados do marketplace, três papéis. A distribuidora entrou aqui
-            junto com o módulo dela — antes o cadastro dela virava cliente em
-            silêncio, porque o papel nem existia no allowlist. */}
+        {/* Grid pública mostra só cliente/profissional. Distribuidora ainda é um
+            role válido no backend (ver PAPEIS_PUBLICOS em ../actions.ts) — quem
+            chega via /signup?role=distribuidora (link enviado manualmente pela
+            equipe) segue funcionando normalmente mesmo sem o card aparecer aqui. */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
-          <RoleOption ativo={role === "cliente"} onClick={() => setRole("cliente")}
+          <RoleOption ativo={role === "cliente"} onClick={() => onRoleChange("cliente")}
             titulo="Cliente" desc="Quero instalar, limpar ou consertar" />
-          <RoleOption ativo={role === "profissional"} onClick={() => setRole("profissional")}
+          <RoleOption ativo={role === "profissional"} onClick={() => onRoleChange("profissional")}
             titulo="Profissional" desc="Instalo / faço manutenção" />
-          <RoleOption ativo={role === "distribuidora"} onClick={() => setRole("distribuidora")}
-            titulo="Distribuidora" desc="Vendo equipamentos" />
         </div>
       </div>
 

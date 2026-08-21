@@ -1,14 +1,46 @@
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
-import { Logo, Wrench, Star, Bolt, ArrowRight } from "@/components/icons";
+import { Logo, Wrench, Star, Bolt, ArrowRight, Shield, Chat } from "@/components/icons";
 
 const mono = "var(--font-geist-mono), ui-monospace, monospace";
 
-const BENEFICIOS = [
-  { Icon: Wrench, t: "Serviços na sua região", d: "Você escolhe os bairros que atende e recebe só o que faz sentido." },
-  { Icon: Star, t: "Reputação por especialidade", d: "Sua nota é separada por serviço — quem é bom em instalação aparece em instalação." },
-  { Icon: Bolt, t: "Sem taxa para orçar", d: "A comissão só existe quando o serviço acontece." },
-];
+type AsideRole = "cliente" | "profissional";
+
+type Beneficio = { Icon: (p: { size?: number }) => ReactNode; t: string; d: string };
+
+const ASIDE_CONTEUDO: Record<AsideRole, {
+  eyebrow: string;
+  titulo: ReactNode;
+  sub: string;
+  beneficios: Beneficio[];
+  ctaHref: string;
+  ctaLabel: string;
+}> = {
+  profissional: {
+    eyebrow: "Para técnicos e empresas",
+    titulo: <>Seja parceiro<br />FrioHub</>,
+    sub: "Receba serviços de climatização na sua região, construa sua reputação e seja encontrado por quem já está pronto para contratar.",
+    beneficios: [
+      { Icon: Wrench, t: "Serviços na sua região", d: "Você escolhe os bairros que atende e recebe só o que faz sentido." },
+      { Icon: Star, t: "Reputação por especialidade", d: "Sua nota é separada por serviço — quem é bom em instalação aparece em instalação." },
+      { Icon: Bolt, t: "Sem taxa para orçar", d: "A comissão só existe quando o serviço acontece." },
+    ],
+    ctaHref: "/parceiros",
+    ctaLabel: "Quero ser parceiro",
+  },
+  cliente: {
+    eyebrow: "Para quem contrata",
+    titulo: <>Contrate com<br />segurança</>,
+    sub: "Peça orçamento com o ambiente já calculado, acompanhe tudo pelo chat e só libere o pagamento quando o serviço estiver confirmado.",
+    beneficios: [
+      { Icon: Shield, t: "Pagamento protegido", d: "O valor fica retido até você confirmar que o serviço foi feito — só então o profissional recebe." },
+      { Icon: Star, t: "Profissionais avaliados", d: "Nota separada por especialidade: quem instala bem não se esconde atrás da média de quem só limpa." },
+      { Icon: Chat, t: "Chat direto, sem intermediário escondido", d: "Converse pelo painel e leve pro WhatsApp quando quiser — sem taxa por isso." },
+    ],
+    ctaHref: "/clientes",
+    ctaLabel: "Saiba mais",
+  },
+};
 
 export function AuthShell({
   title,
@@ -19,6 +51,7 @@ export function AuthShell({
   aviso,
   aba,
   proximo,
+  asideRole,
 }: {
   title: string;
   subtitle: string;
@@ -32,8 +65,12 @@ export function AuthShell({
    *  chega de `/solicitar` e percebe que ainda não tem conta perde o contexto
    *  justamente no clique da aba. */
   proximo?: string;
+  /** Qual conteúdo o painel lateral mostra. `/login` não passa essa prop (sem
+   *  seletor de papel), então cai no default e mantém sempre "Seja parceiro". */
+  asideRole?: AsideRole;
 }) {
   const q = proximo && proximo !== "/painel" ? `?next=${encodeURIComponent(proximo)}` : "";
+  const conteudo = ASIDE_CONTEUDO[asideRole ?? "profissional"];
   return (
     <main className="auth-split">
       {/* ---- coluna do formulário ---- */}
@@ -63,23 +100,22 @@ export function AuthShell({
         </div>
       </section>
 
-      {/* ---- coluna "seja parceiro" ---- */}
+      {/* ---- coluna "seja parceiro" / "seja cliente" ---- */}
       <aside className="auth-aside">
         <div>
           <span style={{ fontFamily: mono, fontSize: 11.5, letterSpacing: "0.16em", textTransform: "uppercase", color: "#7fe0f2" }}>
-            Para técnicos e empresas
+            {conteudo.eyebrow}
           </span>
           <h2 className="auth-aside-title" style={{ marginTop: 12 }}>
-            Seja parceiro<br />FrioHub
+            {conteudo.titulo}
           </h2>
           <p className="auth-aside-sub" style={{ marginTop: 14 }}>
-            Receba serviços de climatização na sua região, construa sua reputação e
-            seja encontrado por quem já está pronto para contratar.
+            {conteudo.sub}
           </p>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-          {BENEFICIOS.map((b) => (
+          {conteudo.beneficios.map((b) => (
             <div key={b.t} className="auth-benefit">
               <span className="auth-benefit-ic"><b.Icon size={17} /></span>
               <div>
@@ -90,8 +126,8 @@ export function AuthShell({
           ))}
         </div>
 
-        <Link href="/parceiros" className="btn btn-onbrand" style={{ alignSelf: "flex-start", gap: 8 }}>
-          Quero ser parceiro <ArrowRight size={17} />
+        <Link href={conteudo.ctaHref} className="btn btn-onbrand" style={{ alignSelf: "flex-start", gap: 8 }}>
+          {conteudo.ctaLabel} <ArrowRight size={17} />
         </Link>
       </aside>
     </main>

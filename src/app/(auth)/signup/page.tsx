@@ -1,5 +1,5 @@
-import { AuthShell } from "../AuthShell";
-import { SignupForm, type PapelCadastro } from "./SignupForm";
+import { type PapelCadastro } from "./SignupForm";
+import { SignupShell } from "./SignupShell";
 import { destinoSeguro } from "@/lib/proximo";
 
 export default async function SignupPage({ searchParams }: PageProps<"/signup">) {
@@ -24,14 +24,12 @@ export default async function SignupPage({ searchParams }: PageProps<"/signup">)
   const proximo = destinoSeguro(sp.next, "");
 
   return (
-    <AuthShell
-      aba="signup"
-      title={TITULO[roleInicial]}
-      subtitle={SUB[roleInicial]}
-      error={error}
+    <SignupShell
+      roleInicial={roleInicial}
       proximo={proximo}
-    >
-      <SignupForm roleInicial={roleInicial} proximo={proximo} />
-    </AuthShell>
+      error={error}
+      titulo={TITULO}
+      sub={SUB}
+    />
   );
 }

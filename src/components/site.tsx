@@ -166,6 +166,7 @@ export function SiteFooter() {
             itens={[
               { label: "Como funciona", href: "/#como-funciona" },
               { label: "Ver profissionais", href: "/profissionais" },
+              { label: "Para clientes", href: "/clientes" },
               { label: "Para profissionais", href: "/parceiros" },
               { label: "Para distribuidoras", href: "/distribuidoras" },
               { label: "Entrar", href: "/login" },
