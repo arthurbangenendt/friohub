@@ -47,6 +47,11 @@ export default async function DistribuidoraPage() {
     .eq("distributor_id", user.id)
     .eq("estoque_disponivel", false);
 
+  // Mesmo selo mostrado pro cliente no catálogo — aqui como KPI de
+  // acompanhamento, sem precisar de tela nova.
+  const { data: repRows } = await supabase.rpc("reputacao_distribuidora", { p_distributor_id: user.id });
+  const reputacao = Array.isArray(repRows) ? repRows[0] : null;
+
   return (
     <div style={wrap}>
       <Cabecalho eyebrow="Painel da distribuidora" titulo={`Olá, ${dist?.razao_social ?? profile?.nome ?? "você"}`} />
@@ -79,6 +84,9 @@ export default async function DistribuidoraPage() {
         <Kpi label="Em andamento" valor={String(emAndamento)} />
         <Kpi label="Entregues" valor={String(entregues.length)} />
         <Kpi label="Faturado" valor={formatarBRL(faturado)} sufixo="pedidos entregues" />
+        {reputacao && reputacao.total_entregues >= 5 && reputacao.taxa_no_prazo !== null && (
+          <Kpi label="No prazo" valor={`${reputacao.taxa_no_prazo}%`} sufixo="últimas entregas" />
+        )}
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px,1fr))", gap: 12, marginTop: 16 }}>

@@ -51,3 +51,14 @@ export async function aprovarDistribuidora(id: string, motivo: string) {
 export async function rejeitarDistribuidora(id: string, motivo: string) {
   return definirVerificacao("distributors", id, "rejeitado", motivo);
 }
+
+/* Lead de distribuidora interessada (formulário público em /distribuidoras) —
+   não tem verificação, só um marcador de "já falei com essa pessoa". Usado
+   direto como `action` de um <form> (sem JS de cliente), por isso devolve
+   `void` — o padrão de retorno {ok,error} não bate com a assinatura exigida
+   por essa forma de uso; se falhar, o admin só clica de novo. */
+export async function marcarInteresseContatado(id: string): Promise<void> {
+  const supabase = await createClient();
+  await supabase.from("distributor_interest").update({ contatado_em: new Date().toISOString() }).eq("id", id);
+  revalidatePath("/admin");
+}

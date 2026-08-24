@@ -62,6 +62,7 @@ export default async function SolicitarPage(props: PageProps<"/solicitar">) {
       precoVenda: Number(p.preco_venda),
       imageUrl: p.image_url,
       distribuidora: p.distribuidora,
+      distributorId: p.distributor_id,
     };
   });
 

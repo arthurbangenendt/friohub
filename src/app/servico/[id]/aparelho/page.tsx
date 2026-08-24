@@ -5,6 +5,7 @@ import { formatarBRL } from "@/lib/pricing";
 import { formatarBtu } from "@/lib/btu";
 import { STATUS_ENTREGA_CLIENTE, resolverMapa } from "@/lib/status";
 import { LinhaTempoEntrega, type EventoEntrega } from "@/components/LinhaTempoEntrega";
+import { SeloDistribuidora } from "@/app/solicitar/wizard/steps/SeloDistribuidora";
 
 const mono = "var(--font-geist-mono), ui-monospace, monospace";
 const STATUS = resolverMapa(STATUS_ENTREGA_CLIENTE);
@@ -21,6 +22,7 @@ type ItemEntrega = {
 type EntregaView = {
   id: string;
   distribuidora: string;
+  distributor_id: string;
   status: string;
   codigo_rastreio: string | null;
   link_rastreio: string | null;
@@ -55,7 +57,7 @@ export default async function AparelhoPage({ params }: { params: Promise<{ id: s
 
   const { data: entregasData } = await supabase
     .from("entregas_cliente")
-    .select("id, distribuidora, status, codigo_rastreio, link_rastreio, nota_fiscal_url, prazo_previsto, created_at, itens, eventos")
+    .select("id, distribuidora, distributor_id, status, codigo_rastreio, link_rastreio, nota_fiscal_url, prazo_previsto, created_at, itens, eventos")
     .eq("job_id", id)
     .order("created_at", { ascending: true });
 
@@ -102,7 +104,10 @@ export default async function AparelhoPage({ params }: { params: Promise<{ id: s
           return (
             <div key={e.id} className="card" style={{ padding: 22 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
-                <SecTitle>{e.distribuidora}</SecTitle>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <SecTitle>{e.distribuidora}</SecTitle>
+                  <SeloDistribuidora distributorId={e.distributor_id} />
+                </div>
                 <span style={{ fontSize: 12.5, fontFamily: mono, padding: "5px 12px", borderRadius: 100, background: st.bg, color: st.cor }}>
                   {st.label}
                 </span>

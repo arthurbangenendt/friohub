@@ -7,6 +7,7 @@ import { abaAmbiente, abaAmbienteOn, badgeRec, input, prodCard, prodCardSel } fr
 import { mono } from "../constants";
 import type { AmbienteForm } from "../types";
 import type { ProdutoDTO } from "../../marketplace-types";
+import { SeloDistribuidora } from "./SeloDistribuidora";
 
 export function StepCatalogo({
   ambientes, ambienteAtivo, focoSeguro, onFocoChange, btus,
@@ -96,6 +97,7 @@ export function StepCatalogo({
                   <span style={{ fontSize: 11.5, color: "var(--ink-faint)" }}>
                     {p.distribuidora ? `Distribuidora: ${p.distribuidora}` : "Distribuidora não informada"}
                   </span>
+                  {p.distributorId && <SeloDistribuidora distributorId={p.distributorId} />}
                 </button>
               );
             })}

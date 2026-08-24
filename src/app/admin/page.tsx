@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AdminActions } from "./AdminActions";
+import { marcarInteresseContatado } from "./actions";
 import { CIDADE } from "@/lib/regiao";
 import { STATUS_VERIFICACAO, resolverMapa } from "@/lib/status";
 import { one } from "@/lib/relacional";
@@ -70,6 +71,12 @@ export default async function AdminPage() {
   }));
   const distPendentes = distribuidoras.filter((d) => d.verification_status === "pendente" || d.verification_status === "em_analise");
   const distOutros = distribuidoras.filter((d) => d.verification_status === "verificado" || d.verification_status === "rejeitado");
+
+  // Leads do formulário público de /distribuidoras — sem verificação, só contato.
+  const { data: interesses } = await supabase
+    .from("distributor_interest")
+    .select("id, nome, empresa, telefone, email, cidade, mensagem, created_at, contatado_em")
+    .order("created_at", { ascending: false });
 
   const { data: casosOperacionais } = await supabase
     .from("operational_cases")
@@ -169,6 +176,16 @@ export default async function AdminPage() {
         {distOutros.length === 0
           ? <Vazio texto="Nenhuma revisada ainda." />
           : distOutros.map((d) => <CardDist key={d.id} d={d} />)}
+      </Secao>
+
+      <h2 style={{ fontSize: "1.4rem", fontWeight: 800, margin: "44px 0 6px" }}>Interesse de distribuidoras</h2>
+      <p style={{ color: "var(--ink-soft)", marginBottom: 24, fontSize: 14.5 }}>
+        Contatos deixados em /distribuidoras. Não cria conta — decida quando enviar o link de cadastro.
+      </p>
+      <Secao titulo={`Leads (${interesses?.length ?? 0})`}>
+        {(interesses?.length ?? 0) === 0
+          ? <Vazio texto="Nenhum contato ainda." />
+          : (interesses ?? []).map((i) => <CardInteresse key={i.id} i={i} />)}
       </Secao>
     </main>
   );
@@ -322,6 +339,38 @@ function CardDist({ d }: {
         </div>
       </div>
       <AdminActions id={d.id} status={d.verification_status} tipo="distribuidora" />
+    </div>
+  );
+}
+
+function CardInteresse({ i }: {
+  i: { id: string; nome: string; empresa: string; telefone: string | null; email: string | null; cidade: string | null; mensagem: string | null; created_at: string; contatado_em: string | null };
+}) {
+  return (
+    <div className="card" style={{ padding: 18, display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
+      <div style={{ flex: 1, minWidth: 220 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <strong style={{ fontSize: 15.5 }}>{i.empresa}</strong>
+          <span style={{ fontSize: 11.5, fontFamily: mono, color: "var(--ink-faint)" }}>{i.nome}</span>
+          {i.contatado_em && (
+            <span style={{ fontSize: 11.5, fontFamily: mono, padding: "3px 9px", borderRadius: 100, background: "var(--good-wash)", color: "var(--good)" }}>contatado</span>
+          )}
+        </div>
+        <div style={{ fontSize: 13, color: "var(--ink-faint)", marginTop: 4 }}>
+          {[i.cidade, i.telefone, i.email].filter(Boolean).join(" · ")}
+        </div>
+        {i.mensagem && <p style={{ fontSize: 13.5, color: "var(--ink-soft)", marginTop: 6 }}>{i.mensagem}</p>}
+        <span style={{ fontSize: 12, color: "var(--ink-faint)", marginTop: 6, display: "block" }}>
+          {new Date(i.created_at).toLocaleDateString("pt-BR")}
+        </span>
+      </div>
+      {!i.contatado_em && (
+        <form action={marcarInteresseContatado.bind(null, i.id)}>
+          <button type="submit" className="btn btn-ghost" style={{ height: 36, padding: "0 14px", fontSize: 13 }}>
+            Marcar como contatado
+          </button>
+        </form>
+      )}
     </div>
   );
 }

@@ -499,6 +499,42 @@ export type Database = {
           },
         ]
       }
+      distributor_interest: {
+        Row: {
+          cidade: string | null
+          contatado_em: string | null
+          created_at: string
+          email: string | null
+          empresa: string
+          id: string
+          mensagem: string | null
+          nome: string
+          telefone: string | null
+        }
+        Insert: {
+          cidade?: string | null
+          contatado_em?: string | null
+          created_at?: string
+          email?: string | null
+          empresa: string
+          id?: string
+          mensagem?: string | null
+          nome: string
+          telefone?: string | null
+        }
+        Update: {
+          cidade?: string | null
+          contatado_em?: string | null
+          created_at?: string
+          email?: string | null
+          empresa?: string
+          id?: string
+          mensagem?: string | null
+          nome?: string
+          telefone?: string | null
+        }
+        Relationships: []
+      }
       distributors: {
         Row: {
           ativo: boolean
@@ -4477,6 +4513,7 @@ export type Database = {
           btu: number
           categoria: string
           distribuidora: string
+          distributor_id: string
           image_url: string
           marca: string
           modelo: string
@@ -5067,6 +5104,15 @@ export type Database = {
           p_user_id: string
         }
         Returns: undefined
+      }
+      reputacao_distribuidora: {
+        Args: { p_distributor_id: string }
+        Returns: {
+          no_prazo: number
+          taxa_no_prazo: number
+          total_entregues: number
+          verificada: boolean
+        }[]
       }
       reservar_notificacoes_whatsapp: {
         Args: { p_limite?: number }

@@ -9,6 +9,7 @@ export type ProdutoDTO = {
   precoVenda: number | null;
   imageUrl: string | null;
   distribuidora: string | null;
+  distributorId: string | null;
 };
 
 export type SkillDTO = {

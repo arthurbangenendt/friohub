@@ -78,6 +78,7 @@ export async function GET(request: NextRequest) {
         precoVenda: null,
         imageUrl: p.image_url,
         distribuidora: p.distribuidora,
+        distributorId: null,
       }));
       const total = Number(data?.[0]?.total_count ?? 0);
       return resposta({ items, total, page, hasMore: offset + items.length < total });
@@ -101,6 +102,7 @@ export async function GET(request: NextRequest) {
       precoVenda: Number(p.preco_venda),
       imageUrl: p.image_url,
       distribuidora: p.distribuidora,
+      distributorId: p.distributor_id,
     }));
     const total = Number(data?.[0]?.total_count ?? 0);
     return resposta({ items, total, page, hasMore: offset + items.length < total });
