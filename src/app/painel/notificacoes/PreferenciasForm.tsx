@@ -6,13 +6,14 @@ import { Alert, useToast } from "@/components/ui";
 
 type ChaveEmail = "quote_requests" | "quotes" | "job_updates" | "messages" | "reminders";
 type ChaveApp = "inapp_quote_requests" | "inapp_quotes" | "inapp_job_updates" | "inapp_messages" | "inapp_reminders";
+type ChaveWhats = "whatsapp_quote_requests" | "whatsapp_quotes" | "whatsapp_job_updates" | "whatsapp_messages" | "whatsapp_reminders";
 
-const OPCOES: { email: ChaveEmail; app: ChaveApp; titulo: string; texto: string }[] = [
-  { email: "quote_requests", app: "inapp_quote_requests", titulo: "Novos pedidos de orçamento", texto: "Quando um cliente envia um pedido para você." },
-  { email: "quotes", app: "inapp_quotes", titulo: "Propostas e decisões", texto: "Proposta recebida, aceita, recusada ou pedido cancelado." },
-  { email: "job_updates", app: "inapp_job_updates", titulo: "Atualizações do serviço", texto: "Mudanças de estado durante o atendimento." },
-  { email: "messages", app: "inapp_messages", titulo: "Novas mensagens", texto: "Agrupadas em janelas de cinco minutos para evitar spam." },
-  { email: "reminders", app: "inapp_reminders", titulo: "Agenda e lembretes", texto: "Propostas de horário, confirmações e lembretes de atendimento." },
+const OPCOES: { email: ChaveEmail; app: ChaveApp; whats: ChaveWhats; titulo: string; texto: string }[] = [
+  { email: "quote_requests", app: "inapp_quote_requests", whats: "whatsapp_quote_requests", titulo: "Novos pedidos de orçamento", texto: "Quando um cliente envia um pedido para você." },
+  { email: "quotes", app: "inapp_quotes", whats: "whatsapp_quotes", titulo: "Propostas e decisões", texto: "Proposta recebida, aceita, recusada ou pedido cancelado." },
+  { email: "job_updates", app: "inapp_job_updates", whats: "whatsapp_job_updates", titulo: "Atualizações do serviço", texto: "Mudanças de estado durante o atendimento." },
+  { email: "messages", app: "inapp_messages", whats: "whatsapp_messages", titulo: "Novas mensagens", texto: "Agrupadas em janelas de cinco minutos para evitar spam." },
+  { email: "reminders", app: "inapp_reminders", whats: "whatsapp_reminders", titulo: "Agenda e lembretes", texto: "Propostas de horário, confirmações e lembretes de atendimento." },
 ];
 
 export function PreferenciasForm({ inicial }: { inicial: PreferenciasNotificacao }) {
@@ -30,9 +31,9 @@ export function PreferenciasForm({ inicial }: { inicial: PreferenciasNotificacao
           ativa sem dizer isso seria prometer o que o produto não faz — o mesmo
           critério que a tela de planos usa para a cobrança. */}
       <Alert tipo="info">
-        O envio por e-mail ainda não está ativo. Você já pode deixar sua escolha
-        registrada: ela passa a valer assim que o canal for ligado. As
-        notificações dentro do app funcionam normalmente.
+        O envio por e-mail e por WhatsApp ainda não estão ativos. Você já pode
+        deixar sua escolha registrada: ela passa a valer assim que cada canal
+        for ligado. As notificações dentro do app funcionam normalmente.
       </Alert>
 
       <div className="card" style={{ padding: 18, display: "grid", gap: 14 }}>
@@ -48,6 +49,12 @@ export function PreferenciasForm({ inicial }: { inicial: PreferenciasNotificacao
           checked={valor.email_enabled}
           onChange={alternar("email_enabled")}
         />
+        <Interruptor
+          titulo="Notificações por WhatsApp"
+          texto="Vale para todas as mensagens de WhatsApp quando o canal for ligado."
+          checked={valor.whatsapp_enabled}
+          onChange={alternar("whatsapp_enabled")}
+        />
       </div>
 
       <div className="card" style={{ padding: 0, overflow: "hidden" }}>
@@ -59,6 +66,7 @@ export function PreferenciasForm({ inicial }: { inicial: PreferenciasNotificacao
           </span>
           <span style={coluna}>No app</span>
           <span style={coluna}>E-mail</span>
+          <span style={coluna}>WhatsApp</span>
         </div>
 
         {OPCOES.map((o, i) => (
@@ -78,6 +86,12 @@ export function PreferenciasForm({ inicial }: { inicial: PreferenciasNotificacao
               checked={valor[o.email]}
               disabled={!valor.email_enabled}
               onChange={alternar(o.email)}
+            />
+            <Caixa
+              rotulo={`${o.titulo} — por WhatsApp`}
+              checked={valor[o.whats]}
+              disabled={!valor.whatsapp_enabled}
+              onChange={alternar(o.whats)}
             />
           </div>
         ))}

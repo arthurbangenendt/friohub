@@ -15,6 +15,8 @@ const PADRAO: PreferenciasNotificacao = {
   job_updates: true, messages: true, reminders: true,
   inapp_enabled: true, inapp_quote_requests: true, inapp_quotes: true,
   inapp_job_updates: true, inapp_messages: true, inapp_reminders: true,
+  whatsapp_enabled: true, whatsapp_quote_requests: true, whatsapp_quotes: true,
+  whatsapp_job_updates: true, whatsapp_messages: true, whatsapp_reminders: true,
 };
 
 const PAGINA = 30;
@@ -33,7 +35,7 @@ export default async function NotificacoesPage({ searchParams }: PageProps<"/pai
   const [{ data: prefs }, { data: linhas }] = await Promise.all([
     supabase
       .from("notification_preferences")
-      .select("email_enabled, quote_requests, quotes, job_updates, messages, reminders, inapp_enabled, inapp_quote_requests, inapp_quotes, inapp_job_updates, inapp_messages, inapp_reminders")
+      .select("email_enabled, quote_requests, quotes, job_updates, messages, reminders, inapp_enabled, inapp_quote_requests, inapp_quotes, inapp_job_updates, inapp_messages, inapp_reminders, whatsapp_enabled, whatsapp_quote_requests, whatsapp_quotes, whatsapp_job_updates, whatsapp_messages, whatsapp_reminders")
       .eq("user_id", user.id)
       .maybeSingle(),
     /* Sem filtro por destinatário: a política de SELECT já recorta para o

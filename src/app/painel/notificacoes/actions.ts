@@ -19,6 +19,12 @@ export type PreferenciasNotificacao = {
   inapp_job_updates: boolean;
   inapp_messages: boolean;
   inapp_reminders: boolean;
+  whatsapp_enabled: boolean;
+  whatsapp_quote_requests: boolean;
+  whatsapp_quotes: boolean;
+  whatsapp_job_updates: boolean;
+  whatsapp_messages: boolean;
+  whatsapp_reminders: boolean;
 };
 
 export async function salvarPreferencias(input: PreferenciasNotificacao) {
@@ -40,6 +46,12 @@ export async function salvarPreferencias(input: PreferenciasNotificacao) {
     inapp_job_updates: input.inapp_job_updates,
     inapp_messages: input.inapp_messages,
     inapp_reminders: input.inapp_reminders,
+    whatsapp_enabled: input.whatsapp_enabled,
+    whatsapp_quote_requests: input.whatsapp_quote_requests,
+    whatsapp_quotes: input.whatsapp_quotes,
+    whatsapp_job_updates: input.whatsapp_job_updates,
+    whatsapp_messages: input.whatsapp_messages,
+    whatsapp_reminders: input.whatsapp_reminders,
   });
   if (error) return { ok: false as const, error: error.message };
 
