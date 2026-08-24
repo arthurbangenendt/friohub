@@ -238,7 +238,18 @@ export async function aceitarProposta(
     const digitos = cpfCnpj.replace(/\D/g, "");
     /* Coleta única, mesmo padrão do CPF/CNPJ do profissional na assinatura
        (20260818141000): só grava se ainda não houver documento salvo — não
-       sobrescreve o que já existe. */
+       sobrescreve o que já existe.
+       Duas etapas porque conta anterior a 12/08 (antes do documento virar
+       obrigatório no cadastro) não tem NENHUMA linha em `profile_private` —
+       um `update` sozinho não cria linha, então "funciona" sem erro e não
+       salva nada. `upsert` com `ignoreDuplicates` cria a linha só se faltar
+       (não mexe em quem já tem linha, com ou sem documento); o `update`
+       depois cobre quem já tinha linha mas ainda sem documento. */
+    const { error: erroCriarLinha } = await supabase
+      .from("profile_private")
+      .upsert({ id: user.id, cpf_cnpj: digitos }, { onConflict: "id", ignoreDuplicates: true });
+    if (erroCriarLinha) return { ok: false as const, error: "Não foi possível salvar o CPF/CNPJ." };
+
     const { error: erroDocumento } = await supabase
       .from("profile_private")
       .update({ cpf_cnpj: digitos })
