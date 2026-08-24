@@ -15,4 +15,4 @@
  * Ao religar, revisar também os textos de /parceiros, que descrevem ao
  * profissional o que acontece depois do cadastro.
  */
-export const EXIGIR_VERIFICACAO = false;
+export const EXIGIR_VERIFICACAO = true;

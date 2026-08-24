@@ -8,6 +8,7 @@ import { PortfolioEditor } from "./PortfolioEditor";
 import { MidiaEditor } from "../MidiaEditor";
 import { MinhaAssinatura, type AssinaturaDTO } from "./MinhaAssinatura";
 import { ChavePix } from "./ChavePix";
+import { DocumentoVerificacao } from "./DocumentoVerificacao";
 import type { PerfilInput, TipoChavePix } from "./actions";
 
 export default async function PerfilPage() {
@@ -21,6 +22,7 @@ export default async function PerfilPage() {
   const { data: pro } = await supabase
     .from("professionals")
     .select(`tipo, razao_social, bio, cidade, anos_experiencia, verification_status, banner_url,
+             documento_tipo, documento_storage_path, documento_enviado_em,
              professional_skills ( specialty, years_experience ),
              service_areas ( cep_prefix ),
              professional_tags ( tag_slug )`)
@@ -122,6 +124,16 @@ export default async function PerfilPage() {
       <div className="card" style={{ padding: 26, marginTop: 16 }}>
         <PerfilForm inicial={inicial} catalogo={catalogo ?? []} />
       </div>
+
+      {pro && (
+        <div className="card" style={{ padding: 26, marginTop: 16 }}>
+          <DocumentoVerificacao
+            status={pro.verification_status as "pendente" | "em_analise" | "verificado" | "rejeitado"}
+            tipoEnviado={pro.documento_tipo as "cnh" | "rg" | "crea_cft" | "cartao_cnpj" | null}
+            enviadoEm={pro.documento_enviado_em}
+          />
+        </div>
+      )}
 
       {pro && <MinhaAssinatura assinatura={assinatura} />}
       {pro && <ChavePix inicial={chavePix} />}

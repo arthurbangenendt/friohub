@@ -6,6 +6,7 @@ import { Avatar } from "@/app/painel/Avatar";
 import { Star, Shield, MapPin, Search } from "@/components/icons";
 import { EmptyState } from "@/components/ui";
 import { REGIAO_LABEL } from "@/lib/regiao";
+import { EXIGIR_VERIFICACAO } from "@/lib/config";
 
 export const metadata: Metadata = {
   title: `Profissionais de ar-condicionado em ${REGIAO_LABEL} — FrioHub`,
@@ -55,6 +56,11 @@ export default async function DiretorioPage({ searchParams }: PageProps<"/profis
   /* Busca por nome só. Procurar dentro da bio traria resultado que o visitante
      não consegue explicar ("por que este apareceu?"). */
   if (busca) consulta = consulta.ilike("nome", `%${busca}%`);
+  /* Antes deste filtro, o diretório era o único lugar do site que mostrava
+     profissional não verificado mesmo com EXIGIR_VERIFICACAO ligado — a home
+     e a busca do marketplace já filtravam, este aqui não (achado ao ativar o
+     gate, 20260824). */
+  if (EXIGIR_VERIFICACAO) consulta = consulta.eq("verification_status", "verificado");
 
   const { data, count } = await consulta
     .order(ORDENS[ordem].coluna, { ascending: false })

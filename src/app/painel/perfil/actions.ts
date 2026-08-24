@@ -161,6 +161,33 @@ export async function removerMidiaPerfil(alvo: AlvoMidiaPerfil) {
   return { ok: true as const };
 }
 
+export type TipoDocumentoVerificacao = "cnh" | "rg" | "crea_cft" | "cartao_cnpj";
+
+/* Dá lastro real ao selo "verificado" — antes disso a verificação era só
+ * leitura de bio/cidade/skills autodeclaradas. Trocar o documento de quem já
+ * está verificado manda de volta pra "em_analise" (protege_confianca_professional,
+ * 20260824110000). Path vem do upload direto no bucket privado
+ * `documentos-verificacao` — aqui só grava a referência, nunca recebe o
+ * binário do arquivo. */
+export async function salvarDocumentoVerificacao(tipo: TipoDocumentoVerificacao, storagePath: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false as const, error: "Não autenticado." };
+
+  if (!storagePath.startsWith(`${user.id}/`)) {
+    return { ok: false as const, error: "Caminho de arquivo inválido." };
+  }
+
+  const { error } = await supabase
+    .from("professionals")
+    .update({ documento_tipo: tipo, documento_storage_path: storagePath, documento_enviado_em: new Date().toISOString() })
+    .eq("id", user.id);
+  if (error) return { ok: false as const, error: error.message };
+
+  revalidatePath("/painel/perfil");
+  return { ok: true as const };
+}
+
 export type TipoChavePix = "cpf" | "cnpj" | "email" | "telefone" | "aleatoria";
 
 /* Destino do repasse automático quando um job é concluído — ver

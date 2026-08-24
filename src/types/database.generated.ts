@@ -3030,6 +3030,9 @@ export type Database = {
           cnpj: string | null
           cpf_cnpj: string | null
           created_at: string
+          documento_enviado_em: string | null
+          documento_storage_path: string | null
+          documento_tipo: string | null
           estado: string
           id: string
           razao_social: string | null
@@ -3050,6 +3053,9 @@ export type Database = {
           cnpj?: string | null
           cpf_cnpj?: string | null
           created_at?: string
+          documento_enviado_em?: string | null
+          documento_storage_path?: string | null
+          documento_tipo?: string | null
           estado?: string
           id: string
           razao_social?: string | null
@@ -3070,6 +3076,9 @@ export type Database = {
           cnpj?: string | null
           cpf_cnpj?: string | null
           created_at?: string
+          documento_enviado_em?: string | null
+          documento_storage_path?: string | null
+          documento_tipo?: string | null
           estado?: string
           id?: string
           razao_social?: string | null
@@ -4835,6 +4844,10 @@ export type Database = {
       }
       plano_permite: {
         Args: { p_feature: string; p_professional_id: string }
+        Returns: boolean
+      }
+      pode_ler_documento_verificacao: {
+        Args: { p_storage_path: string }
         Returns: boolean
       }
       pode_ler_foto_orcamento: {

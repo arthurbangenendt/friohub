@@ -23,19 +23,33 @@ export default async function AdminPage() {
   const { data: pros } = await supabase
     .from("professionals")
     .select(`id, tipo, bio, cidade, estado, verification_status, created_at,
+             documento_tipo, documento_storage_path,
              profiles!inner ( nome ),
              professional_skills ( specialty )`)
     .order("verification_status");
 
-  const lista = (pros ?? []).map((p) => ({
-    id: p.id,
-    nome: one(p.profiles)?.nome ?? "Profissional",
-    tipo: p.tipo as string,
-    bio: p.bio as string | null,
-    cidade: p.cidade as string,
-    estado: p.estado as string,
-    status: p.verification_status as string,
-    skills: ((p.professional_skills ?? []) as { specialty: string }[]).map((s) => s.specialty),
+  /* Signed URL gerada com a sessão do próprio admin — a RLS de
+     `documentos-verificacao` (pode_ler_documento_verificacao) decide se ele
+     pode, sem precisar de service-role nem rota nova. */
+  const lista = await Promise.all((pros ?? []).map(async (p) => {
+    let documentoUrl: string | null = null;
+    if (p.documento_storage_path) {
+      const { data } = await supabase.storage
+        .from("documentos-verificacao")
+        .createSignedUrl(p.documento_storage_path, 3600);
+      documentoUrl = data?.signedUrl ?? null;
+    }
+    return {
+      id: p.id,
+      nome: one(p.profiles)?.nome ?? "Profissional",
+      tipo: p.tipo as string,
+      bio: p.bio as string | null,
+      cidade: p.cidade as string,
+      estado: p.estado as string,
+      status: p.verification_status as string,
+      skills: ((p.professional_skills ?? []) as { specialty: string }[]).map((s) => s.specialty),
+      documentoUrl,
+    };
   }));
 
   const pendentes = lista.filter((p) => p.status === "pendente" || p.status === "em_analise");
@@ -312,7 +326,7 @@ function CardDist({ d }: {
   );
 }
 
-function Card({ p }: { p: { id: string; nome: string; tipo: string; bio: string | null; cidade: string; estado: string; status: string; skills: string[] } }) {
+function Card({ p }: { p: { id: string; nome: string; tipo: string; bio: string | null; cidade: string; estado: string; status: string; skills: string[]; documentoUrl: string | null } }) {
   const st = STATUS_LABEL[p.status] ?? STATUS_LABEL.pendente;
   return (
     <div className="card" style={{ padding: 18, display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
@@ -326,7 +340,14 @@ function Card({ p }: { p: { id: string; nome: string; tipo: string; bio: string 
           {p.cidade} — {p.estado} · {p.skills.map((s) => SPEC_LABEL[s] ?? s).join(", ") || "sem especialidades"}
         </div>
         {p.bio && <p style={{ fontSize: 13.5, color: "var(--ink-soft)", marginTop: 6 }}>{p.bio}</p>}
-        <Link href={`/profissional/${p.id}`} target="_blank" style={{ fontSize: 12.5, color: "var(--cool-deep)", fontWeight: 600, marginTop: 6, display: "inline-block" }}>Ver perfil →</Link>
+        <div style={{ display: "flex", gap: 14, marginTop: 6 }}>
+          <Link href={`/profissional/${p.id}`} target="_blank" style={{ fontSize: 12.5, color: "var(--cool-deep)", fontWeight: 600 }}>Ver perfil →</Link>
+          {p.documentoUrl ? (
+            <a href={p.documentoUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12.5, color: "var(--cool-deep)", fontWeight: 600 }}>Ver documento →</a>
+          ) : (
+            <span style={{ fontSize: 12.5, color: "var(--danger)" }}>Sem documento enviado</span>
+          )}
+        </div>
       </div>
       <AdminActions id={p.id} status={p.status} />
     </div>

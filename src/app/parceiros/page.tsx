@@ -20,16 +20,6 @@ const CAT_TITULO: Record<string, string> = {
   credencial: "Credenciais",
 };
 
-/* Depoimentos de exemplo. NÃO são pessoas reais e estão marcados como exemplo
-   na interface. Trocar por depoimentos reais exige autorização de uso de imagem
-   e do texto — publicar depoimento inventado como verdadeiro é propaganda
-   enganosa, não é detalhe de design. */
-const DEPOIMENTOS_EXEMPLO = [
-  { nome: "Técnico autônomo", iniciais: "TA", cor: "#2E6F8E", regiao: "Zona Leste", texto: "Antes eu dependia de indicação. Hoje fecho a agenda da semana com serviço da região que eu já atendia." },
-  { nome: "Empresa de climatização", iniciais: "EC", cor: "#2E8B6F", regiao: "Zona Sul", texto: "Conseguimos separar a reputação por serviço. Quem procura PMOC encontra a gente, não o concorrente que só instala." },
-  { nome: "Técnico especializado", iniciais: "TE", cor: "#8E5A2E", regiao: "Centro", texto: "O cliente já chega sabendo a capacidade que precisa. Isso corta metade da conversa de orçamento." },
-];
-
 export default async function ParceirosPage() {
   const supabase = await createClient();
 
@@ -175,39 +165,6 @@ export default async function ParceirosPage() {
         <p style={{ fontSize: 13, color: "var(--ink-faint)", marginTop: 18 }}>
           Credenciais são autodeclaradas no cadastro e conferidas na verificação do perfil.
         </p>
-      </section>
-
-      {/* ---------------- DEPOIMENTOS (exemplo) ---------------- */}
-      <section style={{ background: "var(--surface-2)", padding: "64px 0" }}>
-        <div className="container">
-          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-            <span className="eyebrow" style={{ margin: 0 }}>Quem já é parceiro</span>
-            <span className="parc-exemplo">Conteúdo de exemplo</span>
-          </div>
-          <h2 style={h2}>O que dizem</h2>
-          <p style={{ fontSize: 13.5, color: "var(--ink-faint)", marginTop: 8, maxWidth: 620 }}>
-            Os depoimentos abaixo são <strong>ilustrativos</strong>, criados para mostrar o
-            formato da seção. Substitua por depoimentos reais, com autorização de uso de
-            imagem e texto, antes de publicar.
-          </p>
-          <div className="parc-grid" style={{ marginTop: 28 }}>
-            {DEPOIMENTOS_EXEMPLO.map((d) => (
-              <div key={d.nome} className="card" style={{ padding: 22, display: "flex", flexDirection: "column", gap: 14 }}>
-                <div style={{ display: "flex", gap: 4, color: "var(--warm)" }}>
-                  {[0, 1, 2, 3, 4].map((i) => <Star key={i} size={15} filled />)}
-                </div>
-                <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.65, color: "var(--ink-soft)" }}>“{d.texto}”</p>
-                <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: "auto" }}>
-                  <span className="parc-avatar" style={{ background: d.cor }}>{d.iniciais}</span>
-                  <div>
-                    <div style={{ fontWeight: 650, fontSize: 14 }}>{d.nome}</div>
-                    <div style={{ fontSize: 12.5, color: "var(--ink-faint)" }}>{d.regiao} · {CIDADE}</div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
       </section>
 
       {/* ---------------- FAQ ---------------- */}
