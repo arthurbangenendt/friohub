@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import type { JobType } from "@/app/solicitar/tipos";
+import { validarDocumento } from "@/lib/documento";
 import { MAX_AMBIENTES, MAX_DESTINATARIOS } from "./config";
 
 /* Orçamentos (RFQ).
@@ -231,10 +232,10 @@ export async function aceitarProposta(
   if (end.length < 5) return { ok: false as const, error: "Informe o endereço completo do serviço." };
 
   if (cpfCnpj) {
-    const digitos = cpfCnpj.replace(/\D/g, "");
-    if (digitos.length !== 11 && digitos.length !== 14) {
+    if (!validarDocumento(cpfCnpj)) {
       return { ok: false as const, error: "Informe um CPF ou CNPJ válido." };
     }
+    const digitos = cpfCnpj.replace(/\D/g, "");
     /* Coleta única, mesmo padrão do CPF/CNPJ do profissional na assinatura
        (20260818141000): só grava se ainda não houver documento salvo — não
        sobrescreve o que já existe. */

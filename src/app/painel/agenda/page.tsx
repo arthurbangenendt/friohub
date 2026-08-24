@@ -19,6 +19,7 @@ import {
 } from "./tempo";
 import { Semana, type ItemSemana } from "./Semana";
 import { Roteiro, type Parada } from "./Roteiro";
+import { PlanoBloqueado } from "@/components/ui/PlanoBloqueado";
 
 /* Agenda do dia do profissional.
  *
@@ -86,6 +87,22 @@ export default async function AgendaPage(props: PageProps<"/painel/agenda">) {
   /* A agenda é do lado que executa o serviço. Cliente que chegar aqui volta
      para o painel dele em vez de ver uma tela vazia sem explicação. */
   if (profile?.role !== "profissional") redirect("/painel");
+
+  const { data: agendaLiberada } = await supabase.rpc("plano_permite", {
+    p_professional_id: user.id,
+    p_feature: "agenda",
+  });
+  if (!agendaLiberada) {
+    return (
+      <div style={wrap}>
+        <Cabecalho eyebrow="Agenda" titulo="Agenda" />
+        <PlanoBloqueado
+          titulo="Agenda é do plano Profissional"
+          descricao="Veja seus compromissos do dia e da semana num só lugar, com roteiro pronto pra sair de casa. Faça upgrade para liberar."
+        />
+      </div>
+    );
+  }
 
   const hoje = hojeISO();
   const pedido = typeof sp.d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(sp.d) ? sp.d : hoje;

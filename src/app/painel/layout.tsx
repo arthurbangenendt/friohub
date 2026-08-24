@@ -78,6 +78,13 @@ export default async function PainelLayout({ children }: LayoutProps<"/painel">)
     const c = categoriaNotificacao(a.event_type);
     contagem.set(c, (contagem.get(c) ?? 0) + 1);
   }
+  /* Assinatura vencida acende o item "Planos" — mesmo campo já usado no gate
+     de features por plano (`plano_permite`, 20260819210000) e no bloqueio de
+     busca/leads (20260819200000), não uma consulta nova. */
+  const { data: statusAssinatura } = papel === "profissional"
+    ? await supabase.from("professionals").select("subscription_status").eq("id", user.id).single()
+    : { data: null };
+
   /* O item "Pedidos" da distribuidora reaproveita o slot de badge de
      "orcamentos" (mesmo `icone`, ver navegacao.ts) — ela nunca recebe evento
      de quote_requests/quotes, então não há colisão real, só a troca do que
@@ -88,6 +95,7 @@ export default async function PainelLayout({ children }: LayoutProps<"/painel">)
       ? contagem.get("purchase_orders") ?? 0
       : (contagem.get("quote_requests") ?? 0) + (contagem.get("quotes") ?? 0),
     agenda: contagem.get("reminders") ?? 0,
+    planos: statusAssinatura?.subscription_status === "inadimplente" ? 1 : 0,
   };
 
   return (

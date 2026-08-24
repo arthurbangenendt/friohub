@@ -430,6 +430,12 @@ verify_jwt = true
 [functions.asaas-processar-repasses]
 verify_jwt = false
 
+# Acordado pelo pg_cron via pg_net (20260819190000) — não manda JWT do
+# Supabase, só o token guardado em vault.assinaturas_renovacao_worker_key,
+# conferido em index.ts (mesmo raciocínio do asaas-processar-repasses).
+[functions.asaas-renovar-assinaturas]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

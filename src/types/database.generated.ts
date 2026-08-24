@@ -2367,6 +2367,7 @@ export type Database = {
           plan_id: string
           professional_id: string
           proximo_plano_id: string | null
+          renewal_claimed_at: string | null
           status: string
           updated_at: string
         }
@@ -2381,6 +2382,7 @@ export type Database = {
           plan_id: string
           professional_id: string
           proximo_plano_id?: string | null
+          renewal_claimed_at?: string | null
           status?: string
           updated_at?: string
         }
@@ -2395,6 +2397,7 @@ export type Database = {
           plan_id?: string
           professional_id?: string
           proximo_plano_id?: string | null
+          renewal_claimed_at?: string | null
           status?: string
           updated_at?: string
         }
@@ -4398,6 +4401,7 @@ export type Database = {
         Args: { p_due_at: string; p_task_id: string }
         Returns: undefined
       }
+      aplicar_ciclo_assinaturas_vencidas: { Args: never; Returns: undefined }
       aprovar_orcamento_final: {
         Args: { p_job_final_quote_id: string }
         Returns: string
@@ -4629,6 +4633,7 @@ export type Database = {
       destravar_notificacoes_presas: { Args: never; Returns: number }
       disparar_processador_repasses: { Args: never; Returns: undefined }
       disparar_worker_chatwoot: { Args: never; Returns: undefined }
+      disparar_worker_renovacao_assinaturas: { Args: never; Returns: undefined }
       distancia_coordenadas_km: {
         Args: {
           p_latitude_destino: number
@@ -4700,6 +4705,17 @@ export type Database = {
           p_specialty: string
         }
         Returns: boolean
+      }
+      listar_assinaturas_prontas_para_renovar: {
+        Args: { p_limit?: number }
+        Returns: {
+          amount: number
+          ciclo: string
+          next_due_date: string
+          plan_id: string
+          professional_id: string
+          subscription_id: string
+        }[]
       }
       listar_repasses_prontos: {
         Args: { p_limit?: number }
@@ -4808,6 +4824,10 @@ export type Database = {
           telefone: string
         }[]
       }
+      plano_permite: {
+        Args: { p_feature: string; p_professional_id: string }
+        Returns: boolean
+      }
       pode_ler_foto_orcamento: {
         Args: { p_storage_path: string }
         Returns: boolean
@@ -4832,6 +4852,15 @@ export type Database = {
           p_gateway: string
           p_idempotency_key: string
           p_order_id: string
+        }
+        Returns: string
+      }
+      preparar_cobranca_renovacao: {
+        Args: {
+          p_billing_type: string
+          p_gateway: string
+          p_idempotency_key: string
+          p_subscription_id: string
         }
         Returns: string
       }

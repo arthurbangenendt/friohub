@@ -9,6 +9,7 @@ import { PERIODOS, chaveMes, comoPeriodo, janela, rotuloPeriodo } from "./period
 import { Doc } from "@/components/icons";
 import { Repasses } from "./Repasses";
 import { rotuloJob } from "../../solicitar/tipos";
+import { PlanoBloqueado } from "@/components/ui/PlanoBloqueado";
 
 export default async function FinanceiroPage({ searchParams }: PageProps<"/painel/financeiro">) {
   const sp = await searchParams;
@@ -26,7 +27,7 @@ export default async function FinanceiroPage({ searchParams }: PageProps<"/paine
      do usuário e 300 jobs para depois descartar quase tudo no JavaScript.
      `orders` não tem `profissional_id` — o vínculo é por `job_id` —, então o
      recorte por usuário continua sendo responsabilidade da RLS. */
-  const [{ data: jobs }, { data: ordersData }, { data: despesasData }] = await Promise.all([
+  const [{ data: jobs }, { data: ordersData }, { data: despesasData }, { data: graficosLiberado }, { data: custosObraLiberado }] = await Promise.all([
     supabase
       .from("jobs")
       .select("id, status, created_at, job_type")
@@ -40,6 +41,13 @@ export default async function FinanceiroPage({ searchParams }: PageProps<"/paine
     isPro
       ? supabase.from("expenses").select("id, job_id, categoria, descricao, valor, data").gte("data", inicio.slice(0, 10)).lt("data", fim.slice(0, 10)).order("data", { ascending: false })
       : Promise.resolve({ data: [] }),
+    // Gráfico e despesas são features de plano — só se aplica ao profissional.
+    isPro
+      ? supabase.rpc("plano_permite", { p_professional_id: user.id, p_feature: "graficos" })
+      : Promise.resolve({ data: true }),
+    isPro
+      ? supabase.rpc("plano_permite", { p_professional_id: user.id, p_feature: "custos_obra" })
+      : Promise.resolve({ data: false }),
   ]);
 
   type OrderRow = { job_id: string; preco_servico: number; comissao_servico?: number; total: number; payment_status: string; created_at: string };
@@ -173,16 +181,32 @@ export default async function FinanceiroPage({ searchParams }: PageProps<"/paine
           {isPro ? "Pagamentos liquidados e despesas" : "Pagamentos liquidados por mês de contratação"}
         </h2>
         <p style={{ fontSize: 13, color: "var(--ink-soft)", margin: "0 0 6px" }}>{rotuloPeriodo(periodo)}.</p>
-        <GraficoMeses dados={serie} comDespesa={isPro} />
+        {graficosLiberado ? (
+          <GraficoMeses dados={serie} comDespesa={isPro} />
+        ) : (
+          <PlanoBloqueado
+            titulo="Gráfico é do plano Profissional"
+            descricao="Acompanhe receita e despesa mês a mês num gráfico só seu. Faça upgrade para liberar."
+          />
+        )}
       </section>
 
       {isPro && (
         <section style={{ marginTop: 22 }}>
           <h2 style={{ fontSize: "1.05rem", fontWeight: 700, margin: "0 0 4px" }}>Despesas</h2>
-          <p style={{ fontSize: 13, color: "var(--ink-soft)", margin: "0 0 16px" }}>
-            Compras de ferramentas entram automaticamente quando você informa o valor. Lance aqui gasolina, locação e os demais custos da operação.
-          </p>
-          <DespesasEditor inicial={despesas} periodo={rotuloPeriodo(periodo)} servicos={servicosParaDespesa} />
+          {custosObraLiberado ? (
+            <>
+              <p style={{ fontSize: 13, color: "var(--ink-soft)", margin: "0 0 16px" }}>
+                Compras de ferramentas entram automaticamente quando você informa o valor. Lance aqui gasolina, locação e os demais custos da operação.
+              </p>
+              <DespesasEditor inicial={despesas} periodo={rotuloPeriodo(periodo)} servicos={servicosParaDespesa} />
+            </>
+          ) : (
+            <PlanoBloqueado
+              titulo="Controle de despesas é do plano Profissional"
+              descricao="Lance gasolina, locação e os demais custos da operação, e veja o que sobrou em cada serviço. Faça upgrade para liberar."
+            />
+          )}
         </section>
       )}
 

@@ -10,14 +10,14 @@
  * (`reconciliar_financeiro`) pegar depois.
  *
  * Atrás da feature flag `asaas_payments` (20260813184012_resilience_phase5.sql,
- * hoje desligada em toda região) — sem ela ligada para a região do cliente,
- * devolve `{ ok: true, skipped: true }` sem tentar nada.
+ * ligada em produção desde 20260819180000) — sem ela ligada para a região do
+ * cliente, devolve `{ ok: true, skipped: true }` sem tentar nada.
  *
- * PRÉ-REQUISITO AINDA EM ABERTO antes de ligar a flag em produção: o cliente
- * precisa de CPF/CNPJ (profile_private.cpf_cnpj) para o Asaas abrir o
- * customer. Hoje isso só é coletado opcionalmente no cadastro — sem um campo
- * de coleta no fluxo de aceite de proposta, esta função vai falhar (best-
- * effort, não trava o aceite) para todo cliente sem o documento salvo.
+ * CPF/CNPJ do cliente: coletado just-in-time no aceite de proposta quando
+ * ainda não existe documento salvo (Propostas.tsx + actions.ts, validado com
+ * dígito verificador via src/lib/documento.ts) — não é mais um pré-requisito
+ * em aberto. Cliente que ainda assim chegar aqui sem documento (ex.: aceite
+ * feito antes dessa coleta existir) recebe erro explícito abaixo.
  */
 
 import { servico, json } from "../_shared/supabase.ts";

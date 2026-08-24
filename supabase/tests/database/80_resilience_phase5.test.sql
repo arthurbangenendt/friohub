@@ -17,7 +17,7 @@ select has_function('public', 'obter_saude_publica', array[]::text[], 'saúde ag
 
 select is((select launch_stage from public.marketplace_regions where slug = 'sao-paulo-sp'), 'pilot', 'São Paulo nasce como piloto explícito');
 select ok(public.feature_enabled('pmoc', 'sao-paulo-sp', 'cliente-a'), 'PMOC está liberado no piloto');
-select ok(not public.feature_enabled('asaas_payments', 'sao-paulo-sp', 'cliente-a'), 'pagamentos Asaas continuam desligados');
+select ok(public.feature_enabled('asaas_payments', 'sao-paulo-sp', 'cliente-a'), 'pagamentos Asaas ativos em produção (20260819180000)');
 select is(
   public.feature_enabled('pmoc', 'sao-paulo-sp', 'cliente-deterministico'),
   public.feature_enabled('pmoc', 'sao-paulo-sp', 'cliente-deterministico'),

@@ -8,6 +8,7 @@ import { Avatar } from "../../Avatar";
 import { Star } from "@/components/icons";
 import { perguntasDe } from "@/app/solicitar/perguntas-orcamento";
 import type { JobType } from "@/app/solicitar/tipos";
+import { formatarDocumento, validarDocumento } from "@/lib/documento";
 import { aceitarProposta } from "../actions";
 import { ANALYTICS_VERSION, captureAnalytics } from "@/lib/analytics";
 
@@ -79,7 +80,7 @@ export function Propostas({
   const perguntas = perguntasDe(jobType);
 
   const cpfCnpjDigitos = cpfCnpj.replace(/\D/g, "");
-  const cpfCnpjValido = cpfCnpjDigitos.length === 11 || cpfCnpjDigitos.length === 14;
+  const cpfCnpjValido = validarDocumento(cpfCnpj);
 
   function confirmar(quoteId: string) {
     setErro(null);
@@ -220,7 +221,7 @@ export function Propostas({
                         CPF ou CNPJ
                         <input
                           value={cpfCnpj}
-                          onChange={(e) => setCpfCnpj(e.target.value)}
+                          onChange={(e) => setCpfCnpj(formatarDocumento(e.target.value))}
                           placeholder="Só números"
                           inputMode="numeric"
                           style={campoAceite}

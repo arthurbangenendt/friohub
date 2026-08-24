@@ -30,7 +30,7 @@ select lives_ok(
   'admin altera rollout'
 );
 select ok(not public.feature_enabled('ux_growth','sao-paulo-sp','subject-a'),'flag desativada bloqueia sujeito');
-select is((select count(*)::integer from public.admin_audit_log where action='feature_flag_changed' and entity_type='feature_flag'),1,'alteração gera auditoria');
+select is((select count(*)::integer from public.admin_audit_log where action='feature_flag_changed' and entity_type='feature_flag' and reason='Teste controlado de rollback'),1,'alteração gera auditoria');
 select is((select (old_values->>'enabled')::boolean from public.admin_audit_log where action='feature_flag_changed' order by created_at desc limit 1),true,'auditoria preserva estado anterior');
 select is((select (new_values->>'enabled')::boolean from public.admin_audit_log where action='feature_flag_changed' order by created_at desc limit 1),false,'auditoria preserva estado novo');
 select throws_ok(
