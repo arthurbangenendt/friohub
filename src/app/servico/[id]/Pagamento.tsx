@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { formatarBRL } from "@/lib/pricing";
 import { MEIO_COBRANCA, STATUS_COBRANCA, resolver } from "@/lib/status";
 import { Alert } from "@/components/ui";
+import { RetentarPagamento } from "./RetentarPagamento";
 
 /* Pagamento do serviço, do ponto de vista do cliente.
  *
@@ -9,14 +10,14 @@ import { Alert } from "@/components/ui";
  * e portanto já recorta pela política `customer_id = auth.uid()`. A view existe
  * exatamente para não expor o rateio econômico nem o payload do gateway.
  *
- * ATENÇÃO ao ler esta tela em produção hoje: nenhuma cobrança é criada. As RPCs
- * `preparar_cobranca_order` e `vincular_cobranca_gateway` são exclusivas de
- * `service_role`, e não existe consumidor que as chame — o gateway não está
- * conectado e a flag `asaas_payments` está desligada. Na prática o componente
- * cai sempre no aviso de "cobrança pela plataforma ainda não ativa". Ele está
- * aqui pronto para quando o Asaas entrar; não é funcionalidade em uso.
+ * Cobrança real ativada em produção (20260819180000_ativar_asaas_payments).
+ * Se `preparar_cobranca_servico`/`asaas-cobrar-servico` falharem (CPF/CNPJ
+ * ausente, gateway fora do ar), o cliente cai num dos dois estados "sem
+ * cobrança usável" abaixo — <RetentarPagamento> dá a ele uma saída, em vez
+ * de ficar travado vendo "Aguardando emissão" pra sempre (achado testando em
+ * produção 24/08).
  */
-export async function Pagamento({ orderId, total }: { orderId: string; total: number }) {
+export async function Pagamento({ orderId, total, jobId }: { orderId: string; total: number; jobId: string }) {
   const supabase = await createClient();
 
   const { data: cobranca } = await supabase
@@ -29,11 +30,13 @@ export async function Pagamento({ orderId, total }: { orderId: string; total: nu
 
   if (!cobranca) {
     return (
-      <Alert tipo="info">
-        O pagamento pela plataforma ainda não está ativo. Combine a forma de
-        pagamento diretamente com o profissional — o valor acertado é{" "}
-        <strong>{formatarBRL(total)}</strong>.
-      </Alert>
+      <div style={{ display: "grid", gap: 12 }}>
+        <Alert tipo="info">
+          Ainda não geramos a cobrança deste serviço pela plataforma — o
+          valor acertado é <strong>{formatarBRL(total)}</strong>.
+        </Alert>
+        <RetentarPagamento jobId={jobId} />
+      </div>
     );
   }
 
@@ -80,6 +83,18 @@ export async function Pagamento({ orderId, total }: { orderId: string; total: nu
         <a href={cobranca.checkout_url} target="_blank" rel="noopener noreferrer" className="btn btn-primary" style={{ justifySelf: "start" }}>
           Pagar agora
         </a>
+      )}
+
+      {/* Preparamos a cobrança localmente, mas o gateway ainda não devolveu
+          um link — a chamada ao Asaas falhou ou nunca foi feita. Sem isto o
+          cliente ficava vendo "Aguardando emissão" pra sempre. */}
+      {aberto && !cobranca.checkout_url && (
+        <div style={{ display: "grid", gap: 8 }}>
+          <p style={{ margin: 0, fontSize: 13, color: "var(--ink-soft)" }}>
+            Ainda não conseguimos gerar o link de pagamento.
+          </p>
+          <RetentarPagamento jobId={jobId} />
+        </div>
       )}
 
       {liquidado && (

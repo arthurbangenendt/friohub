@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import type { JobType } from "@/app/solicitar/tipos";
 import { validarDocumento } from "@/lib/documento";
+import { salvarCpfCnpjSeAusente } from "@/lib/supabase/salvar-cpf-cnpj-cliente";
 import { MAX_AMBIENTES, MAX_DESTINATARIOS } from "./config";
 
 /* Orçamentos (RFQ).
@@ -236,26 +237,8 @@ export async function aceitarProposta(
       return { ok: false as const, error: "Informe um CPF ou CNPJ válido." };
     }
     const digitos = cpfCnpj.replace(/\D/g, "");
-    /* Coleta única, mesmo padrão do CPF/CNPJ do profissional na assinatura
-       (20260818141000): só grava se ainda não houver documento salvo — não
-       sobrescreve o que já existe.
-       Duas etapas porque conta anterior a 12/08 (antes do documento virar
-       obrigatório no cadastro) não tem NENHUMA linha em `profile_private` —
-       um `update` sozinho não cria linha, então "funciona" sem erro e não
-       salva nada. `upsert` com `ignoreDuplicates` cria a linha só se faltar
-       (não mexe em quem já tem linha, com ou sem documento); o `update`
-       depois cobre quem já tinha linha mas ainda sem documento. */
-    const { error: erroCriarLinha } = await supabase
-      .from("profile_private")
-      .upsert({ id: user.id, cpf_cnpj: digitos }, { onConflict: "id", ignoreDuplicates: true });
-    if (erroCriarLinha) return { ok: false as const, error: "Não foi possível salvar o CPF/CNPJ." };
-
-    const { error: erroDocumento } = await supabase
-      .from("profile_private")
-      .update({ cpf_cnpj: digitos })
-      .eq("id", user.id)
-      .is("cpf_cnpj", null);
-    if (erroDocumento) return { ok: false as const, error: "Não foi possível salvar o CPF/CNPJ." };
+    const r = await salvarCpfCnpjSeAusente(supabase, user.id, digitos);
+    if (!r.ok) return { ok: false as const, error: r.error };
   }
 
   const { data, error } = await supabase.rpc("aceitar_quote", {

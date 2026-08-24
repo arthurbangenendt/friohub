@@ -2,6 +2,9 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { MidiaEditor } from "../MidiaEditor";
 import { ClienteForm } from "./ClienteForm";
+import { CpfCnpjCliente } from "./CpfCnpjCliente";
+import { EnderecoCliente } from "./EnderecoCliente";
+import { ContaSeguranca } from "./ContaSeguranca";
 import { Kpi } from "../shared";
 
 const meses = (desde: string) => {
@@ -35,7 +38,7 @@ export default async function PerfilClientePage() {
 
   const { data: priv } = await supabase
     .from("profile_private")
-    .select("telefone")
+    .select("telefone, cpf_cnpj, endereco_cep, endereco_bairro, endereco_completo")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -69,6 +72,22 @@ export default async function PerfilClientePage() {
 
       <div className="card" style={{ padding: 26, marginTop: 16 }}>
         <ClienteForm nomeInicial={nome} telefoneInicial={priv?.telefone ?? ""} />
+      </div>
+
+      <div className="card" style={{ padding: 26, marginTop: 16 }}>
+        <CpfCnpjCliente cpfCnpjInicial={priv?.cpf_cnpj ?? null} />
+      </div>
+
+      <div className="card" style={{ padding: 26, marginTop: 16 }}>
+        <EnderecoCliente
+          cepInicial={priv?.endereco_cep ?? ""}
+          bairroInicial={priv?.endereco_bairro ?? ""}
+          enderecoCompletoInicial={priv?.endereco_completo ?? ""}
+        />
+      </div>
+
+      <div className="card" style={{ padding: 26, marginTop: 16 }}>
+        <ContaSeguranca emailAtual={user.email ?? ""} />
       </div>
     </main>
   );

@@ -286,3 +286,34 @@ export async function avaliarCliente(input: { jobId: string; rating: number; tag
   revalidatePath(`/servico/${job.id}`);
   return { ok: true as const };
 }
+
+// ---------------------------------------------------------------------------
+// Pagamento — retry de cobrança que falhou (ou nunca foi tentada).
+// ---------------------------------------------------------------------------
+
+/* Chama a mesma Edge Function que `aceitarProposta` já aciona no aceite da
+ * proposta (`painel/orcamentos/actions.ts`) — mas lá é best-effort e engole
+ * o erro de propósito, pra não travar o aceite. Aqui o cliente clicou um
+ * botão pedindo isso, então o erro precisa aparecer pra ele em vez de sumir. */
+export async function tentarNovamenteCobranca(jobId: string) {
+  const supabase = await createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return { ok: false as const, error: "Não autenticado." };
+
+  let corpo: { ok?: boolean; error?: string; checkout_url?: string; skipped?: boolean };
+  try {
+    const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/asaas-cobrar-servico`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ job_id: jobId }),
+    });
+    corpo = await res.json();
+    if (!res.ok) return { ok: false as const, error: corpo.error ?? "Não foi possível gerar a cobrança." };
+  } catch {
+    return { ok: false as const, error: "Não foi possível falar com o gateway de pagamento agora." };
+  }
+
+  revalidatePath(`/servico/${jobId}`);
+  return { ok: true as const, checkoutUrl: corpo.checkout_url };
+}

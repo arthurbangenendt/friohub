@@ -76,20 +76,19 @@ export default async function PedidoPage({ params }: { params: Promise<{ id: str
      assinatura (20260818141000). Enquanto a flag estiver desligada em toda
      região, isto nunca aparece. */
   let precisaCpfCnpj = false;
+  let enderecoSugerido = "";
   if (souCliente) {
-    const { data: cobrancaHabilitada } = await supabase.rpc("feature_enabled", {
-      p_flag_key: "asaas_payments",
-      p_region_slug: REGIAO_SLUG,
-      p_subject_id: user.id,
-    });
-    if (cobrancaHabilitada === true) {
-      const { data: privado } = await supabase
-        .from("profile_private")
-        .select("cpf_cnpj")
-        .eq("id", user.id)
-        .maybeSingle();
-      precisaCpfCnpj = !privado?.cpf_cnpj;
-    }
+    const [{ data: cobrancaHabilitada }, { data: privado }] = await Promise.all([
+      supabase.rpc("feature_enabled", {
+        p_flag_key: "asaas_payments",
+        p_region_slug: REGIAO_SLUG,
+        p_subject_id: user.id,
+      }),
+      supabase.from("profile_private").select("cpf_cnpj, endereco_completo").eq("id", user.id).maybeSingle(),
+    ]);
+    if (cobrancaHabilitada === true) precisaCpfCnpj = !privado?.cpf_cnpj;
+    // Só uma sugestão — o campo em Propostas.tsx continua editável no aceite.
+    enderecoSugerido = privado?.endereco_completo ?? "";
   }
 
   const produto = one(pedido.produto) as { marca: string; modelo: string; btu: number; preco_venda: number } | null;
@@ -338,7 +337,7 @@ export default async function PedidoPage({ params }: { params: Promise<{ id: str
             <Propostas
               propostas={propostas.filter((p) => p.status !== "retirada")}
               podeAceitar={aberto}
-              enderecoSugerido=""
+              enderecoSugerido={enderecoSugerido}
               produtoPreco={Number(produto?.preco_venda ?? 0)}
               jobType={jobType}
               precisaCpfCnpj={precisaCpfCnpj}

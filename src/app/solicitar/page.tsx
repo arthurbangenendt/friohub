@@ -30,6 +30,13 @@ export default async function SolicitarPage(props: PageProps<"/solicitar">) {
     : { data: null };
   const equipmentSite = Array.isArray(equipment?.site) ? equipment.site[0] : equipment?.site;
 
+  /* Terceiro fallback de CEP, depois de ?cep= e do site do aparelho: o CEP
+     salvo no perfil (`/painel/perfil-cliente`). Só busca quando os outros
+     dois já vieram vazios — sem sentido gastar a query à toa. */
+  const { data: perfilPriv } = !equipmentSite?.cep && !cepInicial
+    ? await supabase.from("profile_private").select("endereco_cep").eq("id", user.id).maybeSingle()
+    : { data: null };
+
   // O catálogo inicial é apenas a primeira página. Demais páginas e o matching
   // por CEP são buscados sob demanda pelo Route Handler do marketplace.
   const { data: produtos, error: produtosError } = await supabase.rpc("buscar_produtos_marketplace", {
@@ -63,7 +70,7 @@ export default async function SolicitarPage(props: PageProps<"/solicitar">) {
       produtos={produtosDTO}
       totalProdutos={Number(produtos?.[0]?.total_count ?? produtosDTO.length)}
       profissionais={[]}
-      cepInicial={equipmentSite?.cep ?? cepInicial}
+      cepInicial={equipmentSite?.cep || cepInicial || perfilPriv?.endereco_cep || ""}
       equipmentInitial={equipment ? { id: equipment.id, label: equipmentSite?.label ?? "Local", brand: equipment.brand, model: equipment.model, capacityBtu: equipment.capacity_btu } : null}
       userId={user.id}
     />

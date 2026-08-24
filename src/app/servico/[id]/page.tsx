@@ -346,7 +346,7 @@ export default async function ServicoPage({ params }: { params: Promise<{ id: st
                 />
               </div>
             )}
-            <Pagamento orderId={o.id} total={o.total} />
+            <Pagamento orderId={o.id} total={o.total} jobId={job.id} />
             {isCliente && job.status === "concluido" && <ContestarExecucao jobId={job.id} />}
           </div>
         ))}

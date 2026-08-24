@@ -3101,6 +3101,9 @@ export type Database = {
         Row: {
           cpf_cnpj: string | null
           created_at: string
+          endereco_bairro: string | null
+          endereco_cep: string | null
+          endereco_completo: string | null
           id: string
           telefone: string | null
           termos_aceitos_em: string | null
@@ -3110,6 +3113,9 @@ export type Database = {
         Insert: {
           cpf_cnpj?: string | null
           created_at?: string
+          endereco_bairro?: string | null
+          endereco_cep?: string | null
+          endereco_completo?: string | null
           id: string
           telefone?: string | null
           termos_aceitos_em?: string | null
@@ -3119,6 +3125,9 @@ export type Database = {
         Update: {
           cpf_cnpj?: string | null
           created_at?: string
+          endereco_bairro?: string | null
+          endereco_cep?: string | null
+          endereco_completo?: string | null
           id?: string
           telefone?: string | null
           termos_aceitos_em?: string | null
