@@ -1,6 +1,7 @@
 import { login } from "../actions";
 import { AuthShell } from "../AuthShell";
-import { Field, primaryBtn } from "../ui";
+import { Field } from "../ui";
+import { BotaoEntrar } from "../BotaoEntrar";
 import { destinoSeguro } from "@/lib/proximo";
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
@@ -23,7 +24,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
         <input type="hidden" name="next" value={proximo} />
         <Field label="Email" name="email" type="email" autoComplete="email" placeholder="voce@email.com" />
         <Field label="Senha" name="password" type="password" autoComplete="current-password" placeholder="••••••••" />
-        <button type="submit" style={primaryBtn}>Entrar</button>
+        <BotaoEntrar />
       </form>
     </AuthShell>
   );
