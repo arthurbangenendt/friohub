@@ -107,11 +107,19 @@ export default async function AdminPage() {
   });
   const funil = funilData?.[0] ?? null;
 
+  const { count: disputasAbertas } = await supabase
+    .from("job_disputes")
+    .select("id", { count: "exact", head: true })
+    .in("status", ["aberta", "processando_reembolso"]);
+
   return (
     <main className="container-tight" style={{ padding: "40px 24px 80px" }}>
       <Link href="/painel" style={{ fontFamily: mono, fontSize: 13, color: "var(--ink-faint)" }}>← Painel</Link>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 18 }}>
         <Link href="/admin/saude" className="btn">Saúde operacional</Link>
+        <Link href="/admin/disputas" className="btn">
+          Disputas{disputasAbertas ? ` (${disputasAbertas})` : ""}
+        </Link>
         <Link href="/admin/financeiro" className="btn">Financeiro (ledger e conciliação)</Link>
         <Link href="/admin/pmoc" className="btn">Fila PMOC</Link>
         <Link href="/admin/assinaturas" className="btn">Assinaturas</Link>

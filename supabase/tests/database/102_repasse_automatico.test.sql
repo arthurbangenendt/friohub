@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
-select plan(17);
+select plan(19);
 
 select has_table('public', 'payment_transfers', 'reserva de repasse existe');
 select has_column('public', 'payment_transfers', 'scheduled_for', 'repasse tem janela de contenção');
@@ -118,15 +118,17 @@ select is(
 );
 
 -- ===========================================================================
--- Contestação do cliente
+-- Contestação do cliente — desde 20260825091000, sempre cria job_disputes,
+-- mesmo quando não há repasse bloqueável (job d...002, que falhou por falta
+-- de PIX): o cliente não esbarra mais num erro sem saída, o admin só vê a
+-- disputa marcada como 'sem_repasse'.
 -- ===========================================================================
 set local role authenticated;
 select set_config('request.jwt.claim.sub','c0000000-0000-0000-0000-000000000001',true);
 
-select throws_ok(
+select lives_ok(
   $$select public.contestar_execucao_job('d0000000-0000-0000-0000-000000000002', 'nada foi feito')$$,
-  'Não há repasse pendente para contestar neste serviço — ele já foi processado ou ainda não foi preparado.',
-  'não dá pra contestar repasse que já não está mais pendente (aqui, o que falhou por falta de PIX)'
+  'contestar um repasse que já não está mais pendente (falhou por falta de PIX) não lança mais exceção — cria disputa sinalizada'
 );
 select lives_ok(
   $$select public.contestar_execucao_job('d0000000-0000-0000-0000-000000000001', 'profissional não compareceu')$$,
@@ -138,6 +140,16 @@ select is(
   (select status from public.payment_transfers where job_id = 'd0000000-0000-0000-0000-000000000001'),
   'cancelled',
   'contestação cancela o repasse — ninguém recebe até o financeiro resolver manualmente'
+);
+select is(
+  (select situacao_repasse from public.job_disputes where job_id = 'd0000000-0000-0000-0000-000000000001'),
+  'bloqueado',
+  'disputa registra que o repasse foi travado com sucesso'
+);
+select is(
+  (select situacao_repasse from public.job_disputes where job_id = 'd0000000-0000-0000-0000-000000000002'),
+  'sem_repasse',
+  'disputa do job sem repasse bloqueável fica sinalizada, não gera erro'
 );
 
 select * from finish();

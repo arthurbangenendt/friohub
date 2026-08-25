@@ -436,6 +436,11 @@ verify_jwt = false
 [functions.asaas-renovar-assinaturas]
 verify_jwt = false
 
+# Recebe o JWT do admin que está aprovando uma disputa — index.ts confere o
+# papel (role='admin') antes de chamar o Asaas.
+[functions.asaas-resolver-disputa]
+verify_jwt = true
+
 [analytics]
 enabled = true
 port = 54327

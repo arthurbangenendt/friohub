@@ -18,6 +18,7 @@ import { Rastreio, type EtapaId } from "./Rastreio";
 import { Evidencias } from "./Evidencias";
 import { Pagamento } from "./Pagamento";
 import { ContestarExecucao } from "./ContestarExecucao";
+import { CancelarJobPago } from "./CancelarJobPago";
 import { OrcamentoFinal } from "./OrcamentoFinal";
 
 const mono = "var(--font-geist-mono), ui-monospace, monospace";
@@ -213,6 +214,26 @@ export default async function ServicoPage({ params }: { params: Promise<{ id: st
   const review = one(job.review) as { rating: number; comment: string | null } | null;
   const st = STATUS[job.status] ?? STATUS.aberto;
 
+  /* Disputa (contestação pós-conclusão ou cancelamento de job pago em
+     execução) — só o cliente que abriu vê (RLS de job_disputes), então só
+     buscamos quando é o cliente olhando. O profissional não enxerga esse
+     bloco por ora. */
+  const { data: disputa } = isCliente
+    ? await supabase
+        .from("job_disputes")
+        .select("id, tipo, status, situacao_repasse, valor_referencia, valor_reembolso, created_at")
+        .eq("job_id", job.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    : { data: null };
+  const disputaEmAndamento = disputa ? ["aberta", "processando_reembolso"].includes(disputa.status) : false;
+  const temPagamentoRecebido = orders.some((o) => o.payment_status === "pago" || o.payment_status === "reembolsado");
+  const podeCancelarPago = isCliente
+    && ["aceito", "em_execucao", "aguardando_orcamento_final"].includes(job.status)
+    && temPagamentoRecebido
+    && !disputa;
+
   return (
     <main className="container-tight" style={{ padding: "40px 24px 80px" }}>
       <Link href="/painel" style={{ fontFamily: mono, fontSize: 13, color: "var(--ink-faint)" }}>← Painel</Link>
@@ -347,9 +368,33 @@ export default async function ServicoPage({ params }: { params: Promise<{ id: st
               </div>
             )}
             <Pagamento orderId={o.id} total={o.total} jobId={job.id} />
-            {isCliente && job.status === "concluido" && <ContestarExecucao jobId={job.id} />}
           </div>
         ))}
+
+        {/* Disputa: contestação pós-conclusão, cancelamento de job pago em
+            execução, ou o status de uma disputa já aberta — as três coisas
+            são mutuamente exclusivas por causa do status do job, então cabem
+            num bloco só, uma vez por serviço (não por order). */}
+        {isCliente && disputa && (
+          <div className="card" style={{ padding: 22 }}>
+            <SecTitle>Cancelamento / contestação</SecTitle>
+            {disputaEmAndamento ? (
+              <p style={{ fontSize: 13.5, color: "var(--ink-soft)", margin: 0 }}>
+                Sua solicitação está em análise pela nossa equipe.
+              </p>
+            ) : disputa.status === "rejeitada" ? (
+              <p style={{ fontSize: 13.5, color: "var(--ink-soft)", margin: 0 }}>
+                Sua solicitação foi analisada e não foi aprovada. Fale com a gente pelo chat se quiser entender melhor.
+              </p>
+            ) : (
+              <p style={{ fontSize: 13.5, color: "var(--good)", fontWeight: 600, margin: 0 }}>
+                Reembolso aprovado{disputa.valor_reembolso ? `: ${formatarBRL(disputa.valor_reembolso)}` : ""}.
+              </p>
+            )}
+          </div>
+        )}
+        {isCliente && !disputa && job.status === "concluido" && <ContestarExecucao jobId={job.id} />}
+        {podeCancelarPago && <CancelarJobPago jobId={job.id} />}
 
         {/* entrega do equipamento — resumo compacto; detalhe completo (itens de
             cada distribuidora, linha do tempo) mora em tela própria, porque o

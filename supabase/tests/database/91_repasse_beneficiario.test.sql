@@ -27,7 +27,7 @@ select ok(
   'preparar cobrança segue exclusiva de service_role'
 );
 select ok(
-  not has_function_privilege('authenticated','public.registrar_lancamento_financeiro(uuid,uuid,text,text,text,text,timestamp with time zone,jsonb,uuid)','EXECUTE'),
+  not has_function_privilege('authenticated','public.registrar_lancamento_financeiro(uuid,uuid,text,text,text,text,timestamp with time zone,jsonb,uuid,uuid)','EXECUTE'),
   'lançamento no ledger segue exclusivo de service_role'
 );
 

@@ -123,6 +123,20 @@ export async function cancelarCobranca(gatewayPaymentId: string): Promise<void> 
   await asaas("DELETE", `/payments/${gatewayPaymentId}`);
 }
 
+export type AsaasRefund = {
+  status: string;
+};
+
+/* Estorna uma cobrança já liquidada. `value` omitido = estorno integral;
+ * informado = estorno parcial (o Asaas aceita valor menor que o total da
+ * cobrança). Usado só pelo fluxo de resolução de disputa
+ * (asaas-resolver-disputa) — a aplicação da política de rateio (comissão da
+ * plataforma absorve primeiro) acontece no banco, via
+ * `aplicar_reembolso_proporcional`, depois que o Asaas confirma o estorno. */
+export async function estornarCobranca(gatewayPaymentId: string, value?: number): Promise<AsaasRefund> {
+  return await asaas("POST", `/payments/${gatewayPaymentId}/refund`, value !== undefined ? { value } : undefined) as AsaasRefund;
+}
+
 /* Achado testando em produção: um customer apagado manualmente no painel do
  * Asaas (sandbox) deixa `payment_customers.gateway_customer_id` local
  * apontando para um id que não existe mais lá. `POST /payments` recusa com

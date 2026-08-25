@@ -1258,6 +1258,86 @@ export type Database = {
           },
         ]
       }
+      job_disputes: {
+        Row: {
+          aberto_por: string
+          created_at: string
+          id: string
+          job_id: string
+          motivo: string
+          nota_admin: string | null
+          resolvido_em: string | null
+          resolvido_por: string | null
+          situacao_repasse: string | null
+          status: string
+          tipo: string
+          updated_at: string
+          valor_reembolso: number | null
+          valor_referencia: number
+        }
+        Insert: {
+          aberto_por: string
+          created_at?: string
+          id?: string
+          job_id: string
+          motivo: string
+          nota_admin?: string | null
+          resolvido_em?: string | null
+          resolvido_por?: string | null
+          situacao_repasse?: string | null
+          status?: string
+          tipo: string
+          updated_at?: string
+          valor_reembolso?: number | null
+          valor_referencia?: number
+        }
+        Update: {
+          aberto_por?: string
+          created_at?: string
+          id?: string
+          job_id?: string
+          motivo?: string
+          nota_admin?: string | null
+          resolvido_em?: string | null
+          resolvido_por?: string | null
+          situacao_repasse?: string | null
+          status?: string
+          tipo?: string
+          updated_at?: string
+          valor_reembolso?: number | null
+          valor_referencia?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_disputes_aberto_por_fkey"
+            columns: ["aberto_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_disputes_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_disputes_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos_distribuidora"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "job_disputes_resolvido_por_fkey"
+            columns: ["resolvido_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_events: {
         Row: {
           actor_id: string | null
@@ -4456,6 +4536,15 @@ export type Database = {
         Returns: undefined
       }
       aplicar_ciclo_assinaturas_vencidas: { Args: never; Returns: undefined }
+      aplicar_reembolso_proporcional: {
+        Args: {
+          p_charge_id: string
+          p_idempotency_key: string
+          p_occurred_at?: string
+          p_valor_reembolso: number
+        }
+        Returns: string
+      }
       aprovar_orcamento_final: {
         Args: { p_job_final_quote_id: string }
         Returns: string
@@ -4579,6 +4668,10 @@ export type Database = {
         Args: { p_professional_id: string }
         Returns: string
       }
+      cancelar_job_pago_aprovado: {
+        Args: { p_job_id: string }
+        Returns: undefined
+      }
       cancelar_pedido_orcamento: {
         Args: { p_quote_request_id: string; p_reason: string }
         Returns: undefined
@@ -4618,6 +4711,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      confirmar_reembolso_disputa: {
+        Args: { p_dispute_id: string; p_resultados: Json }
+        Returns: undefined
+      }
       consume_rate_limit: {
         Args: {
           p_max_hits: number
@@ -4633,7 +4730,7 @@ export type Database = {
       }
       contestar_execucao_job: {
         Args: { p_job_id: string; p_motivo: string }
-        Returns: undefined
+        Returns: string
       }
       criar_follow_up: {
         Args: { p_due_at: string; p_quote_request_id: string; p_title?: string }
@@ -4927,6 +5024,15 @@ export type Database = {
         Args: { p_cliente_id: string; p_job_id: string }
         Returns: string
       }
+      preparar_reembolso_disputa: {
+        Args: {
+          p_admin_id: string
+          p_dispute_id: string
+          p_nota_admin: string
+          p_valor_reembolso: number
+        }
+        Returns: Json
+      }
       preparar_repasse_profissional: {
         Args: { p_job_id: string }
         Returns: undefined
@@ -4986,6 +5092,10 @@ export type Database = {
           p_site_name: string
         }
         Returns: string
+      }
+      reativar_repasse_contestado: {
+        Args: { p_job_id: string }
+        Returns: undefined
       }
       recomendar_manutencao: {
         Args: { p_due_on: string; p_equipment_id: string; p_reason: string }
@@ -5066,36 +5176,21 @@ export type Database = {
         Args: { p_ciclo: string; p_slug: string }
         Returns: string
       }
-      registrar_lancamento_financeiro:
-        | {
-            Args: {
-              p_charge_id: string
-              p_description: string
-              p_external_event_id: string
-              p_idempotency_key: string
-              p_journal_type: string
-              p_lines: Json
-              p_occurred_at: string
-              p_order_id: string
-              p_reversal_of?: string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              p_charge_id: string
-              p_description: string
-              p_external_event_id: string
-              p_idempotency_key: string
-              p_journal_type: string
-              p_lines: Json
-              p_occurred_at: string
-              p_order_id: string
-              p_reversal_of?: string
-              p_subscription_id?: string
-            }
-            Returns: string
-          }
+      registrar_lancamento_financeiro: {
+        Args: {
+          p_charge_id: string
+          p_description: string
+          p_external_event_id: string
+          p_idempotency_key: string
+          p_journal_type: string
+          p_lines: Json
+          p_occurred_at: string
+          p_order_id: string
+          p_reversal_of?: string
+          p_subscription_id?: string
+        }
+        Returns: string
+      }
       registrar_payment_customer: {
         Args: {
           p_external_reference: string
@@ -5125,6 +5220,10 @@ export type Database = {
           payload: Json
           recipient_id: string
         }[]
+      }
+      resolver_disputa_rejeitar: {
+        Args: { p_dispute_id: string; p_nota_admin: string }
+        Returns: undefined
       }
       responder_agendamento: {
         Args: { p_accept: boolean; p_appointment_id: string; p_reason?: string }
@@ -5176,6 +5275,10 @@ export type Database = {
           p_razao_social: string
         }
         Returns: undefined
+      }
+      solicitar_cancelamento_job_pago: {
+        Args: { p_job_id: string; p_motivo: string }
+        Returns: string
       }
       solicitar_downgrade_assinatura: {
         Args: { p_novo_plano_id: string; p_professional_id: string }
