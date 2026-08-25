@@ -11,6 +11,7 @@ import type { JobType } from "@/app/solicitar/tipos";
 import { formatarDocumento, validarDocumento } from "@/lib/documento";
 import { aceitarProposta } from "../actions";
 import { ANALYTICS_VERSION, captureAnalytics } from "@/lib/analytics";
+import { Campo, CampoSelecao } from "@/components/ui";
 
 export type PropostaView = {
   id: string;
@@ -39,12 +40,6 @@ export type PropostaView = {
 };
 
 const dataBR = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString("pt-BR");
-
-const campoAceite: React.CSSProperties = {
-  width: "100%", marginTop: 6, padding: "11px 14px", borderRadius: 11,
-  border: "1px solid var(--line)", background: "var(--surface)",
-  fontSize: 14.5, fontFamily: "inherit", color: "var(--ink)",
-};
 
 /* Comparação de propostas.
  *
@@ -202,34 +197,26 @@ export function Propostas({
                   <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                     {/* O endereço completo só é pedido agora: até aqui o
                         profissional viu apenas o CEP e o bairro. */}
-                    <label style={{ fontSize: 13, fontWeight: 650, color: "var(--ink-soft)" }}>
-                      Endereço completo do serviço
-                      <input
-                        value={endereco}
-                        onChange={(e) => setEndereco(e.target.value)}
-                        placeholder="Rua, número, complemento"
-                        style={campoAceite}
-                      />
-                    </label>
+                    <Campo
+                      rotulo="Endereço completo do serviço"
+                      value={endereco}
+                      onChange={(e) => setEndereco(e.target.value)}
+                      placeholder="Rua, número, complemento"
+                    />
 
                     {/* CPF/CNPJ só aparece quando a cobrança real está ligada
                         pra esta região e o cliente ainda não tem documento
                         salvo — coleta just-in-time, o Asaas exige isso pra
                         abrir o pagador. */}
                     {precisaCpfCnpj && (
-                      <label style={{ fontSize: 13, fontWeight: 650, color: "var(--ink-soft)" }}>
-                        CPF ou CNPJ
-                        <input
-                          value={cpfCnpj}
-                          onChange={(e) => setCpfCnpj(formatarDocumento(e.target.value))}
-                          placeholder="Só números"
-                          inputMode="numeric"
-                          style={campoAceite}
-                        />
-                        <span style={{ fontSize: 12, color: "var(--ink-faint)", display: "block", marginTop: 5, fontWeight: 500 }}>
-                          Necessário para processar o pagamento do serviço pela plataforma.
-                        </span>
-                      </label>
+                      <Campo
+                        rotulo="CPF ou CNPJ"
+                        value={cpfCnpj}
+                        onChange={(e) => setCpfCnpj(formatarDocumento(e.target.value))}
+                        placeholder="Só números"
+                        inputMode="numeric"
+                        dica="Necessário para processar o pagamento do serviço pela plataforma."
+                      />
                     )}
 
                     {/* Questionário técnico: só nesta hora. No pedido inicial
@@ -242,19 +229,16 @@ export function Propostas({
                           deixe em branco — ele confirma na hora.
                         </span>
                         {perguntas.map((q) => (
-                          <label key={q.id} style={{ fontSize: 13, fontWeight: 650, color: "var(--ink-soft)" }}>
-                            {q.label}
-                            {q.tipo === "select" ? (
-                              <select value={respostas[q.id] ?? ""} style={campoAceite}
-                                onChange={(e) => setRespostas((r) => ({ ...r, [q.id]: e.target.value }))}>
-                                <option value="">Selecione…</option>
-                                {q.opcoes!.map((o) => <option key={o} value={o}>{o}</option>)}
-                              </select>
-                            ) : (
-                              <input value={respostas[q.id] ?? ""} style={campoAceite}
-                                onChange={(e) => setRespostas((r) => ({ ...r, [q.id]: e.target.value }))} />
-                            )}
-                          </label>
+                          q.tipo === "select" ? (
+                            <CampoSelecao key={q.id} rotulo={q.label} value={respostas[q.id] ?? ""}
+                              onChange={(e) => setRespostas((r) => ({ ...r, [q.id]: e.target.value }))}>
+                              <option value="">Selecione…</option>
+                              {q.opcoes!.map((o) => <option key={o} value={o}>{o}</option>)}
+                            </CampoSelecao>
+                          ) : (
+                            <Campo key={q.id} rotulo={q.label} value={respostas[q.id] ?? ""}
+                              onChange={(e) => setRespostas((r) => ({ ...r, [q.id]: e.target.value }))} />
+                          )
                         ))}
                       </div>
                     )}

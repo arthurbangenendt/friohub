@@ -5,6 +5,10 @@ import { formatarBRL } from "@/lib/pricing";
 import { Cabecalho, Kpi, wrap } from "../shared";
 import { salvarMeta } from "./actions";
 import { featureHabilitada } from "@/lib/feature-flags";
+import { Campo } from "@/components/ui";
+import { TimelineContent } from "@/components/ui/timeline-animation";
+import { Search, Doc, Star, Check, Bolt, Tool } from "@/components/icons";
+
 export default async function DesempenhoPage() {
   const supabase = await createClient();
   const {
@@ -64,6 +68,7 @@ export default async function DesempenhoPage() {
     .filter((o) => o.payment_status === "pago")
     .reduce((s, o) => s + Number(o.preco_servico) - Number(o.comissao_servico), 0);
   const target = Number(goal?.revenue_target ?? 0);
+  const metaPct = target > 0 ? Math.min(100, Math.round((revenue / target) * 100)) : 0;
   const completeness =
     [
       p.avatar_url,
@@ -88,67 +93,111 @@ export default async function DesempenhoPage() {
         Funil do mês com o mesmo período em todas as etapas. Sem vaidade e sem denominadores misturados.
       </p>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(145px,1fr))", gap: 10 }}>
-        <Kpi label="Oportunidades" valor={String(sent)} />
+        <Kpi label="Oportunidades" valor={String(sent)} icone={<Search size={16} />} />
         <Kpi
           label="Propostas"
           valor={String(responses)}
           sufixo={sent ? `${Math.round((responses / sent) * 100)}% das oportunidades` : "sem amostra"}
+          icone={<Doc size={16} />}
         />
         <Kpi
           label="Ganhos"
           valor={String(wins)}
           sufixo={responses ? `${Math.round((wins / responses) * 100)}% das propostas` : "sem amostra"}
+          icone={<Star size={16} filled />}
         />
-        <Kpi label="Concluídos" valor={String(completed)} />
+        <Kpi label="Concluídos" valor={String(completed)} icone={<Check size={16} />} />
       </div>
-      <section className="card" style={{ padding: 22, marginTop: 16 }}>
-        <h2 style={{ fontSize: 17 }}>Meta do mês</h2>
-        <strong style={{ fontSize: 24 }}>{formatarBRL(revenue)}</strong>
-        {target > 0 && (
-          <p>
-            {Math.min(100, Math.round((revenue / target) * 100))}% de {formatarBRL(target)}
+
+      <TimelineContent delay={0}>
+        <section className="card" style={{ padding: 22, marginTop: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+            <div className="perfil-skill-icone"><Bolt size={18} /></div>
+            <h2 style={{ fontSize: 16.5, fontWeight: 700, margin: 0 }}>Meta do mês</h2>
+          </div>
+
+          <strong style={{ fontSize: 24 }}>{formatarBRL(revenue)}</strong>
+
+          {target > 0 && (
+            <div style={{ marginTop: 12 }}>
+              <div style={{ height: 10, borderRadius: 100, background: "var(--surface-2)", overflow: "hidden" }}>
+                <div style={{
+                  height: "100%", width: `${metaPct}%`, borderRadius: 100,
+                  background: metaPct >= 100 ? "var(--good)" : "var(--cool)",
+                  transition: "width .4s ease",
+                }} />
+              </div>
+              <p style={{ fontSize: 13, color: "var(--ink-soft)", margin: "8px 0 0" }}>
+                {metaPct}% de {formatarBRL(target)}
+              </p>
+            </div>
+          )}
+
+          <form action={salvarMeta} style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 18, alignItems: "end" }}>
+            <input type="hidden" name="month" value={since.toISOString().slice(0, 7)} />
+            <div style={{ flex: "1 1 220px" }}>
+              <Campo
+                rotulo="Meta de receita líquida"
+                rotuloOculto
+                name="target"
+                type="number"
+                min="1"
+                step="0.01"
+                defaultValue={target || undefined}
+                placeholder="Meta de receita líquida"
+              />
+            </div>
+            <button className="btn" style={{ height: 44 }}>Salvar meta</button>
+          </form>
+        </section>
+      </TimelineContent>
+
+      <TimelineContent delay={.08}>
+        <section className="card" style={{ padding: 22, marginTop: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+            <div className="perfil-skill-icone"><Tool size={18} /></div>
+            <h2 style={{ fontSize: 16.5, fontWeight: 700, margin: 0 }}>Assistente de perfil</h2>
+          </div>
+
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ height: 10, borderRadius: 100, background: "var(--surface-2)", overflow: "hidden" }}>
+              <div style={{
+                height: "100%", width: `${Math.round(completeness * 100)}%`, borderRadius: 100,
+                background: completeness >= 1 ? "var(--good)" : "var(--cool)",
+                transition: "width .4s ease",
+              }} />
+            </div>
+            <p style={{ fontSize: 13, color: "var(--ink-soft)", margin: "8px 0 0" }}>
+              Completude: <strong>{Math.round(completeness * 100)}%</strong>
+            </p>
+          </div>
+
+          {suggestions.length ? (
+            <ul style={{ display: "flex", flexDirection: "column", gap: 10, margin: "0 0 16px", padding: 0, listStyle: "none" }}>
+              {suggestions.map((s) => (
+                <li key={s} style={{
+                  display: "flex", gap: 10, alignItems: "flex-start", fontSize: 14, color: "var(--ink)",
+                  padding: "10px 13px", borderRadius: 10, background: "var(--surface-2)",
+                }}>
+                  <span style={{ color: "var(--warm)", flexShrink: 0, marginTop: 2 }}><Bolt size={14} /></span>
+                  {s}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p style={{ color: "var(--good)" }}>
+              Seu perfil cobre os principais sinais de confiança. Continue atualizando trabalhos reais.
+            </p>
+          )}
+          <Link href="/painel/perfil" className="btn">
+            Melhorar meu perfil
+          </Link>
+          <p style={{ fontSize: 12, color: "var(--ink-faint)", marginTop: 14 }}>
+            Visualizações de perfil não aparecem porque esse evento ainda não é instrumentado; não exibimos
+            estimativas inventadas.
           </p>
-        )}
-        <form action={salvarMeta} style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <input type="hidden" name="month" value={since.toISOString().slice(0, 7)} />
-          <input
-            name="target"
-            type="number"
-            min="1"
-            step="0.01"
-            defaultValue={target || undefined}
-            placeholder="Meta de receita líquida"
-            style={{ padding: 10, border: "1px solid var(--line)", borderRadius: 9 }}
-          />
-          <button className="btn">Salvar meta</button>
-        </form>
-      </section>
-      <section className="card" style={{ padding: 22, marginTop: 16 }}>
-        <h2 style={{ fontSize: 17 }}>Assistente de perfil</h2>
-        <p>
-          Completude: <strong>{Math.round(completeness * 100)}%</strong>
-        </p>
-        {suggestions.length ? (
-          <ul>
-            {suggestions.map((s) => (
-              <li key={s} style={{ marginBottom: 8 }}>
-                {s}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p style={{ color: "var(--good)" }}>
-            Seu perfil cobre os principais sinais de confiança. Continue atualizando trabalhos reais.
-          </p>
-        )}
-        <Link href="/painel/perfil" className="btn">
-          Melhorar meu perfil
-        </Link>
-        <p style={{ fontSize: 12, color: "var(--ink-faint)" }}>
-          Visualizações de perfil não aparecem porque esse evento ainda não é instrumentado; não exibimos
-          estimativas inventadas.
-        </p>
-      </section>
+        </section>
+      </TimelineContent>
     </div>
   );
 }

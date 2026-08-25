@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { formatarBRL } from "@/lib/pricing";
 import { formatarBtu } from "@/lib/btu";
 import { alternarEstoque, salvarProduto } from "../actions";
+import { Campo, CampoSelecao } from "@/components/ui";
 
 export type ProdutoLinha = {
   id: string;
@@ -24,12 +25,6 @@ const CATEGORIAS = ["split", "inverter", "multi_split", "piso_teto", "janela"];
 const CAT_LABEL: Record<string, string> = {
   split: "Split", inverter: "Inverter", multi_split: "Multi-split", piso_teto: "Piso-teto", janela: "Janela",
 };
-
-const campo: React.CSSProperties = {
-  width: "100%", padding: "11px 14px", borderRadius: 11, border: "1px solid var(--line)",
-  background: "var(--surface)", fontSize: 14.5, fontFamily: "inherit", color: "var(--ink)",
-};
-const rotulo: React.CSSProperties = { fontSize: 13, fontWeight: 650, color: "var(--ink-soft)", display: "block", marginBottom: 6 };
 
 /* Catálogo da distribuidora.
  *
@@ -171,26 +166,20 @@ function Formulario({
       <strong style={{ fontSize: 15.5 }}>{inicial ? "Editar produto" : "Novo produto"}</strong>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px,1fr))", gap: 12 }}>
-        <label><span style={rotulo}>Marca</span>
-          <input value={marca} onChange={(e) => setMarca(e.target.value)} style={campo} placeholder="Ex.: Midea" /></label>
-        <label><span style={rotulo}>Capacidade (BTU)</span>
-          <input value={btu} onChange={(e) => setBtu(e.target.value)} inputMode="numeric" style={campo} /></label>
-        <label><span style={rotulo}>Categoria</span>
-          <select value={categoria} onChange={(e) => setCategoria(e.target.value)} style={campo}>
-            {CATEGORIAS.map((c) => <option key={c} value={c}>{CAT_LABEL[c]}</option>)}
-          </select></label>
+        <Campo rotulo="Marca" value={marca} onChange={(e) => setMarca(e.target.value)} placeholder="Ex.: Midea" />
+        <Campo rotulo="Capacidade (BTU)" value={btu} onChange={(e) => setBtu(e.target.value)} inputMode="numeric" />
+        <CampoSelecao rotulo="Categoria" value={categoria} onChange={(e) => setCategoria(e.target.value)}>
+          {CATEGORIAS.map((c) => <option key={c} value={c}>{CAT_LABEL[c]}</option>)}
+        </CampoSelecao>
       </div>
 
-      <label><span style={rotulo}>Modelo</span>
-        <input value={modelo} onChange={(e) => setModelo(e.target.value)} style={campo}
-          placeholder="Descrição completa como aparece na nota" /></label>
+      <Campo rotulo="Modelo" value={modelo} onChange={(e) => setModelo(e.target.value)}
+        placeholder="Descrição completa como aparece na nota" />
 
-      <label><span style={rotulo}>URL da imagem</span>
-        <input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} style={campo} placeholder="https://…" /></label>
+      <Campo rotulo="URL da imagem" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://…" />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px,1fr))", gap: 12, alignItems: "end" }}>
-        <label><span style={rotulo}>Seu custo (R$)</span>
-          <input value={custo} onChange={(e) => setCusto(e.target.value)} inputMode="decimal" style={campo} placeholder="0,00" /></label>
+        <Campo rotulo="Seu custo (R$)" value={custo} onChange={(e) => setCusto(e.target.value)} inputMode="decimal" placeholder="0,00" />
         <div style={{ padding: "11px 14px", borderRadius: 11, background: "var(--surface-2)" }}>
           <div style={{ fontSize: 12.5, color: "var(--ink-faint)" }}>Preço na vitrine</div>
           <div style={{ fontWeight: 700 }}>{formatarBRL(vitrine)}</div>

@@ -14,3 +14,4 @@ export { EmptyState } from "./EmptyState";
 export { StatusPill } from "./StatusPill";
 export { Campo, CampoTexto, CampoSelecao, controle } from "./Field";
 export { ToastProvider, useToast } from "./Toast";
+export { SecaoComIcone } from "./SecaoComIcone";

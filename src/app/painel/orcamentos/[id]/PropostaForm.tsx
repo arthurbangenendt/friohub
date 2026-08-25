@@ -6,12 +6,7 @@ import { formatarBRL } from "@/lib/pricing";
 import { enviarProposta, recusarPedido } from "../actions";
 import { CATEGORIA_LABEL } from "@/app/solicitar/tipos";
 import type { ProdutoDTO } from "@/app/solicitar/marketplace-types";
-
-const campo: React.CSSProperties = {
-  width: "100%", padding: "11px 14px", borderRadius: 11, border: "1px solid var(--line)",
-  background: "var(--surface)", fontSize: 14.5, fontFamily: "inherit", color: "var(--ink)",
-};
-const rotulo: React.CSSProperties = { fontSize: 13, fontWeight: 650, color: "var(--ink-soft)", display: "block", marginBottom: 6 };
+import { Campo, CampoTexto } from "@/components/ui";
 
 const emDias = (n: number) => {
   const d = new Date();
@@ -148,14 +143,8 @@ export function PropostaForm({
           campos de valor a menos de 160px cada. */}
       {tipo === "preco_fechado" ? (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
-          <label>
-            <span style={rotulo}>Mão de obra (R$)</span>
-            <input value={maoObra} onChange={(e) => setMaoObra(e.target.value)} inputMode="decimal" placeholder="0,00" style={campo} />
-          </label>
-          <label>
-            <span style={rotulo}>Materiais (R$)</span>
-            <input value={materiais} onChange={(e) => setMateriais(e.target.value)} inputMode="decimal" placeholder="0,00" style={campo} />
-          </label>
+          <Campo rotulo="Mão de obra (R$)" value={maoObra} onChange={(e) => setMaoObra(e.target.value)} inputMode="decimal" placeholder="0,00" />
+          <Campo rotulo="Materiais (R$)" value={materiais} onChange={(e) => setMateriais(e.target.value)} inputMode="decimal" placeholder="0,00" />
         </div>
       ) : null}
 
@@ -208,20 +197,14 @@ export function PropostaForm({
               })}
             </div>
           )}
-          <label>
-            <span style={rotulo}>Preço do aparelho que você vai cobrar do cliente (R$)</span>
-            <input value={valorEquipamento} onChange={(e) => setValorEquipamento(e.target.value)}
-              inputMode="decimal" placeholder="0,00" style={campo} disabled={!produtoEscolhido} />
-          </label>
+          <Campo rotulo="Preço do aparelho que você vai cobrar do cliente (R$)" value={valorEquipamento} onChange={(e) => setValorEquipamento(e.target.value)}
+            inputMode="decimal" placeholder="0,00" disabled={!produtoEscolhido} />
         </div>
       )}
 
       {tipo === "visita_tecnica" && (
         <div style={{ display: "grid", gap: 12 }}>
-          <label>
-            <span style={rotulo}>Valor da visita (R$)</span>
-            <input value={visita} onChange={(e) => setVisita(e.target.value)} inputMode="decimal" placeholder="0,00 (deixe zero se for gratuita)" style={campo} />
-          </label>
+          <Campo rotulo="Valor da visita (R$)" value={visita} onChange={(e) => setVisita(e.target.value)} inputMode="decimal" placeholder="0,00 (deixe zero se for gratuita)" />
           <label style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 14, color: "var(--ink-soft)" }}>
             <input type="checkbox" checked={visitaAbatida} onChange={(e) => setVisitaAbatida(e.target.checked)} />
             O valor da visita é abatido se o serviço for fechado comigo
@@ -229,40 +212,20 @@ export function PropostaForm({
         </div>
       )}
 
-      <label>
-        <span style={rotulo}>O que está incluso</span>
-        <textarea value={inclui} onChange={(e) => setInclui(e.target.value)} rows={2}
-          placeholder="Ex.: até 3 m de tubulação, suporte, vácuo, teste de estanqueidade e start-up." style={{ ...campo, resize: "vertical" }} />
-      </label>
+      <CampoTexto rotulo="O que está incluso" value={inclui} onChange={(e) => setInclui(e.target.value)} rows={2}
+        placeholder="Ex.: até 3 m de tubulação, suporte, vácuo, teste de estanqueidade e start-up." />
 
-      <label>
-        <span style={rotulo}>O que NÃO está incluso</span>
-        <textarea value={naoInclui} onChange={(e) => setNaoInclui(e.target.value)} rows={2}
-          placeholder="Ex.: elétrica dedicada, andaime, alvenaria, tubulação acima de 3 m." style={{ ...campo, resize: "vertical" }} />
-        <span style={{ fontSize: 12.5, color: "var(--ink-faint)", display: "block", marginTop: 5 }}>
-          É aqui que quase toda discussão depois do serviço começa. Vale detalhar.
-        </span>
-      </label>
+      <CampoTexto rotulo="O que NÃO está incluso" value={naoInclui} onChange={(e) => setNaoInclui(e.target.value)} rows={2}
+        placeholder="Ex.: elétrica dedicada, andaime, alvenaria, tubulação acima de 3 m."
+        dica="É aqui que quase toda discussão depois do serviço começa. Vale detalhar." />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
-        <label>
-          <span style={rotulo}>Prazo de execução</span>
-          <input value={prazo} onChange={(e) => setPrazo(e.target.value)} placeholder="Ex.: 1 dia útil" style={campo} />
-        </label>
-        <label>
-          <span style={rotulo}>Garantia (dias)</span>
-          <input value={garantia} onChange={(e) => setGarantia(e.target.value)} inputMode="numeric" style={campo} />
-        </label>
-        <label>
-          <span style={rotulo}>Proposta válida até</span>
-          <input type="date" value={validade} onChange={(e) => setValidade(e.target.value)} style={campo} />
-        </label>
+        <Campo rotulo="Prazo de execução" value={prazo} onChange={(e) => setPrazo(e.target.value)} placeholder="Ex.: 1 dia útil" />
+        <Campo rotulo="Garantia (dias)" value={garantia} onChange={(e) => setGarantia(e.target.value)} inputMode="numeric" />
+        <Campo rotulo="Proposta válida até" type="date" value={validade} onChange={(e) => setValidade(e.target.value)} />
       </div>
 
-      <label>
-        <span style={rotulo}>Observações (opcional)</span>
-        <textarea value={obs} onChange={(e) => setObs(e.target.value)} rows={2} style={{ ...campo, resize: "vertical" }} />
-      </label>
+      <CampoTexto rotulo="Observações (opcional)" value={obs} onChange={(e) => setObs(e.target.value)} rows={2} />
 
       {/* O profissional vê quanto sobra para ele antes de enviar — nada de
           descobrir a comissão só na hora de receber. */}
@@ -291,18 +254,15 @@ export function PropostaForm({
 
       {recusando && (
         <div style={{ padding: 15, borderRadius: 12, border: "1px solid var(--line)", background: "var(--surface-2)" }}>
-          <label>
-            <span style={rotulo}>Por que você não vai atender?</span>
-            <textarea
-              value={motivoRecusa}
-              onChange={(event) => setMotivoRecusa(event.target.value)}
-              rows={2}
-              maxLength={500}
-              autoFocus
-              placeholder="Ex.: agenda lotada nesta semana."
-              style={{ ...campo, resize: "vertical" }}
-            />
-          </label>
+          <CampoTexto
+            rotulo="Por que você não vai atender?"
+            value={motivoRecusa}
+            onChange={(event) => setMotivoRecusa(event.target.value)}
+            rows={2}
+            maxLength={500}
+            autoFocus
+            placeholder="Ex.: agenda lotada nesta semana."
+          />
           <div style={{ display: "flex", gap: 9, marginTop: 10 }}>
             <button className="btn" onClick={recusar} disabled={pending}
               style={{ background: "var(--danger-solid)", color: "#fff" }}>

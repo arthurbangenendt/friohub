@@ -4,12 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { formatarBRL } from "@/lib/pricing";
 import { enviarOrcamentoFinal, aprovarOrcamentoFinal, recusarOrcamentoFinal } from "./actions";
-
-const campo: React.CSSProperties = {
-  width: "100%", padding: "11px 14px", borderRadius: 11, border: "1px solid var(--line)",
-  background: "var(--surface)", fontSize: 14.5, fontFamily: "inherit", color: "var(--ink)",
-};
-const rotulo: React.CSSProperties = { fontSize: 13, fontWeight: 650, color: "var(--ink-soft)", display: "block", marginBottom: 6 };
+import { Campo, CampoTexto } from "@/components/ui";
 
 export type PendenteView = {
   id: string;
@@ -63,14 +58,8 @@ export function OrcamentoFinal({
           O valor da visita ({formatarBRL(valorVisita)}) já é seu, à parte. Informe agora o valor do
           serviço em si para o cliente aprovar.
         </p>
-        <label>
-          <span style={rotulo}>Valor do serviço (R$)</span>
-          <input value={valor} onChange={(e) => setValor(e.target.value)} inputMode="decimal" placeholder="0,00" style={campo} />
-        </label>
-        <label>
-          <span style={rotulo}>Observações (opcional)</span>
-          <textarea value={obs} onChange={(e) => setObs(e.target.value)} rows={2} style={{ ...campo, resize: "vertical" }} />
-        </label>
+        <Campo rotulo="Valor do serviço (R$)" value={valor} onChange={(e) => setValor(e.target.value)} inputMode="decimal" placeholder="0,00" />
+        <CampoTexto rotulo="Observações (opcional)" value={obs} onChange={(e) => setObs(e.target.value)} rows={2} />
         {erro && <p style={{ color: "var(--danger)", fontSize: 13.5, margin: 0 }}>{erro}</p>}
         <button
           className="btn btn-primary"
@@ -111,17 +100,14 @@ export function OrcamentoFinal({
 
       {recusando && (
         <div style={{ padding: 15, borderRadius: 12, border: "1px solid var(--line)", background: "var(--surface-2)" }}>
-          <label>
-            <span style={rotulo}>Por que você está recusando? (opcional)</span>
-            <textarea
-              value={motivo}
-              onChange={(e) => setMotivo(e.target.value)}
-              rows={2}
-              maxLength={500}
-              autoFocus
-              style={{ ...campo, resize: "vertical" }}
-            />
-          </label>
+          <CampoTexto
+            rotulo="Por que você está recusando? (opcional)"
+            value={motivo}
+            onChange={(e) => setMotivo(e.target.value)}
+            rows={2}
+            maxLength={500}
+            autoFocus
+          />
           <div style={{ display: "flex", gap: 9, marginTop: 10 }}>
             <button
               className="btn"

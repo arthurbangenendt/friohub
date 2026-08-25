@@ -3,12 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { contestarExecucao } from "./actions";
-
-const campo: React.CSSProperties = {
-  width: "100%", marginTop: 6, padding: "11px 14px", borderRadius: 11,
-  border: "1px solid var(--line)", background: "var(--surface)",
-  fontSize: 14.5, fontFamily: "inherit", color: "var(--ink)", resize: "vertical",
-};
+import { CampoTexto } from "@/components/ui";
 
 /* Só existe alguma coisa a contestar quando há repasse automático em jogo —
  * hoje isso significa que a cobrança real (asaas_payments) está ligada para
@@ -57,12 +52,13 @@ export function ContestarExecucao({ jobId }: { jobId: string }) {
 
   return (
     <div style={{ marginTop: 12, padding: 14, borderRadius: 12, border: "1px solid var(--line)", background: "var(--surface-2)" }}>
-      <label>
-        <span style={{ fontSize: 13, fontWeight: 650, color: "var(--ink-soft)" }}>
-          O que aconteceu? Isso trava o repasse ao profissional até o time revisar.
-        </span>
-        <textarea value={motivo} onChange={(e) => setMotivo(e.target.value)} rows={3} maxLength={500} style={campo} />
-      </label>
+      <CampoTexto
+        rotulo="O que aconteceu? Isso trava o repasse ao profissional até o time revisar."
+        value={motivo}
+        onChange={(e) => setMotivo(e.target.value)}
+        rows={3}
+        maxLength={500}
+      />
       {erro && <p style={{ color: "var(--danger)", fontSize: 13, margin: "8px 0 0" }}>{erro}</p>}
       <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
         <button type="button" className="btn" onClick={enviar} disabled={pending}

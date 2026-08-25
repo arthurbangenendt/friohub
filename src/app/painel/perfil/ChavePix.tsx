@@ -2,12 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { salvarChavePix, type TipoChavePix } from "./actions";
-
-const campo: React.CSSProperties = {
-  width: "100%", padding: "11px 14px", borderRadius: 11, border: "1px solid var(--line)",
-  background: "var(--surface)", fontSize: 14.5, fontFamily: "inherit", color: "var(--ink)",
-};
-const rotulo: React.CSSProperties = { fontSize: 13, fontWeight: 650, color: "var(--ink-soft)", display: "block", marginBottom: 6 };
+import { Campo, CampoSelecao } from "@/components/ui";
 
 const TIPOS: { valor: TipoChavePix; label: string }[] = [
   { valor: "cpf", label: "CPF" },
@@ -63,21 +58,15 @@ export function ChavePix({ inicial }: { inicial: { chavePix: string; chavePixTip
         </div>
       ) : (
         <div style={{ display: "grid", gap: 12 }}>
-          <label>
-            <span style={rotulo}>Tipo de chave</span>
-            <select value={tipo} onChange={(e) => setTipo(e.target.value as TipoChavePix)} style={campo}>
-              {TIPOS.map((t) => <option key={t.valor} value={t.valor}>{t.label}</option>)}
-            </select>
-          </label>
-          <label>
-            <span style={rotulo}>Chave PIX</span>
-            <input
-              value={chave}
-              onChange={(e) => setChave(e.target.value)}
-              placeholder={tipo === "cpf" || tipo === "cnpj" ? "Só números" : "Digite a chave"}
-              style={campo}
-            />
-          </label>
+          <CampoSelecao rotulo="Tipo de chave" value={tipo} onChange={(e) => setTipo(e.target.value as TipoChavePix)}>
+            {TIPOS.map((t) => <option key={t.valor} value={t.valor}>{t.label}</option>)}
+          </CampoSelecao>
+          <Campo
+            rotulo="Chave PIX"
+            value={chave}
+            onChange={(e) => setChave(e.target.value)}
+            placeholder={tipo === "cpf" || tipo === "cnpj" ? "Só números" : "Digite a chave"}
+          />
           {erro && <p style={{ color: "var(--danger)", fontSize: 13.5, margin: 0 }}>{erro}</p>}
           <div style={{ display: "flex", gap: 10 }}>
             <button type="button" className="btn btn-primary" onClick={salvar} disabled={pending}>

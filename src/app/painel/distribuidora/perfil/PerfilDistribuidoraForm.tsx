@@ -4,11 +4,8 @@ import { useState, useTransition } from "react";
 import { formatarDocumento, validarDocumento } from "@/lib/documento";
 import { ESTADO } from "@/lib/regiao";
 import { salvarPerfilDistribuidora } from "../actions";
+import { Campo } from "@/components/ui";
 
-const campo: React.CSSProperties = {
-  width: "100%", padding: "11px 14px", borderRadius: 11, border: "1px solid var(--line)",
-  background: "var(--surface)", fontSize: 14.5, fontFamily: "inherit", color: "var(--ink)",
-};
 const rotulo: React.CSSProperties = { fontSize: 13, fontWeight: 650, color: "var(--ink-soft)", display: "block", marginBottom: 6 };
 
 // UFs mais prováveis primeiro; o dropship raramente sai do eixo no início.
@@ -49,19 +46,13 @@ export function PerfilDistribuidoraForm({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <label><span style={rotulo}>Razão social</span>
-        <input value={razaoSocial} onChange={(e) => setRazaoSocial(e.target.value)} style={campo} /></label>
+      <Campo rotulo="Razão social" value={razaoSocial} onChange={(e) => setRazaoSocial(e.target.value)} />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px,1fr))", gap: 12 }}>
-        <label><span style={rotulo}>CNPJ</span>
-          <input value={cnpj} onChange={(e) => setCnpj(formatarDocumento(e.target.value))} inputMode="numeric" style={campo} />
-          {cnpjInvalido && <span style={{ fontSize: 12.5, color: "var(--danger)" }}>CNPJ inválido.</span>}
-        </label>
-        <label><span style={rotulo}>Cidade da operação</span>
-          <input value={cidade} onChange={(e) => setCidade(e.target.value)} style={campo} /></label>
-        <label><span style={rotulo}>Prazo de entrega (dias úteis)</span>
-          <input value={prazo} onChange={(e) => setPrazo(e.target.value)} inputMode="numeric" style={campo} />
-        </label>
+        <Campo rotulo="CNPJ" value={cnpj} onChange={(e) => setCnpj(formatarDocumento(e.target.value))} inputMode="numeric"
+          erro={cnpjInvalido ? "CNPJ inválido." : null} />
+        <Campo rotulo="Cidade da operação" value={cidade} onChange={(e) => setCidade(e.target.value)} />
+        <Campo rotulo="Prazo de entrega (dias úteis)" value={prazo} onChange={(e) => setPrazo(e.target.value)} inputMode="numeric" />
       </div>
 
       <div>

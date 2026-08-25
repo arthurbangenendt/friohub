@@ -2,12 +2,11 @@
 
 import { useState, useTransition } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { Campo } from "@/components/ui";
 
 const SENHA_MINIMA = 8;
 
-const campo: React.CSSProperties = { display: "flex", flexDirection: "column", gap: 7 };
-const rotulo: React.CSSProperties = { fontSize: 13.5, fontWeight: 650, color: "var(--ink-soft)" };
-const input: React.CSSProperties = { height: 44, padding: "0 14px", borderRadius: 10, border: "1px solid var(--line)", background: "var(--bg)", color: "var(--ink)", fontSize: 15, width: "100%" };
+const subtitulo: React.CSSProperties = { fontSize: 14.5, fontWeight: 650, color: "var(--ink-soft)" };
 
 /* Senha e e-mail passam direto pelo Supabase Auth do navegador — sessão
  * autenticada já é a prova de identidade, sem RPC nem server action.
@@ -15,9 +14,6 @@ const input: React.CSSProperties = { height: 44, padding: "0 14px", borderRadius
 export function ContaSeguranca({ emailAtual }: { emailAtual: string }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
-      <div style={{ fontSize: 12.5, fontWeight: 650, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--ink-faint)" }}>
-        Conta e segurança
-      </div>
       <TrocarSenha />
       <TrocarEmail emailAtual={emailAtual} />
     </div>
@@ -49,17 +45,11 @@ function TrocarSenha() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-      <span style={{ ...rotulo, fontSize: 14.5 }}>Trocar senha</span>
-      <label style={campo}>
-        <span style={rotulo}>Nova senha</span>
-        <input type="password" value={novaSenha} onChange={(e) => setNovaSenha(e.target.value)} style={input} />
-        {curta && <span style={{ fontSize: 12.5, color: "var(--danger)" }}>Mínimo de {SENHA_MINIMA} caracteres.</span>}
-      </label>
-      <label style={campo}>
-        <span style={rotulo}>Confirmar nova senha</span>
-        <input type="password" value={confirmar} onChange={(e) => setConfirmar(e.target.value)} style={input} />
-        {naoBate && <span style={{ fontSize: 12.5, color: "var(--danger)" }}>As senhas não são iguais.</span>}
-      </label>
+      <span style={subtitulo}>Trocar senha</span>
+      <Campo rotulo="Nova senha" type="password" value={novaSenha} onChange={(e) => setNovaSenha(e.target.value)}
+        erro={curta ? `Mínimo de ${SENHA_MINIMA} caracteres.` : null} />
+      <Campo rotulo="Confirmar nova senha" type="password" value={confirmar} onChange={(e) => setConfirmar(e.target.value)}
+        erro={naoBate ? "As senhas não são iguais." : null} />
       {erro && <p style={{ color: "var(--danger)", fontSize: 14, margin: 0 }}>{erro}</p>}
       {sucesso && <p style={{ color: "var(--good)", fontSize: 14, fontWeight: 600, margin: 0 }}>Senha atualizada!</p>}
       <button className="btn btn-primary" onClick={salvar}
@@ -93,15 +83,12 @@ function TrocarEmail({ emailAtual }: { emailAtual: string }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-      <span style={{ ...rotulo, fontSize: 14.5 }}>Trocar e-mail</span>
+      <span style={subtitulo}>Trocar e-mail</span>
       <p style={{ margin: 0, fontSize: 13, color: "var(--ink-soft)" }}>
         E-mail atual: <strong>{emailAtual}</strong>
       </p>
-      <label style={campo}>
-        <span style={rotulo}>Novo e-mail</span>
-        <input type="email" value={novoEmail} onChange={(e) => setNovoEmail(e.target.value)} style={input} placeholder="novo@email.com" />
-        {invalido && <span style={{ fontSize: 12.5, color: "var(--danger)" }}>E-mail inválido.</span>}
-      </label>
+      <Campo rotulo="Novo e-mail" type="email" value={novoEmail} onChange={(e) => setNovoEmail(e.target.value)}
+        placeholder="novo@email.com" erro={invalido ? "E-mail inválido." : null} />
       {erro && <p style={{ color: "var(--danger)", fontSize: 14, margin: 0 }}>{erro}</p>}
       {sucesso && (
         <p style={{ color: "var(--good)", fontSize: 14, fontWeight: 600, margin: 0 }}>

@@ -3,12 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { atribuirPmoc, cancelarPmoc, concluirVisitaPmoc, responderPmoc, solicitarPmoc } from "./actions";
-
-const input: React.CSSProperties = {
-  height: 43, padding: "0 12px", borderRadius: 10, border: "1px solid var(--line)",
-  background: "var(--bg)", color: "var(--ink)", fontSize: 14, width: "100%",
-};
-const label: React.CSSProperties = { display: "flex", flexDirection: "column", gap: 6, fontSize: 13, fontWeight: 650 };
+import { Campo, CampoSelecao, CampoTexto } from "@/components/ui";
 
 function Mensagem({ erro, sucesso }: { erro: string | null; sucesso?: string | null }) {
   if (!erro && !sucesso) return null;
@@ -37,18 +32,16 @@ export function SolicitarPmocForm() {
       });
     }}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 12 }}>
-        <label style={label}>Empresa<input name="empresa" required minLength={2} maxLength={160} style={input} /></label>
-        <label style={label}>Unidade atendida<input name="unidade" required minLength={2} maxLength={160} style={input} placeholder="Matriz, loja Centro…" /></label>
-        <label style={label}>CEP<input name="cep" required inputMode="numeric" pattern="[0-9. -]{8,10}" style={input} /></label>
-        <label style={label}>Quantidade de equipamentos<input name="equipamentos" required type="number" min={1} max={10000} style={input} /></label>
-        <label style={label}>Periodicidade
-          <select name="intervalo" defaultValue="3" style={input}>
-            <option value="1">Mensal</option><option value="2">Bimestral</option><option value="3">Trimestral</option>
-            <option value="6">Semestral</option><option value="12">Anual</option>
-          </select>
-        </label>
+        <Campo rotulo="Empresa" name="empresa" required minLength={2} maxLength={160} />
+        <Campo rotulo="Unidade atendida" name="unidade" required minLength={2} maxLength={160} placeholder="Matriz, loja Centro…" />
+        <Campo rotulo="CEP" name="cep" required inputMode="numeric" pattern="[0-9. -]{8,10}" />
+        <Campo rotulo="Quantidade de equipamentos" name="equipamentos" required type="number" min={1} max={10000} />
+        <CampoSelecao rotulo="Periodicidade" name="intervalo" defaultValue="3">
+          <option value="1">Mensal</option><option value="2">Bimestral</option><option value="3">Trimestral</option>
+          <option value="6">Semestral</option><option value="12">Anual</option>
+        </CampoSelecao>
       </div>
-      <label style={label}>Observações<textarea name="observacoes" maxLength={4000} rows={4} style={{ ...input, height: "auto", padding: 12, resize: "vertical" }} /></label>
+      <CampoTexto rotulo="Observações" name="observacoes" maxLength={4000} rows={4} />
       <Mensagem erro={erro} sucesso={sucesso} />
       <button className="btn btn-primary" disabled={pending} style={{ justifySelf: "start" }}>{pending ? "Enviando…" : "Solicitar PMOC"}</button>
     </form>
@@ -70,8 +63,8 @@ export function ResponderPmocForm({ planoId }: { planoId: string }) {
   return (
     <form style={{ display: "grid", gap: 10, marginTop: 14 }} onSubmit={(e) => { e.preventDefault(); executar(true, e.currentTarget); }}>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-        <label style={label}>Valor por visita (R$)<input name="valor" required type="number" min="0.01" step="0.01" style={input} /></label>
-        <label style={label}>Primeira visita<input name="data" required type="date" style={input} /></label>
+        <Campo rotulo="Valor por visita (R$)" name="valor" required type="number" min="0.01" step="0.01" />
+        <Campo rotulo="Primeira visita" name="data" required type="date" />
       </div>
       <Mensagem erro={erro} />
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -88,7 +81,7 @@ export function ConcluirVisitaForm({ visitaId }: { visitaId: string }) {
     e.preventDefault(); const data = new FormData(e.currentTarget); setErro(null);
     start(async () => { const r = await concluirVisitaPmoc(visitaId, String(data.get("observacoes") ?? "")); if (!r.ok) setErro(r.error); else router.refresh(); });
   }}>
-    <textarea name="observacoes" maxLength={4000} rows={2} style={{ ...input, height: "auto", padding: 10 }} placeholder="O que foi executado nesta visita?" />
+    <CampoTexto rotulo="O que foi executado nesta visita?" rotuloOculto name="observacoes" maxLength={4000} rows={2} placeholder="O que foi executado nesta visita?" />
     <Mensagem erro={erro} /><button className="btn btn-primary" disabled={pending} style={{ justifySelf: "start" }}>{pending ? "Concluindo…" : "Marcar como concluída"}</button>
   </form>;
 }
@@ -100,7 +93,9 @@ export function CancelarPmocForm({ planoId }: { planoId: string }) {
     e.preventDefault(); const data = new FormData(e.currentTarget); setErro(null);
     start(async () => { const r = await cancelarPmoc(planoId, String(data.get("motivo") ?? "")); if (!r.ok) setErro(r.error); else router.refresh(); });
   }}>
-    <label style={{ ...label, flex: "1 1 240px" }}>Motivo<input name="motivo" required minLength={5} maxLength={500} style={input} /></label>
+    <div style={{ flex: "1 1 240px" }}>
+      <Campo rotulo="Motivo" name="motivo" required minLength={5} maxLength={500} />
+    </div>
     <button className="btn" disabled={pending}>{pending ? "Cancelando…" : "Confirmar cancelamento"}</button><Mensagem erro={erro} />
   </form>;
 }
@@ -111,7 +106,11 @@ export function AtribuirPmocForm({ planoId, profissionais }: { planoId: string; 
     e.preventDefault(); const data = new FormData(e.currentTarget); setErro(null);
     start(async () => { const r = await atribuirPmoc(planoId, String(data.get("profissional") ?? "")); if (!r.ok) setErro(r.error); else router.refresh(); });
   }}>
-    <label style={{ ...label, flex: "1 1 240px" }}>Profissional elegível<select name="profissional" required defaultValue="" style={input}><option value="" disabled>Selecione…</option>{profissionais.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}</select></label>
+    <div style={{ flex: "1 1 240px" }}>
+      <CampoSelecao rotulo="Profissional elegível" name="profissional" required defaultValue="">
+        <option value="" disabled>Selecione…</option>{profissionais.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
+      </CampoSelecao>
+    </div>
     <button className="btn btn-primary" disabled={pending || profissionais.length === 0}>{pending ? "Atribuindo…" : "Enviar oferta"}</button><Mensagem erro={erro} />
   </form>;
 }

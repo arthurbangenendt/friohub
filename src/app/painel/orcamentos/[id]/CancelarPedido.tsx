@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { cancelarPedido } from "../actions";
+import { CampoTexto } from "@/components/ui";
 
 export function CancelarPedido({ pedidoId }: { pedidoId: string }) {
   const router = useRouter();
@@ -39,25 +40,16 @@ export function CancelarPedido({ pedidoId }: { pedidoId: string }) {
 
   return (
     <div className="card" style={{ padding: 18, borderColor: "#e8b4b0" }}>
-      <label style={{ display: "block", fontSize: 13, fontWeight: 650, color: "var(--ink-soft)" }}>
-        Por que você está cancelando?
-        <textarea
-          value={motivo}
-          onChange={(event) => setMotivo(event.target.value)}
-          rows={3}
-          maxLength={500}
-          autoFocus
-          placeholder="Ex.: decidi adiar o serviço para o próximo mês."
-          style={{
-            width: "100%", marginTop: 7, padding: "11px 14px", borderRadius: 11,
-            border: "1px solid var(--line)", background: "var(--surface)",
-            fontSize: 14, fontFamily: "inherit", color: "var(--ink)", resize: "vertical",
-          }}
-        />
-      </label>
-      <p style={{ margin: "7px 0 0", fontSize: 12.5, color: "var(--ink-faint)" }}>
-        O motivo fica registrado no histórico e ajuda a melhorar o atendimento.
-      </p>
+      <CampoTexto
+        rotulo="Por que você está cancelando?"
+        value={motivo}
+        onChange={(event) => setMotivo(event.target.value)}
+        rows={3}
+        maxLength={500}
+        autoFocus
+        placeholder="Ex.: decidi adiar o serviço para o próximo mês."
+        dica="O motivo fica registrado no histórico e ajuda a melhorar o atendimento."
+      />
       {erro && <p style={{ color: "var(--danger)", fontSize: 13, margin: "8px 0 0" }}>{erro}</p>}
       <div style={{ display: "flex", gap: 9, marginTop: 12 }}>
         <button className="btn" onClick={confirmar} disabled={pending}

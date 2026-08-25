@@ -6,6 +6,9 @@ import { CpfCnpjCliente } from "./CpfCnpjCliente";
 import { EnderecoCliente } from "./EnderecoCliente";
 import { ContaSeguranca } from "./ContaSeguranca";
 import { Kpi } from "../shared";
+import { SecaoComIcone } from "@/components/ui";
+import { TimelineContent } from "@/components/ui/timeline-animation";
+import { User, Doc, MapPin, Shield } from "@/components/icons";
 
 const meses = (desde: string) => {
   const d = new Date(desde);
@@ -65,30 +68,40 @@ export default async function PerfilClientePage() {
         <Kpi label="Avaliações que você fez" valor={String(avaliacoes ?? 0)} />
       </div>
 
-      <div className="card" style={{ padding: 26, marginTop: 16 }}>
-        <MidiaEditor uid={user.id} nome={nome} avatarUrl={profile?.avatar_url ?? null}
-          bannerUrl={null} mostrarBanner={false} />
-      </div>
+      <TimelineContent delay={0}>
+        <SecaoComIcone icone={<User size={18} />} titulo="Foto de perfil">
+          <MidiaEditor uid={user.id} nome={nome} avatarUrl={profile?.avatar_url ?? null}
+            bannerUrl={null} mostrarBanner={false} />
+        </SecaoComIcone>
+      </TimelineContent>
 
-      <div className="card" style={{ padding: 26, marginTop: 16 }}>
-        <ClienteForm nomeInicial={nome} telefoneInicial={priv?.telefone ?? ""} />
-      </div>
+      <TimelineContent delay={.06}>
+        <SecaoComIcone icone={<User size={18} />} titulo="Dados pessoais">
+          <ClienteForm nomeInicial={nome} telefoneInicial={priv?.telefone ?? ""} />
+        </SecaoComIcone>
+      </TimelineContent>
 
-      <div className="card" style={{ padding: 26, marginTop: 16 }}>
-        <CpfCnpjCliente cpfCnpjInicial={priv?.cpf_cnpj ?? null} />
-      </div>
+      <TimelineContent delay={.12}>
+        <SecaoComIcone icone={<Doc size={18} />} titulo="Documento">
+          <CpfCnpjCliente cpfCnpjInicial={priv?.cpf_cnpj ?? null} />
+        </SecaoComIcone>
+      </TimelineContent>
 
-      <div className="card" style={{ padding: 26, marginTop: 16 }}>
-        <EnderecoCliente
-          cepInicial={priv?.endereco_cep ?? ""}
-          bairroInicial={priv?.endereco_bairro ?? ""}
-          enderecoCompletoInicial={priv?.endereco_completo ?? ""}
-        />
-      </div>
+      <TimelineContent delay={.18}>
+        <SecaoComIcone icone={<MapPin size={18} />} titulo="Endereço">
+          <EnderecoCliente
+            cepInicial={priv?.endereco_cep ?? ""}
+            bairroInicial={priv?.endereco_bairro ?? ""}
+            enderecoCompletoInicial={priv?.endereco_completo ?? ""}
+          />
+        </SecaoComIcone>
+      </TimelineContent>
 
-      <div className="card" style={{ padding: 26, marginTop: 16 }}>
-        <ContaSeguranca emailAtual={user.email ?? ""} />
-      </div>
+      <TimelineContent delay={.24}>
+        <SecaoComIcone icone={<Shield size={18} />} titulo="Conta e segurança">
+          <ContaSeguranca emailAtual={user.email ?? ""} />
+        </SecaoComIcone>
+      </TimelineContent>
     </main>
   );
 }
