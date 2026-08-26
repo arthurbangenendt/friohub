@@ -106,10 +106,7 @@ export default async function AssinaturasPage() {
 
   return (
     <main className="container-tight" style={{ padding: "40px 24px 80px" }}>
-      <Link href="/admin" style={{ color: "var(--ink-faint)", fontSize: 13 }}>
-        ← Administração
-      </Link>
-      <h1 style={{ margin: "20px 0 6px" }}>Assinaturas</h1>
+      <h1 style={{ margin: "0 0 6px" }}>Assinaturas</h1>
       <p style={{ color: "var(--ink-soft)", marginBottom: 26, lineHeight: 1.6 }}>
         A cobrança ainda não está ligada, então ninguém paga nada. O que esta tela mostra é a{" "}
         <strong>intenção registrada</strong> — quem escolheu qual plano em /planos. É o número que

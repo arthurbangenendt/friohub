@@ -441,6 +441,11 @@ verify_jwt = false
 [functions.asaas-resolver-disputa]
 verify_jwt = true
 
+# Recebe o JWT do admin que está suspendendo/reativando login de cliente —
+# index.ts confere o papel antes de chamar auth.admin.updateUserById.
+[functions.admin-suspender-usuario]
+verify_jwt = true
+
 [analytics]
 enabled = true
 port = 54327

@@ -48,9 +48,10 @@ type OrderView = {
   comissao_servico?: number; // só existe para o profissional
 };
 
-/* Profissional lê `orders` direto; cliente lê a view `orders_cliente`, que não
-   expõe margem nem comissão da plataforma. As duas fontes são protegidas no
-   banco — se o papel não bater, o retorno é vazio, não um erro.
+/* Profissional e admin leem `orders` direto (a linha completa, com margem e
+   comissão — RLS `orders_admin_read`); cliente lê a view `orders_cliente`, que
+   não expõe isso. As duas fontes são protegidas no banco — se o papel não
+   bater, o retorno é vazio, não um erro.
 
    Um job pode ter até duas orders: a do aceite da proposta (produto e/ou
    mão de obra, ou a visita técnica) e a do orçamento final pós-visita
@@ -58,9 +59,9 @@ type OrderView = {
 async function carregarOrders(
   supabase: Awaited<ReturnType<typeof createClient>>,
   jobId: string,
-  isPro: boolean,
+  completo: boolean,
 ): Promise<OrderView[]> {
-  if (isPro) {
+  if (completo) {
     const { data } = await supabase
       .from("orders")
       .select("id, preco_produto, preco_servico, comissao_servico, total, payment_status, origem")
@@ -82,23 +83,27 @@ export default async function ServicoPage({ params }: { params: Promise<{ id: st
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: job } = await supabase
-    .from("jobs")
-    .select(`id, job_type, status, created_at, ambiente, area_m2, btu_recomendado, cep, endereco, descricao, cliente_id, profissional_id,
-             produto:products ( marca, modelo, btu, preco_venda ),
-             itens:job_itens ( id, ordem, ambiente, area_m2, btu_recomendado, quantidade,
-                               produto:products ( marca, modelo ) ),
-             profissional:professionals ( id, tipo, profiles ( nome ) ),
-             cliente:profiles!jobs_cliente_id_fkey ( nome ),
-             review:reviews ( rating, comment )`)
-    .eq("id", id)
-    .single();
+  const [{ data: job }, { data: perfilLogado }] = await Promise.all([
+    supabase
+      .from("jobs")
+      .select(`id, job_type, status, created_at, ambiente, area_m2, btu_recomendado, cep, endereco, descricao, cliente_id, profissional_id,
+               produto:products ( marca, modelo, btu, preco_venda ),
+               itens:job_itens ( id, ordem, ambiente, area_m2, btu_recomendado, quantidade,
+                                 produto:products ( marca, modelo ) ),
+               profissional:professionals ( id, tipo, profiles ( nome ) ),
+               cliente:profiles!jobs_cliente_id_fkey ( nome ),
+               review:reviews ( rating, comment )`)
+      .eq("id", id)
+      .single(),
+    supabase.from("profiles").select("role").eq("id", user.id).single(),
+  ]);
 
   if (!job) redirect("/painel");
 
   const isCliente = job.cliente_id === user.id;
   const isPro = job.profissional_id === user.id;
-  if (!isCliente && !isPro) redirect("/painel");
+  const isAdmin = !isCliente && !isPro && perfilLogado?.role === "admin";
+  if (!isCliente && !isPro && !isAdmin) redirect("/painel");
   const podeIniciarExecucao = isPro && await featureHabilitada(supabase, "ux_execution", user.id);
 
   const produto = one(job.produto) as { marca: string; modelo: string; btu: number; preco_venda: number } | null;
@@ -118,7 +123,7 @@ export default async function ServicoPage({ params }: { params: Promise<{ id: st
   /* As orders vêm de fonte diferente conforme quem olha: o profissional lê a
      tabela (enxerga a comissão descontada dele), o cliente lê a view sem margem
      nem comissão. Ver migration 20260812130000_orders_cliente_view. */
-  const orders = await carregarOrders(supabase, job.id, isPro);
+  const orders = await carregarOrders(supabase, job.id, isPro || isAdmin);
   const ordemAceite = orders.find((o) => o.origem === "aceite_quote") ?? null;
 
   /* Orçamento final só existe para propostas do tipo 'visita_tecnica' — em
@@ -244,11 +249,13 @@ export default async function ServicoPage({ params }: { params: Promise<{ id: st
       </div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap", marginBottom: 28 }}>
         <p style={{ color: "var(--ink-faint)", fontSize: 14, margin: 0 }}>
-          {isPro ? `Cliente: ${cliNome}` : `Profissional: ${proNome}`}
+          {isAdmin ? `${cliNome} · ${proNome}` : isPro ? `Cliente: ${cliNome}` : `Profissional: ${proNome}`}
         </p>
         {/* Falar com a outra parte é a ação mais frequente nesta tela — antes não
-            existia caminho nenhum, nem telefone nem chat. */}
-        {job.profissional_id && (
+            existia caminho nenhum, nem telefone nem chat. Admin fica de fora: ele
+            já acompanha toda conversa em modo leitura por /painel/mensagens, e
+            abrir por aqui criaria uma thread nova com ELE como participante. */}
+        {job.profissional_id && !isAdmin && (
           <AbrirChat
             professionalId={job.profissional_id}
             jobId={job.id}
@@ -354,8 +361,14 @@ export default async function ServicoPage({ params }: { params: Promise<{ id: st
             separado sem redesenhar o pagamento. Por isso o valor total soma
             os dois, mas a tela detalha as duas linhas antes do total, pra não
             deixar a impressão de que a visita/serviço sozinha custou tudo
-            aquilo. */}
-        {!isPro && orders.map((o) => (
+            aquilo.
+
+            Fica fora do admin: `Pagamento` lê `payment_status_cliente`, view
+            recortada por `customer_id = auth.uid()` — para o admin ela sempre
+            volta vazia, o que mostraria "cobrança não gerada" mesmo quando
+            existe, e ofereceria um botão de nova tentativa de cobrança que não
+            é dele acionar. */}
+        {!isPro && !isAdmin && orders.map((o) => (
           <div key={`pag-${o.id}`} className="card" style={{ padding: 22 }}>
             <SecTitle>{rotuloPagamentoOrder(o, isVisitaTecnica)}</SecTitle>
             {o.preco_produto > 0 && (
@@ -417,8 +430,11 @@ export default async function ServicoPage({ params }: { params: Promise<{ id: st
           </Link>
         )}
 
-        {/* ações do profissional */}
-        {["aguardando_profissional", "aceito"].includes(job.status) && (
+        {/* Propor/confirmar/cancelar horário — nunca pro admin: o formulário
+            manda `user.id` como se fosse participante, e as RPCs por trás
+            (`propor_agendamento` etc.) até recusam quem não é cliente/profissional
+            do job, mas a tela não deveria nem oferecer o botão pra começar. */}
+        {(isCliente || isPro) && ["aguardando_profissional", "aceito"].includes(job.status) && (
           <div className="card" style={{ padding: 22 }}>
             <SecTitle>Agendamento</SecTitle>
             <Agendamento jobId={job.id} userId={user.id} atual={agendamento as AgendamentoView | null} />

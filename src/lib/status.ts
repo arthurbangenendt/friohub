@@ -105,6 +105,15 @@ export const MEIO_COBRANCA: Record<string, string> = {
   CREDIT_CARD: "Cartão de crédito",
 };
 
+/** `payment_transfers.status` — repasse financeiro ao profissional/distribuidora via Asaas. */
+export const STATUS_TRANSFERENCIA: Record<string, Estado> = {
+  pending_creation: { label: "Na fila", tom: "espera" },
+  pending: { label: "Em voo no gateway", tom: "andamento" },
+  confirmed: { label: "Confirmado", tom: "sucesso" },
+  failed: { label: "Falhou", tom: "erro" },
+  cancelled: { label: "Cancelado", tom: "neutro" },
+};
+
 /** `orders.payment_status`. */
 export const STATUS_PAGAMENTO: Record<string, Estado> = {
   pendente: { label: "Pendente", tom: "espera" },

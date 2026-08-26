@@ -59,16 +59,22 @@ export default async function PedidoPage({ params }: { params: Promise<{ id: str
   const souCliente = pedido.cliente_id === user.id;
 
   // A RLS já garante que só cliente, destinatário ou admin chegam aqui; isto é
-  // apenas para saber QUAL tela renderizar.
-  const { data: alvo } = await supabase
-    .from("quote_request_targets")
-    .select("professional_id, recusado_em")
-    .eq("quote_request_id", id)
-    .eq("professional_id", user.id)
-    .maybeSingle();
+  // apenas para saber QUAL tela renderizar. O guard abaixo, por outro lado, é
+  // aplicação — e até aqui não conhecia o papel admin, então o expulsava antes
+  // de a RLS sequer entrar em jogo (achado ao ligar o painel de suporte).
+  const [{ data: alvo }, { data: perfilLogado }] = await Promise.all([
+    supabase
+      .from("quote_request_targets")
+      .select("professional_id, recusado_em")
+      .eq("quote_request_id", id)
+      .eq("professional_id", user.id)
+      .maybeSingle(),
+    supabase.from("profiles").select("role").eq("id", user.id).single(),
+  ]);
 
   const souDestinatario = !!alvo;
-  if (!souCliente && !souDestinatario) redirect("/painel/orcamentos");
+  const isAdmin = !souCliente && !souDestinatario && perfilLogado?.role === "admin";
+  if (!souCliente && !souDestinatario && !isAdmin) redirect("/painel/orcamentos");
 
   /* CPF/CNPJ do cliente só é pedido quando a cobrança real está ligada pra
      essa região (asaas_payments) e ele ainda não tem documento salvo — coleta

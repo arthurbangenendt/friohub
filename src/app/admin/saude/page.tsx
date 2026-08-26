@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
@@ -18,8 +17,7 @@ export default async function SaudePage() {
     : { data: [] };
 
   return <main className="container-tight" style={{ padding: "40px 24px 80px" }}>
-    <Link href="/admin" style={{ color: "var(--ink-faint)", fontSize: 13 }}>← Administração</Link>
-    <h1 style={{ margin: "20px 0 6px" }}>Saúde operacional</h1>
+    <h1 style={{ margin: "0 0 6px" }}>Saúde operacional</h1>
     <p style={{ color: "var(--ink-soft)", marginBottom: 26 }}>Snapshot interno atualizado pelo PostgreSQL a cada cinco minutos. Um alerta indica investigação; não substitui monitor externo.</p>
     {!run && <div className="card" style={{ padding: 22 }}>Nenhum health check executado.</div>}
     {run && <>

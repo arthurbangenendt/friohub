@@ -17,6 +17,7 @@ type ItemEntrega = {
   modelo: string | null;
   btu: number | null;
   preco_venda_snapshot: number;
+  image_url: string | null;
 };
 
 type EntregaView = {
@@ -44,16 +45,20 @@ export default async function AparelhoPage({ params }: { params: Promise<{ id: s
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: job } = await supabase
-    .from("jobs")
-    .select("id, cliente_id, profissional_id, job_type")
-    .eq("id", id)
-    .maybeSingle();
+  const [{ data: job }, { data: perfilLogado }] = await Promise.all([
+    supabase
+      .from("jobs")
+      .select("id, cliente_id, profissional_id, job_type")
+      .eq("id", id)
+      .maybeSingle(),
+    supabase.from("profiles").select("role").eq("id", user.id).single(),
+  ]);
 
   if (!job) redirect("/painel");
   const isCliente = job.cliente_id === user.id;
   const isPro = job.profissional_id === user.id;
-  if (!isCliente && !isPro) redirect(`/servico/${id}`);
+  const isAdmin = !isCliente && !isPro && perfilLogado?.role === "admin";
+  if (!isCliente && !isPro && !isAdmin) redirect(`/servico/${id}`);
 
   const { data: entregasData } = await supabase
     .from("entregas_cliente")
@@ -117,7 +122,19 @@ export default async function AparelhoPage({ params }: { params: Promise<{ id: s
                 {e.itens.map((it, i) => (
                   <Linha
                     key={i}
-                    k={`${it.marca ?? ""} ${it.modelo ?? ""}${it.btu ? ` · ${formatarBtu(it.btu)}` : ""}${it.quantidade > 1 ? ` · ${it.quantidade}x` : ""}`}
+                    k={(
+                      <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        {it.image_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={it.image_url}
+                            alt={`${it.marca ?? ""} ${it.modelo ?? ""}`}
+                            style={{ width: 40, height: 40, borderRadius: 8, objectFit: "cover", border: "1px solid var(--line)", flexShrink: 0 }}
+                          />
+                        ) : null}
+                        {`${it.marca ?? ""} ${it.modelo ?? ""}${it.btu ? ` · ${formatarBtu(it.btu)}` : ""}${it.quantidade > 1 ? ` · ${it.quantidade}x` : ""}`}
+                      </span>
+                    )}
                     v={formatarBRL(Number(it.preco_venda_snapshot))}
                   />
                 ))}

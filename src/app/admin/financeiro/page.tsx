@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatarBRL } from "@/lib/pricing";
@@ -79,8 +78,7 @@ export default async function AdminFinanceiroPage() {
 
   return (
     <div style={{ maxWidth: 980, margin: "0 auto", padding: "40px 28px 80px" }}>
-      <Link href="/admin" style={{ fontSize: 13.5, color: "var(--cool-deep)" }}>← Administração</Link>
-      <h1 style={{ fontSize: "1.9rem", fontWeight: 800, letterSpacing: "-0.025em", margin: "12px 0 6px" }}>
+      <h1 style={{ fontSize: "1.9rem", fontWeight: 800, letterSpacing: "-0.025em", margin: "0 0 6px" }}>
         Ledger e conciliação
       </h1>
       <p style={{ color: "var(--ink-soft)", margin: "0 0 24px" }}>

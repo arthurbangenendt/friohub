@@ -7,8 +7,6 @@ import { one } from "@/lib/relacional";
 import { EmptyState } from "@/components/ui";
 import { ResolverDisputaForm } from "./ResolverDisputaForm";
 
-const mono = "var(--font-geist-mono), ui-monospace, monospace";
-
 const TIPO_LABEL: Record<string, string> = {
   contestacao_pos_conclusao: "Contestação pós-conclusão",
   cancelamento_em_execucao: "Cancelamento de serviço pago",
@@ -76,8 +74,7 @@ export default async function AdminDisputasPage() {
 
   return (
     <main className="container-tight" style={{ padding: "40px 24px 80px" }}>
-      <Link href="/admin" style={{ fontFamily: mono, fontSize: 13, color: "var(--cool-deep)" }}>← Administração</Link>
-      <h1 style={{ fontSize: "1.9rem", fontWeight: 800, letterSpacing: "-0.025em", margin: "12px 0 6px" }}>Disputas</h1>
+      <h1 style={{ fontSize: "1.9rem", fontWeight: 800, letterSpacing: "-0.025em", margin: "0 0 6px" }}>Disputas</h1>
       <p style={{ color: "var(--ink-soft)", margin: "0 0 24px" }}>
         Contestações pós-conclusão e cancelamentos de serviço já pago. Aprovar dispara o estorno de verdade no Asaas na hora.
       </p>

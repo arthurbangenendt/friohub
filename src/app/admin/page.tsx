@@ -1,17 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { AdminActions } from "./AdminActions";
-import { marcarInteresseContatado } from "./actions";
 import { CIDADE } from "@/lib/regiao";
-import { STATUS_VERIFICACAO, resolverMapa } from "@/lib/status";
-import { one } from "@/lib/relacional";
 
 const mono = "var(--font-geist-mono), ui-monospace, monospace";
-const SPEC_LABEL: Record<string, string> = {
-  instalacao: "Instalação", manutencao: "Manutenção", remanejamento: "Remanejamento", limpeza: "Limpeza", conserto: "Conserto",
-};
-const STATUS_LABEL = resolverMapa(STATUS_VERIFICACAO);
 
 export default async function AdminPage() {
   const supabase = await createClient();
@@ -20,63 +12,6 @@ export default async function AdminPage() {
 
   const { data: perfil } = await supabase.from("profiles").select("role").eq("id", user.id).single();
   if (perfil?.role !== "admin") redirect("/painel");
-
-  const { data: pros } = await supabase
-    .from("professionals")
-    .select(`id, tipo, bio, cidade, estado, verification_status, created_at,
-             documento_tipo, documento_storage_path,
-             profiles!inner ( nome ),
-             professional_skills ( specialty )`)
-    .order("verification_status");
-
-  /* Signed URL gerada com a sessão do próprio admin — a RLS de
-     `documentos-verificacao` (pode_ler_documento_verificacao) decide se ele
-     pode, sem precisar de service-role nem rota nova. */
-  const lista = await Promise.all((pros ?? []).map(async (p) => {
-    let documentoUrl: string | null = null;
-    if (p.documento_storage_path) {
-      const { data } = await supabase.storage
-        .from("documentos-verificacao")
-        .createSignedUrl(p.documento_storage_path, 3600);
-      documentoUrl = data?.signedUrl ?? null;
-    }
-    return {
-      id: p.id,
-      nome: one(p.profiles)?.nome ?? "Profissional",
-      tipo: p.tipo as string,
-      bio: p.bio as string | null,
-      cidade: p.cidade as string,
-      estado: p.estado as string,
-      status: p.verification_status as string,
-      skills: ((p.professional_skills ?? []) as { specialty: string }[]).map((s) => s.specialty),
-      documentoUrl,
-    };
-  }));
-
-  const pendentes = lista.filter((p) => p.status === "pendente" || p.status === "em_analise");
-  const outros = lista.filter((p) => p.status === "verificado" || p.status === "rejeitado");
-
-  /* Distribuidoras usam o mesmo trio de colunas de confiança e a mesma dupla de
-     ações — ver `definirVerificacao` em admin/actions.ts. */
-  const { data: dists } = await supabase
-    .from("distributors")
-    .select("id, razao_social, cidade, estado, verification_status, ativo, prazo_entrega_dias")
-    .order("verification_status");
-
-  const distribuidoras = await Promise.all((dists ?? []).map(async (dist) => {
-    const { data: cnpj } = await supabase.rpc("obter_cnpj_distribuidora", {
-      p_distributor_id: dist.id,
-    });
-    return { ...dist, cnpj };
-  }));
-  const distPendentes = distribuidoras.filter((d) => d.verification_status === "pendente" || d.verification_status === "em_analise");
-  const distOutros = distribuidoras.filter((d) => d.verification_status === "verificado" || d.verification_status === "rejeitado");
-
-  // Leads do formulário público de /distribuidoras — sem verificação, só contato.
-  const { data: interesses } = await supabase
-    .from("distributor_interest")
-    .select("id, nome, empresa, telefone, email, cidade, mensagem, created_at, contatado_em")
-    .order("created_at", { ascending: false });
 
   const { data: casosOperacionais } = await supabase
     .from("operational_cases")
@@ -107,27 +42,11 @@ export default async function AdminPage() {
   });
   const funil = funilData?.[0] ?? null;
 
-  const { count: disputasAbertas } = await supabase
-    .from("job_disputes")
-    .select("id", { count: "exact", head: true })
-    .in("status", ["aberta", "processando_reembolso"]);
-
   return (
     <main className="container-tight" style={{ padding: "40px 24px 80px" }}>
-      <Link href="/painel" style={{ fontFamily: mono, fontSize: 13, color: "var(--ink-faint)" }}>← Painel</Link>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 18 }}>
-        <Link href="/admin/saude" className="btn">Saúde operacional</Link>
-        <Link href="/admin/disputas" className="btn">
-          Disputas{disputasAbertas ? ` (${disputasAbertas})` : ""}
-        </Link>
-        <Link href="/admin/financeiro" className="btn">Financeiro (ledger e conciliação)</Link>
-        <Link href="/admin/pmoc" className="btn">Fila PMOC</Link>
-        <Link href="/admin/assinaturas" className="btn">Assinaturas</Link>
-        <Link href="/admin/rollout" className="btn">Rollout UX</Link>
-      </div>
-      <h1 style={{ fontSize: "1.8rem", fontWeight: 800, margin: "20px 0 6px" }}>Verificação de profissionais</h1>
+      <h1 style={{ fontSize: "1.8rem", fontWeight: 800, margin: "0 0 6px" }}>Visão geral</h1>
       <p style={{ color: "var(--ink-soft)", marginBottom: 30 }}>
-        Aprove os profissionais antes que apareçam nas buscas (RISCO 4 — qualidade da rede).
+        Funil do marketplace, atendimentos fora do SLA e divergências financeiras abertas.
       </p>
 
       <Secao titulo="Funil do marketplace · últimos 30 dias">
@@ -154,46 +73,6 @@ export default async function AdminPage() {
           : divergenciasFinanceiras.map((item) => (
             <CardDivergencia key={item.id} item={item as DivergenciaFinanceira} />
           ))}
-      </Secao>
-
-      <Secao titulo={`Aguardando análise (${pendentes.length})`}>
-        {pendentes.length === 0
-          ? <Vazio texto="Nenhum profissional aguardando." />
-          : pendentes.map((p) => <Card key={p.id} p={p} />)}
-      </Secao>
-
-      <Secao titulo={`Já revisados (${outros.length})`}>
-        {outros.length === 0
-          ? <Vazio texto="Ninguém revisado ainda." />
-          : outros.map((p) => <Card key={p.id} p={p} />)}
-      </Secao>
-
-      <h2 style={{ fontSize: "1.4rem", fontWeight: 800, margin: "44px 0 6px" }}>Distribuidoras</h2>
-      <p style={{ color: "var(--ink-soft)", marginBottom: 24, fontSize: 14.5 }}>
-        Aprovar deixa a distribuidora verificada <strong>e ativa</strong> — os produtos dela entram no
-        catálogo na mesma hora.
-      </p>
-
-      <Secao titulo={`Aguardando análise (${distPendentes.length})`}>
-        {distPendentes.length === 0
-          ? <Vazio texto="Nenhuma distribuidora aguardando." />
-          : distPendentes.map((d) => <CardDist key={d.id} d={d} />)}
-      </Secao>
-
-      <Secao titulo={`Já revisadas (${distOutros.length})`}>
-        {distOutros.length === 0
-          ? <Vazio texto="Nenhuma revisada ainda." />
-          : distOutros.map((d) => <CardDist key={d.id} d={d} />)}
-      </Secao>
-
-      <h2 style={{ fontSize: "1.4rem", fontWeight: 800, margin: "44px 0 6px" }}>Interesse de distribuidoras</h2>
-      <p style={{ color: "var(--ink-soft)", marginBottom: 24, fontSize: 14.5 }}>
-        Contatos deixados em /distribuidoras. Não cria conta — decida quando enviar o link de cadastro.
-      </p>
-      <Secao titulo={`Leads (${interesses?.length ?? 0})`}>
-        {(interesses?.length ?? 0) === 0
-          ? <Vazio texto="Nenhum contato ainda." />
-          : (interesses ?? []).map((i) => <CardInteresse key={i.id} i={i} />)}
       </Secao>
     </main>
   );
@@ -323,90 +202,6 @@ function CardOperacional({ caso }: { caso: CasoOperacional }) {
         : `/servico/${caso.aggregate_id}`}>
         Analisar atendimento
       </Link>
-    </div>
-  );
-}
-
-function CardDist({ d }: {
-  d: { id: string; razao_social: string; cnpj: string | null; cidade: string; estado: string; verification_status: string; ativo: boolean; prazo_entrega_dias: number };
-}) {
-  const st = STATUS_LABEL[d.verification_status] ?? STATUS_LABEL.pendente;
-  return (
-    <div className="card" style={{ padding: 18, display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
-      <div style={{ flex: 1, minWidth: 220 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <strong style={{ fontSize: 15.5 }}>{d.razao_social}</strong>
-          <span style={{ fontSize: 11.5, fontFamily: mono, padding: "3px 9px", borderRadius: 100, background: st.bg, color: st.cor }}>{st.label}</span>
-          {d.verification_status === "verificado" && !d.ativo && (
-            <span style={{ fontSize: 11.5, fontFamily: mono, color: "var(--warm)" }}>inativa</span>
-          )}
-        </div>
-        <div style={{ fontSize: 13, color: "var(--ink-faint)", marginTop: 4 }}>
-          {d.cidade} — {d.estado} · entrega em {d.prazo_entrega_dias} dia(s)
-          {d.cnpj ? ` · CNPJ ${d.cnpj}` : " · sem CNPJ informado"}
-        </div>
-      </div>
-      <AdminActions id={d.id} status={d.verification_status} tipo="distribuidora" />
-    </div>
-  );
-}
-
-function CardInteresse({ i }: {
-  i: { id: string; nome: string; empresa: string; telefone: string | null; email: string | null; cidade: string | null; mensagem: string | null; created_at: string; contatado_em: string | null };
-}) {
-  return (
-    <div className="card" style={{ padding: 18, display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
-      <div style={{ flex: 1, minWidth: 220 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <strong style={{ fontSize: 15.5 }}>{i.empresa}</strong>
-          <span style={{ fontSize: 11.5, fontFamily: mono, color: "var(--ink-faint)" }}>{i.nome}</span>
-          {i.contatado_em && (
-            <span style={{ fontSize: 11.5, fontFamily: mono, padding: "3px 9px", borderRadius: 100, background: "var(--good-wash)", color: "var(--good)" }}>contatado</span>
-          )}
-        </div>
-        <div style={{ fontSize: 13, color: "var(--ink-faint)", marginTop: 4 }}>
-          {[i.cidade, i.telefone, i.email].filter(Boolean).join(" · ")}
-        </div>
-        {i.mensagem && <p style={{ fontSize: 13.5, color: "var(--ink-soft)", marginTop: 6 }}>{i.mensagem}</p>}
-        <span style={{ fontSize: 12, color: "var(--ink-faint)", marginTop: 6, display: "block" }}>
-          {new Date(i.created_at).toLocaleDateString("pt-BR")}
-        </span>
-      </div>
-      {!i.contatado_em && (
-        <form action={marcarInteresseContatado.bind(null, i.id)}>
-          <button type="submit" className="btn btn-ghost" style={{ height: 36, padding: "0 14px", fontSize: 13 }}>
-            Marcar como contatado
-          </button>
-        </form>
-      )}
-    </div>
-  );
-}
-
-function Card({ p }: { p: { id: string; nome: string; tipo: string; bio: string | null; cidade: string; estado: string; status: string; skills: string[]; documentoUrl: string | null } }) {
-  const st = STATUS_LABEL[p.status] ?? STATUS_LABEL.pendente;
-  return (
-    <div className="card" style={{ padding: 18, display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
-      <div style={{ flex: 1, minWidth: 220 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <strong style={{ fontSize: 15.5 }}>{p.nome}</strong>
-          <span style={{ fontSize: 11.5, color: "var(--ink-faint)", fontFamily: mono }}>{p.tipo === "empresa" ? "Empresa" : "Autônomo"}</span>
-          <span style={{ fontSize: 11.5, fontFamily: mono, padding: "3px 9px", borderRadius: 100, background: st.bg, color: st.cor }}>{st.label}</span>
-        </div>
-        <div style={{ fontSize: 13, color: "var(--ink-faint)", marginTop: 4 }}>
-          {p.cidade} — {p.estado} · {p.skills.map((s) => SPEC_LABEL[s] ?? s).join(", ") || "sem especialidades"}
-        </div>
-        {p.bio && <p style={{ fontSize: 13.5, color: "var(--ink-soft)", marginTop: 6 }}>{p.bio}</p>}
-        <div style={{ display: "flex", gap: 14, marginTop: 6 }}>
-          <Link href={`/profissional/${p.id}`} target="_blank" style={{ fontSize: 12.5, color: "var(--cool-deep)", fontWeight: 600 }}>Ver perfil →</Link>
-          {p.documentoUrl ? (
-            <a href={p.documentoUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12.5, color: "var(--cool-deep)", fontWeight: 600 }}>Ver documento →</a>
-          ) : (
-            <span style={{ fontSize: 12.5, color: "var(--danger)" }}>Sem documento enviado</span>
-          )}
-        </div>
-      </div>
-      <AdminActions id={p.id} status={p.status} />
     </div>
   );
 }

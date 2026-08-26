@@ -154,6 +154,9 @@ export type Database = {
           created_at: string
           id: string
           job_id: string
+          oculta_em: string | null
+          oculta_motivo: string | null
+          oculta_por: string | null
           professional_id: string
           rating: number
           tags: string[]
@@ -163,6 +166,9 @@ export type Database = {
           created_at?: string
           id?: string
           job_id: string
+          oculta_em?: string | null
+          oculta_motivo?: string | null
+          oculta_por?: string | null
           professional_id: string
           rating: number
           tags?: string[]
@@ -172,6 +178,9 @@ export type Database = {
           created_at?: string
           id?: string
           job_id?: string
+          oculta_em?: string | null
+          oculta_motivo?: string | null
+          oculta_por?: string | null
           professional_id?: string
           rating?: number
           tags?: string[]
@@ -197,6 +206,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "pedidos_distribuidora"
             referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "client_reviews_oculta_por_fkey"
+            columns: ["oculta_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "client_reviews_professional_id_fkey"
@@ -3850,6 +3866,9 @@ export type Database = {
           created_at: string
           id: string
           job_id: string
+          oculta_em: string | null
+          oculta_motivo: string | null
+          oculta_por: string | null
           professional_id: string
           rating: number
           specialty: string
@@ -3860,6 +3879,9 @@ export type Database = {
           created_at?: string
           id?: string
           job_id: string
+          oculta_em?: string | null
+          oculta_motivo?: string | null
+          oculta_por?: string | null
           professional_id: string
           rating: number
           specialty: string
@@ -3870,6 +3892,9 @@ export type Database = {
           created_at?: string
           id?: string
           job_id?: string
+          oculta_em?: string | null
+          oculta_motivo?: string | null
+          oculta_por?: string | null
           professional_id?: string
           rating?: number
           specialty?: string
@@ -3895,6 +3920,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "pedidos_distribuidora"
             referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "reviews_oculta_por_fkey"
+            columns: ["oculta_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "reviews_professional_id_fkey"
@@ -4535,6 +4567,14 @@ export type Database = {
         Args: { p_due_at: string; p_task_id: string }
         Returns: undefined
       }
+      admin_intervir_repasse: {
+        Args: { p_acao: string; p_motivo: string; p_transfer_id: string }
+        Returns: undefined
+      }
+      alterar_papel_usuario: {
+        Args: { p_new_role: string; p_reason: string; p_user_id: string }
+        Returns: undefined
+      }
       aplicar_ciclo_assinaturas_vencidas: { Args: never; Returns: undefined }
       aplicar_reembolso_proporcional: {
         Args: {
@@ -4915,6 +4955,15 @@ export type Database = {
           chave_pix: string
           chave_pix_tipo: string
         }[]
+      }
+      moderar_review: {
+        Args: {
+          p_id: string
+          p_motivo: string
+          p_ocultar: boolean
+          p_tabela: string
+        }
+        Returns: undefined
       }
       obter_checkout_cobranca: {
         Args: { p_charge_id: string }

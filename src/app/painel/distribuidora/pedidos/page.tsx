@@ -20,6 +20,7 @@ type ItemPedido = {
   btu: number | null;
   preco_venda_snapshot: number;
   custo_snapshot: number;
+  image_url: string | null;
 };
 
 export default async function PedidosDistribuidoraPage() {
@@ -88,12 +89,22 @@ function Card({ l }: { l: { id: string; status: string; custo_snapshot: number; 
             </span>
           </div>
           {itens.length > 0 && (
-            <div style={{ fontSize: 13, color: "var(--ink-soft)", marginTop: 3 }}>
+            <div style={{ display: "grid", gap: 6, marginTop: 6 }}>
               {itens.map((it, i) => (
-                <div key={i}>
-                  {it.ambiente ? `${it.ambiente}: ` : ""}{it.marca} {it.modelo}
-                  {it.btu ? ` · ${formatarBtu(it.btu)}` : ""}
-                  {it.quantidade > 1 ? ` · ${it.quantidade}x` : ""}
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--ink-soft)" }}>
+                  {it.image_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={it.image_url}
+                      alt={`${it.marca ?? ""} ${it.modelo ?? ""}`}
+                      style={{ width: 34, height: 34, borderRadius: 7, objectFit: "cover", border: "1px solid var(--line)", flexShrink: 0 }}
+                    />
+                  ) : null}
+                  <span>
+                    {it.ambiente ? `${it.ambiente}: ` : ""}{it.marca} {it.modelo}
+                    {it.btu ? ` · ${formatarBtu(it.btu)}` : ""}
+                    {it.quantidade > 1 ? ` · ${it.quantidade}x` : ""}
+                  </span>
                 </div>
               ))}
             </div>
