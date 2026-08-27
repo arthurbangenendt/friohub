@@ -48,13 +48,15 @@ export const NAV_POR_PAPEL: Record<Papel, ItemNav[]> = {
     { href: "/painel/notificacoes", label: "Notificações", icone: "notificacoes" },
     { href: "/painel/distribuidora/perfil", label: "Meu perfil", icone: "perfil" },
   ],
-  /* O admin também é um usuário comum do lado cliente, então mantém os pedidos
-     dele — mas a moderação vem primeiro, que é o motivo de ele entrar aqui. */
+  /* Sem "Meus pedidos": conta admin não contrata serviço, e mostrar os
+     pedidos pessoais dela (em geral vazios/de teste) só confunde quem abre o
+     painel esperando informação do sistema. "Administração" já leva pra
+     Visão geral, que é onde os números de verdade (receita, funil,
+     exceções) moram — não duplica aqui. */
   admin: [
     { href: "/admin", label: "Administração", icone: "admin" },
     { href: "/painel/mensagens", label: "Conversas", icone: "mensagens" },
     { href: "/painel/pmoc", label: "PMOC", icone: "pmoc" },
-    { href: "/painel", label: "Meus pedidos", icone: "servicos" },
     { href: "/painel/notificacoes", label: "Notificações", icone: "notificacoes" },
     { href: "/painel/perfil-cliente", label: "Meu perfil", icone: "perfil" },
   ],

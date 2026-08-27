@@ -60,12 +60,13 @@ export default async function AdminPage() {
       </p>
 
       <Secao titulo="Receita da plataforma · este mês">
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
           <TileMoeda
             label="Receita da plataforma"
             valor={Number(mesAtual?.receita ?? 0)}
             valorAnterior={Number(mesPassado?.receita ?? 0)}
             nota="comissão + margem + assinatura"
+            destaque
           />
           <TileMoeda
             label="GMV"
@@ -74,7 +75,7 @@ export default async function AdminPage() {
             nota="volume total transacionado"
           />
         </div>
-        <Link href="/admin/financeiro" style={{ fontSize: 12.5, color: "var(--cool-deep)", fontWeight: 600, marginTop: 12, display: "inline-block" }}>
+        <Link href="/admin/financeiro" style={{ fontSize: 12.5, color: "var(--cool-deep)", fontWeight: 600, marginTop: 14, display: "inline-block" }}>
           Ver detalhe mês a mês →
         </Link>
       </Secao>
@@ -126,30 +127,40 @@ function FunilMarketplace({ funil, funilAnterior }: { funil: FunilRow; funilAnte
     ["Em execução", funil.started, funilAnterior?.started],
     ["Concluídas", funil.completed, funilAnterior?.completed],
   ] as const;
+  // Primeira etapa é sempre a maior — a barra dela vira a régua de 100% das demais.
+  const maior = Math.max(1, etapas[0][1]);
 
   return (
-    <div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10 }}>
+    <div className="card" style={{ padding: 20 }}>
+      <div style={{ display: "grid", gap: 14 }}>
         {etapas.map(([label, value, valorAnterior], index) => {
           const base = index === 0 ? value : etapas[index - 1][1];
           const conversao = index === 0 || base === 0 ? null : Math.round((value / base) * 100);
           // Sem base de comparação (período anterior zerado) não dá delta — "+∞%" seria mentira.
           const deltaPct = valorAnterior && valorAnterior > 0 ? Math.round(((value - valorAnterior) / valorAnterior) * 100) : null;
+          const largura = Math.max(value > 0 ? 2 : 0, (value / maior) * 100);
           return (
-            <div key={label} className="card" style={{ padding: 14 }}>
-              <div style={{ fontSize: 12, color: "var(--ink-faint)" }}>{label}</div>
-              <strong style={{ display: "block", fontSize: 24, marginTop: 3 }}>{value}</strong>
-              {conversao !== null && <span style={{ display: "block", fontSize: 11.5, color: "var(--ink-soft)" }}>{conversao}% da etapa anterior</span>}
-              {deltaPct !== null && (
-                <span style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: deltaPct >= 0 ? "var(--good)" : "var(--danger)" }}>
-                  {deltaPct >= 0 ? "+" : ""}{deltaPct}% vs. período anterior
+            <div key={label}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, marginBottom: 6 }}>
+                <span style={{ fontSize: 13.5, fontWeight: 600 }}>{label}</span>
+                <span style={{ display: "flex", alignItems: "baseline", gap: 9, whiteSpace: "nowrap" }}>
+                  <strong style={{ fontSize: 18 }}>{value}</strong>
+                  {conversao !== null && <span style={{ fontSize: 11.5, color: "var(--ink-faint)" }}>{conversao}% da etapa anterior</span>}
+                  {deltaPct !== null && (
+                    <span style={{ fontSize: 11.5, fontWeight: 700, color: deltaPct >= 0 ? "var(--good)" : "var(--danger)" }}>
+                      {deltaPct >= 0 ? "↑" : "↓"} {Math.abs(deltaPct)}%
+                    </span>
+                  )}
                 </span>
-              )}
+              </div>
+              <div style={{ height: 20, borderRadius: 10, background: "var(--cool-wash)", overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${largura}%`, borderRadius: 10, background: "var(--chart-1)" }} />
+              </div>
             </div>
           );
         })}
       </div>
-      <p style={{ margin: "12px 0 0", color: "var(--ink-faint)", fontSize: 12.5 }}>
+      <p style={{ margin: "16px 0 0", color: "var(--ink-faint)", fontSize: 12.5 }}>
         Primeira resposta: {funil.avg_first_response_minutes === null ? "sem dados" : `${funil.avg_first_response_minutes} min`}
         {` · ${funil.repeat_customers} cliente(s) recorrente(s)`}
       </p>
@@ -189,7 +200,7 @@ const DIVERGENCIA_LABEL: Record<string, string> = {
 
 function CardDivergencia({ item }: { item: DivergenciaFinanceira }) {
   return (
-    <div className="card" style={{ padding: 18 }}>
+    <div className="card" style={{ padding: 18, borderLeft: "4px solid var(--danger)" }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <strong style={{ color: "var(--danger)", fontSize: 14.5 }}>
           {DIVERGENCIA_LABEL[item.divergence_type] ?? item.divergence_type}
@@ -218,10 +229,14 @@ function CardOperacional({ caso }: { caso: CasoOperacional }) {
   const rotulo = caso.case_type === "quote_without_response"
     ? "Pedido sem proposta no prazo"
     : "Serviço aguardando aceite do profissional";
-  const cor = caso.priority === "critical" ? "var(--danger)" : "var(--warm)";
+  const critico = caso.priority === "critical";
+  const cor = critico ? "var(--danger)" : "var(--warm)";
 
   return (
-    <div className="card" style={{ padding: 18, display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+    <div className="card" style={{
+      padding: 18, display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap",
+      borderLeft: `4px solid ${cor}`, background: critico ? "var(--danger-wash)" : undefined,
+    }}>
       <div style={{ flex: 1, minWidth: 220 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap" }}>
           <strong style={{ fontSize: 15 }}>{rotulo}</strong>
@@ -242,18 +257,22 @@ function CardOperacional({ caso }: { caso: CasoOperacional }) {
     </div>
   );
 }
-function TileMoeda({ label, valor, valorAnterior, nota }: { label: string; valor: number; valorAnterior: number; nota: string }) {
+function TileMoeda({ label, valor, valorAnterior, nota, destaque = false }: {
+  label: string; valor: number; valorAnterior: number; nota: string; destaque?: boolean;
+}) {
   // Sem base de comparação (mês anterior zerado) não dá delta — mostrar "+∞%" seria mentira.
   const deltaPct = valorAnterior > 0 ? Math.round(((valor - valorAnterior) / valorAnterior) * 100) : null;
   return (
-    <div className="card" style={{ padding: 14 }}>
-      <div style={{ fontSize: 12, color: "var(--ink-faint)" }}>{label}</div>
-      <strong style={{ display: "block", fontSize: 22, marginTop: 3, letterSpacing: "-0.02em" }}>{formatarBRL(valor)}</strong>
-      <div style={{ fontSize: 11.5, color: "var(--ink-soft)", marginTop: 2 }}>
+    <div className="card" style={{ padding: 18, borderTop: destaque ? "3px solid var(--chart-1)" : undefined }}>
+      <div style={{ fontSize: 12.5, color: "var(--ink-faint)", fontWeight: 600 }}>{label}</div>
+      <strong style={{ display: "block", fontSize: destaque ? 36 : 26, marginTop: 5, letterSpacing: "-0.03em", lineHeight: 1.1 }}>
+        {formatarBRL(valor)}
+      </strong>
+      <div style={{ fontSize: 12, color: "var(--ink-soft)", marginTop: 6 }}>
         {nota}
         {deltaPct !== null && (
-          <span style={{ color: deltaPct >= 0 ? "var(--good)" : "var(--danger)", fontWeight: 600 }}>
-            {` · ${deltaPct >= 0 ? "+" : ""}${deltaPct}% vs. mês passado`}
+          <span style={{ color: deltaPct >= 0 ? "var(--good)" : "var(--danger)", fontWeight: 700 }}>
+            {` · ${deltaPct >= 0 ? "↑" : "↓"} ${Math.abs(deltaPct)}% vs. mês passado`}
           </span>
         )}
       </div>
