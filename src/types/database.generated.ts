@@ -4982,8 +4982,12 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: string
       }
+      obter_documento_verificacao: {
+        Args: { p_professional_id: string }
+        Returns: string
+      }
       obter_funil_marketplace: {
-        Args: { p_city?: string; p_days?: number }
+        Args: { p_city?: string; p_days?: number; p_end_date?: string }
         Returns: {
           accepted: number
           avg_first_response_minutes: number
@@ -5008,6 +5012,14 @@ export type Database = {
           nome: string
           preco_anual: number
           preco_mensal: number
+        }[]
+      }
+      obter_receita_gmv_mensal: {
+        Args: { p_meses?: number }
+        Returns: {
+          gmv: number
+          mes: string
+          receita: number
         }[]
       }
       obter_saude_publica: {

@@ -15,3 +15,4 @@ export { StatusPill } from "./StatusPill";
 export { Campo, CampoTexto, CampoSelecao, controle } from "./Field";
 export { ToastProvider, useToast } from "./Toast";
 export { SecaoComIcone } from "./SecaoComIcone";
+export { GraficoMeses, type PontoMes } from "./GraficoMeses";

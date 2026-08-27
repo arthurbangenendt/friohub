@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AdminActions } from "../AdminActions";
 import { STATUS_VERIFICACAO, resolverMapa } from "@/lib/status";
+import { Alert } from "@/components/ui";
 
 const mono = "var(--font-geist-mono), ui-monospace, monospace";
 const STATUS_LABEL = resolverMapa(STATUS_VERIFICACAO);
@@ -15,7 +16,7 @@ export default async function AdminDistribuidorasPage() {
 
   /* Distribuidoras usam o mesmo trio de colunas de confiança e a mesma dupla de
      ações — ver `definirVerificacao` em admin/actions.ts. */
-  const { data: dists } = await supabase
+  const { data: dists, error: erroDists } = await supabase
     .from("distributors")
     .select("id, razao_social, cidade, estado, verification_status, ativo, prazo_entrega_dias")
     .order("verification_status");
@@ -36,6 +37,12 @@ export default async function AdminDistribuidorasPage() {
         Aprovar deixa a distribuidora verificada <strong>e ativa</strong> — os produtos dela entram no
         catálogo na mesma hora.
       </p>
+
+      {erroDists && (
+        <Alert tipo="erro" titulo="Não foi possível carregar as distribuidoras">
+          {erroDists.message}
+        </Alert>
+      )}
 
       <Secao titulo={`Aguardando análise (${pendentes.length})`}>
         {pendentes.length === 0

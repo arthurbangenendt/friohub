@@ -22,7 +22,7 @@ export const GRUPOS_ADMIN: GrupoNavAdmin[] = [
     itens: [{ href: "/admin", label: "Visão geral" }],
   },
   {
-    titulo: "Verificação",
+    titulo: "Cadastros",
     itens: [
       { href: "/admin/profissionais", label: "Profissionais", badge: "profissionais" },
       { href: "/admin/distribuidoras", label: "Distribuidoras", badge: "distribuidoras" },

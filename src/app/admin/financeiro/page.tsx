@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatarBRL } from "@/lib/pricing";
 import { STATUS_COBRANCA, resolver } from "@/lib/status";
-import { Alert, EmptyState } from "@/components/ui";
+import { Alert, EmptyState, GraficoMeses } from "@/components/ui";
 
 /* Ledger e conciliação, visão do administrador.
  *
@@ -76,6 +76,17 @@ export default async function AdminFinanceiroPage() {
 
   const ultima = corridas?.[0];
 
+  const { data: receitaMensal } = await supabase.rpc("obter_receita_gmv_mensal", { p_meses: 12 });
+  const meses = receitaMensal ?? [];
+  const mesLabel = (iso: string) =>
+    new Date(`${iso}T00:00:00Z`).toLocaleDateString("pt-BR", { month: "short", timeZone: "UTC" });
+  const serieReceita = meses.map((m) => ({ mes: mesLabel(m.mes), receita: Number(m.receita), despesa: 0 }));
+  const mesAtualGmv = meses[meses.length - 1] ?? null;
+  const mesPassadoGmv = meses[meses.length - 2] ?? null;
+  const deltaGmv = mesPassadoGmv && Number(mesPassadoGmv.gmv) > 0
+    ? Math.round(((Number(mesAtualGmv?.gmv ?? 0) - Number(mesPassadoGmv.gmv)) / Number(mesPassadoGmv.gmv)) * 100)
+    : null;
+
   return (
     <div style={{ maxWidth: 980, margin: "0 auto", padding: "40px 28px 80px" }}>
       <h1 style={{ fontSize: "1.9rem", fontWeight: 800, letterSpacing: "-0.025em", margin: "0 0 6px" }}>
@@ -120,6 +131,27 @@ export default async function AdminFinanceiroPage() {
             </strong>
           </div>
         ))}
+      </div>
+
+      <h2 style={{ fontSize: "1.05rem", fontWeight: 700, margin: "32px 0 12px" }}>Receita da plataforma</h2>
+      <p style={{ color: "var(--ink-faint)", fontSize: 12.5, margin: "-6px 0 14px" }}>
+        Mês a mês — diferente do “Movimento por conta” acima, que é saldo acumulado desde sempre.
+      </p>
+      <div className="card" style={{ padding: 20 }}>
+        <GraficoMeses dados={serieReceita} comDespesa={false} />
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, marginTop: 12 }}>
+        <div className="card" style={{ padding: "14px 16px" }}>
+          <div style={{ fontSize: 12, color: "var(--ink-soft)" }}>GMV do mês</div>
+          <strong style={{ fontSize: "1.15rem", letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums" }}>
+            {formatarBRL(Number(mesAtualGmv?.gmv ?? 0))}
+          </strong>
+          {deltaGmv !== null && (
+            <div style={{ fontSize: 11.5, color: deltaGmv >= 0 ? "var(--good)" : "var(--danger)", fontWeight: 600, marginTop: 2 }}>
+              {deltaGmv >= 0 ? "+" : ""}{deltaGmv}% vs. mês passado
+            </div>
+          )}
+        </div>
       </div>
 
       <h2 style={{ fontSize: "1.05rem", fontWeight: 700, margin: "32px 0 12px" }}>Conciliação</h2>

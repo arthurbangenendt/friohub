@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { CIDADE } from "@/lib/regiao";
+import { formatarBRL } from "@/lib/pricing";
 
 const mono = "var(--font-geist-mono), ui-monospace, monospace";
 
@@ -36,21 +37,50 @@ export default async function AdminPage() {
       .limit(100)
     : { data: [] };
 
-  const { data: funilData } = await supabase.rpc("obter_funil_marketplace", {
-    p_days: 30,
-    p_city: CIDADE,
-  });
+  const agora = new Date();
+  const trintaDiasAtras = new Date(agora);
+  trintaDiasAtras.setDate(trintaDiasAtras.getDate() - 30);
+
+  const [{ data: funilData }, { data: funilAnteriorData }] = await Promise.all([
+    supabase.rpc("obter_funil_marketplace", { p_days: 30, p_city: CIDADE, p_end_date: agora.toISOString() }),
+    supabase.rpc("obter_funil_marketplace", { p_days: 30, p_city: CIDADE, p_end_date: trintaDiasAtras.toISOString() }),
+  ]);
   const funil = funilData?.[0] ?? null;
+  const funilAnterior = funilAnteriorData?.[0] ?? null;
+
+  // obter_receita_gmv_mensal devolve em ordem crescente: [0] mês passado, [1] mês atual.
+  const { data: receitaData } = await supabase.rpc("obter_receita_gmv_mensal", { p_meses: 2 });
+  const [mesPassado, mesAtual] = receitaData ?? [];
 
   return (
     <main className="container-tight" style={{ padding: "40px 24px 80px" }}>
       <h1 style={{ fontSize: "1.8rem", fontWeight: 800, margin: "0 0 6px" }}>Visão geral</h1>
       <p style={{ color: "var(--ink-soft)", marginBottom: 30 }}>
-        Funil do marketplace, atendimentos fora do SLA e divergências financeiras abertas.
+        Receita, funil do marketplace, atendimentos fora do SLA e divergências financeiras abertas.
       </p>
 
+      <Secao titulo="Receita da plataforma · este mês">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
+          <TileMoeda
+            label="Receita da plataforma"
+            valor={Number(mesAtual?.receita ?? 0)}
+            valorAnterior={Number(mesPassado?.receita ?? 0)}
+            nota="comissão + margem + assinatura"
+          />
+          <TileMoeda
+            label="GMV"
+            valor={Number(mesAtual?.gmv ?? 0)}
+            valorAnterior={Number(mesPassado?.gmv ?? 0)}
+            nota="volume total transacionado"
+          />
+        </div>
+        <Link href="/admin/financeiro" style={{ fontSize: 12.5, color: "var(--cool-deep)", fontWeight: 600, marginTop: 12, display: "inline-block" }}>
+          Ver detalhe mês a mês →
+        </Link>
+      </Secao>
+
       <Secao titulo="Funil do marketplace · últimos 30 dias">
-        {!funil ? <Vazio texto="Métricas ainda indisponíveis." /> : <FunilMarketplace funil={funil} />}
+        {!funil ? <Vazio texto="Métricas ainda indisponíveis." /> : <FunilMarketplace funil={funil} funilAnterior={funilAnterior} />}
       </Secao>
 
       <Secao titulo={`Exceções operacionais (${casosOperacionais?.length ?? 0})`}>
@@ -88,26 +118,33 @@ type FunilRow = {
   avg_first_response_minutes: number | null;
 };
 
-function FunilMarketplace({ funil }: { funil: FunilRow }) {
+function FunilMarketplace({ funil, funilAnterior }: { funil: FunilRow; funilAnterior: FunilRow | null }) {
   const etapas = [
-    ["Solicitações", funil.requested],
-    ["Com resposta", funil.responded],
-    ["Aceitas", funil.accepted],
-    ["Em execução", funil.started],
-    ["Concluídas", funil.completed],
+    ["Solicitações", funil.requested, funilAnterior?.requested],
+    ["Com resposta", funil.responded, funilAnterior?.responded],
+    ["Aceitas", funil.accepted, funilAnterior?.accepted],
+    ["Em execução", funil.started, funilAnterior?.started],
+    ["Concluídas", funil.completed, funilAnterior?.completed],
   ] as const;
 
   return (
     <div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10 }}>
-        {etapas.map(([label, value], index) => {
+        {etapas.map(([label, value, valorAnterior], index) => {
           const base = index === 0 ? value : etapas[index - 1][1];
           const conversao = index === 0 || base === 0 ? null : Math.round((value / base) * 100);
+          // Sem base de comparação (período anterior zerado) não dá delta — "+∞%" seria mentira.
+          const deltaPct = valorAnterior && valorAnterior > 0 ? Math.round(((value - valorAnterior) / valorAnterior) * 100) : null;
           return (
             <div key={label} className="card" style={{ padding: 14 }}>
               <div style={{ fontSize: 12, color: "var(--ink-faint)" }}>{label}</div>
               <strong style={{ display: "block", fontSize: 24, marginTop: 3 }}>{value}</strong>
-              {conversao !== null && <span style={{ fontSize: 11.5, color: "var(--ink-soft)" }}>{conversao}% da etapa anterior</span>}
+              {conversao !== null && <span style={{ display: "block", fontSize: 11.5, color: "var(--ink-soft)" }}>{conversao}% da etapa anterior</span>}
+              {deltaPct !== null && (
+                <span style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: deltaPct >= 0 ? "var(--good)" : "var(--danger)" }}>
+                  {deltaPct >= 0 ? "+" : ""}{deltaPct}% vs. período anterior
+                </span>
+              )}
             </div>
           );
         })}
@@ -202,6 +239,24 @@ function CardOperacional({ caso }: { caso: CasoOperacional }) {
         : `/servico/${caso.aggregate_id}`}>
         Analisar atendimento
       </Link>
+    </div>
+  );
+}
+function TileMoeda({ label, valor, valorAnterior, nota }: { label: string; valor: number; valorAnterior: number; nota: string }) {
+  // Sem base de comparação (mês anterior zerado) não dá delta — mostrar "+∞%" seria mentira.
+  const deltaPct = valorAnterior > 0 ? Math.round(((valor - valorAnterior) / valorAnterior) * 100) : null;
+  return (
+    <div className="card" style={{ padding: 14 }}>
+      <div style={{ fontSize: 12, color: "var(--ink-faint)" }}>{label}</div>
+      <strong style={{ display: "block", fontSize: 22, marginTop: 3, letterSpacing: "-0.02em" }}>{formatarBRL(valor)}</strong>
+      <div style={{ fontSize: 11.5, color: "var(--ink-soft)", marginTop: 2 }}>
+        {nota}
+        {deltaPct !== null && (
+          <span style={{ color: deltaPct >= 0 ? "var(--good)" : "var(--danger)", fontWeight: 600 }}>
+            {` · ${deltaPct >= 0 ? "+" : ""}${deltaPct}% vs. mês passado`}
+          </span>
+        )}
+      </div>
     </div>
   );
 }

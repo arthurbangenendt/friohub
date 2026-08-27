@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { AdminActions } from "../AdminActions";
 import { STATUS_VERIFICACAO, resolverMapa } from "@/lib/status";
 import { one } from "@/lib/relacional";
+import { Alert } from "@/components/ui";
 
 const mono = "var(--font-geist-mono), ui-monospace, monospace";
 const SPEC_LABEL: Record<string, string> = {
@@ -18,10 +19,18 @@ export default async function AdminProfissionaisPage() {
   const { data: perfil } = await supabase.from("profiles").select("role").eq("id", user.id).single();
   if (perfil?.role !== "admin") redirect("/painel");
 
-  const { data: pros } = await supabase
+  /* Erro de busca não pode virar "ninguém aguardando" em silêncio — mesmo
+     cuidado já registrado em admin/financeiro/page.tsx: um `?? []` sozinho
+     esconde RLS/coluna/embed quebrado atrás de uma lista vazia legítima.
+
+     `documento_storage_path` NÃO entra neste select: a coluna nunca esteve
+     no grant público de `professionals` (20260814114010_rest_api_role_grants
+     só libera um allowlist pra vitrine) — mesma sensibilidade que já levava
+     o arquivo em si a exigir RLS de storage dedicada. É lida à parte, por
+     profissional, via `obter_documento_verificacao` (admin-only). */
+  const { data: pros, error: erroPros } = await supabase
     .from("professionals")
     .select(`id, tipo, bio, cidade, estado, verification_status, created_at,
-             documento_tipo, documento_storage_path,
              profiles!inner ( nome ),
              professional_skills ( specialty )`)
     .order("verification_status");
@@ -30,11 +39,12 @@ export default async function AdminProfissionaisPage() {
      `documentos-verificacao` (pode_ler_documento_verificacao) decide se ele
      pode, sem precisar de service-role nem rota nova. */
   const lista = await Promise.all((pros ?? []).map(async (p) => {
+    const { data: caminho } = await supabase.rpc("obter_documento_verificacao", { p_professional_id: p.id });
     let documentoUrl: string | null = null;
-    if (p.documento_storage_path) {
+    if (caminho) {
       const { data } = await supabase.storage
         .from("documentos-verificacao")
-        .createSignedUrl(p.documento_storage_path, 3600);
+        .createSignedUrl(caminho, 3600);
       documentoUrl = data?.signedUrl ?? null;
     }
     return {
@@ -59,6 +69,12 @@ export default async function AdminProfissionaisPage() {
       <p style={{ color: "var(--ink-soft)", marginBottom: 30 }}>
         Aprove os profissionais antes que apareçam nas buscas (RISCO 4 — qualidade da rede).
       </p>
+
+      {erroPros && (
+        <Alert tipo="erro" titulo="Não foi possível carregar os profissionais">
+          {erroPros.message}
+        </Alert>
+      )}
 
       <Secao titulo={`Aguardando análise (${pendentes.length})`}>
         {pendentes.length === 0

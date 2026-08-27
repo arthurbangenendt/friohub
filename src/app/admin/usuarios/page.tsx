@@ -1,14 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { STATUS_VERIFICACAO, resolver } from "@/lib/status";
 import { ROTULO_PAPEL, comoPapel } from "@/app/painel/navegacao";
 import { EmptyState } from "@/components/ui";
 import { UsuarioActions } from "./UsuarioActions";
 
-/* Busca global de pessoa — hoje só profissional/distribuidora têm um lever
- * administrativo (verificação); cliente não tinha nenhum, e achar QUALQUER
- * pessoa dependia de link que outra tela já tivesse decidido mostrar.
+/* Busca de cliente/admin — profissional e distribuidora já têm tela própria
+ * (Cadastros > Profissionais/Distribuidoras), com o ciclo de vida de
+ * verificação deles; aqui é só quem esta tela sabe agir de verdade: alternar
+ * cliente<->admin e suspender login de cliente.
  *
  * `profiles` é lido por qualquer authenticated (policy `profiles_read_auth`)
  * e `profile_private.telefone` já é admin-readable (`profile_private_admin_read`)
@@ -40,9 +40,9 @@ export default async function AdminUsuariosPage({
   const pagina = Number.isFinite(paginaSolicitada) && paginaSolicitada > 0 ? paginaSolicitada : 1;
   const inicio = (pagina - 1) * POR_PAGINA;
 
-  let registros: Linha[] = [];
-  let total = 0;
-
+  // Só cliente e admin — profissional/distribuidora vivem em Cadastros.
+  // Sem busca, lista todo mundo (mais recente primeiro) — busca só estreita.
+  let consulta = supabase.from("profiles").select("id, nome, role, created_at", { count: "exact" }).in("role", ["cliente", "admin"]);
   if (qSeguro) {
     const { data: porTelefone } = await supabase
       .from("profile_private")
@@ -53,39 +53,26 @@ export default async function AdminUsuariosPage({
     const filtro = idsTelefone.length
       ? `nome.ilike.%${qSeguro}%,id.in.(${idsTelefone.join(",")})`
       : `nome.ilike.%${qSeguro}%`;
-
-    const { data, count } = await supabase
-      .from("profiles")
-      .select("id, nome, role, created_at", { count: "exact" })
-      .or(filtro)
-      .order("nome")
-      .range(inicio, inicio + POR_PAGINA - 1);
-
-    registros = (data ?? []) as Linha[];
-    total = count ?? 0;
+    consulta = consulta.or(filtro);
   }
 
-  const proIds = registros.filter((r) => r.role === "profissional").map((r) => r.id);
-  const distIds = registros.filter((r) => r.role === "distribuidora").map((r) => r.id);
+  const { data, count } = await consulta
+    .order(qSeguro ? "nome" : "created_at", { ascending: !!qSeguro })
+    .range(inicio, inicio + POR_PAGINA - 1);
+
+  const registros = (data ?? []) as Linha[];
+  const total = count ?? 0;
+
   const clienteIds = registros.filter((r) => r.role === "cliente").map((r) => r.id);
-
-  const [{ data: pros }, { data: dists }, { data: eventosSuspensao }] = await Promise.all([
-    proIds.length ? supabase.from("professionals").select("id, verification_status").in("id", proIds) : Promise.resolve({ data: [] }),
-    distIds.length ? supabase.from("distributors").select("id, verification_status").in("id", distIds) : Promise.resolve({ data: [] }),
-    clienteIds.length
-      ? supabase
-        .from("admin_audit_log")
-        .select("entity_id, action, created_at")
-        .eq("entity_type", "profile")
-        .in("action", ["user_suspended", "user_reactivated"])
-        .in("entity_id", clienteIds)
-        .order("created_at", { ascending: false })
-      : Promise.resolve({ data: [] }),
-  ]);
-
-  const statusVerificacaoPorId = new Map<string, string>();
-  for (const p of (pros ?? []) as { id: string; verification_status: string }[]) statusVerificacaoPorId.set(p.id, p.verification_status);
-  for (const d of (dists ?? []) as { id: string; verification_status: string }[]) statusVerificacaoPorId.set(d.id, d.verification_status);
+  const { data: eventosSuspensao } = clienteIds.length
+    ? await supabase
+      .from("admin_audit_log")
+      .select("entity_id, action, created_at")
+      .eq("entity_type", "profile")
+      .in("action", ["user_suspended", "user_reactivated"])
+      .in("entity_id", clienteIds)
+      .order("created_at", { ascending: false })
+    : { data: [] };
 
   // Primeira ocorrência de cada pessoa já é a mais recente (ordem desc).
   const suspensoPorId = new Map<string, boolean>();
@@ -100,7 +87,8 @@ export default async function AdminUsuariosPage({
     <main className="container-tight" style={{ padding: "40px 24px 80px" }}>
       <h1 style={{ fontSize: "1.9rem", fontWeight: 800, letterSpacing: "-0.025em", margin: "0 0 6px" }}>Usuários</h1>
       <p style={{ color: "var(--ink-soft)", margin: "0 0 22px" }}>
-        Busque por nome ou telefone para promover/revogar admin ou suspender o login de um cliente.
+        Clientes e admins, mais recentes primeiro — profissional e distribuidora ficam em Cadastros. Busque
+        por nome ou telefone pra estreitar, promova/revogue admin ou suspenda o login de um cliente.
       </p>
 
       <form method="get" style={{ display: "flex", gap: 10, marginBottom: 24 }}>
@@ -114,16 +102,14 @@ export default async function AdminUsuariosPage({
         <button type="submit" className="btn btn-primary" style={{ height: 40 }}>Buscar</button>
       </form>
 
-      {!qSeguro ? (
-        <EmptyState titulo="Digite um nome ou telefone" descricao="A lista completa de usuários não aparece por padrão — busque quem você precisa encontrar." />
-      ) : registros.length === 0 ? (
-        <EmptyState titulo="Ninguém encontrado" descricao={`Nenhum usuário com nome ou telefone parecido com "${qSeguro}".`} />
+      {registros.length === 0 ? (
+        qSeguro
+          ? <EmptyState titulo="Ninguém encontrado" descricao={`Nenhum usuário com nome ou telefone parecido com "${qSeguro}".`} />
+          : <EmptyState titulo="Nenhum usuário cadastrado ainda" />
       ) : (
         <div style={{ display: "grid", gap: 12 }}>
           {registros.map((r) => {
             const papel = comoPapel(r.role);
-            const statusVerif = statusVerificacaoPorId.get(r.id);
-            const st = statusVerif ? resolver(STATUS_VERIFICACAO, statusVerif) : null;
             const suspenso = suspensoPorId.get(r.id) ?? false;
             return (
               <div key={r.id} className="card" style={{ padding: 18, display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
@@ -131,9 +117,6 @@ export default async function AdminUsuariosPage({
                   <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                     <strong style={{ fontSize: 15.5 }}>{r.nome}</strong>
                     <span style={{ fontSize: 11.5, fontFamily: mono, color: "var(--ink-faint)" }}>{ROTULO_PAPEL[papel]}</span>
-                    {st && (
-                      <span style={{ fontSize: 11.5, fontFamily: mono, padding: "3px 9px", borderRadius: 100, background: st.bg, color: st.cor }}>{st.label}</span>
-                    )}
                     {suspenso && (
                       <span style={{ fontSize: 11.5, fontFamily: mono, padding: "3px 9px", borderRadius: 100, background: "var(--danger-wash)", color: "var(--danger)" }}>
                         Login suspenso
@@ -151,7 +134,7 @@ export default async function AdminUsuariosPage({
         </div>
       )}
 
-      {qSeguro && totalPaginas > 1 && (
+      {totalPaginas > 1 && (
         <nav style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 22, fontSize: 13.5 }}>
           {pagina > 1
             ? <Link href={`/admin/usuarios?pagina=${pagina - 1}${qs}`}>← Anterior</Link>

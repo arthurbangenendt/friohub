@@ -23,8 +23,8 @@ select has_function(
   'regra territorial por raio existe no banco'
 );
 select has_function(
-  'public', 'obter_funil_marketplace', array['integer', 'text'],
-  'funil administrativo existe'
+  'public', 'obter_funil_marketplace', array['integer', 'text', 'timestamptz'],
+  'funil administrativo existe, com âncora de período pra comparação'
 );
 select is(
   (select prosecdef from pg_proc where oid =

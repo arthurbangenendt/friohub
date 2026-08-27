@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { marcarInteresseContatado } from "../actions";
+import { Alert } from "@/components/ui";
 
 const mono = "var(--font-geist-mono), ui-monospace, monospace";
 
@@ -12,7 +13,7 @@ export default async function AdminLeadsPage() {
   if (perfil?.role !== "admin") redirect("/painel");
 
   // Leads do formulário público de /distribuidoras — sem verificação, só contato.
-  const { data: interesses } = await supabase
+  const { data: interesses, error: erroInteresses } = await supabase
     .from("distributor_interest")
     .select("id, nome, empresa, telefone, email, cidade, mensagem, created_at, contatado_em")
     .order("created_at", { ascending: false });
@@ -23,6 +24,12 @@ export default async function AdminLeadsPage() {
       <p style={{ color: "var(--ink-soft)", marginBottom: 30 }}>
         Contatos deixados em /distribuidoras. Não cria conta — decida quando enviar o link de cadastro.
       </p>
+
+      {erroInteresses && (
+        <Alert tipo="erro" titulo="Não foi possível carregar os leads">
+          {erroInteresses.message}
+        </Alert>
+      )}
 
       <Secao titulo={`Leads (${interesses?.length ?? 0})`}>
         {(interesses?.length ?? 0) === 0

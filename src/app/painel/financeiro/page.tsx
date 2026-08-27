@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatarBRL, TAXA_COMISSAO } from "@/lib/pricing";
 import { Kpi, FECHADOS, wrap } from "../shared";
-import { GraficoMeses, type PontoMes } from "./GraficoMeses";
+import { GraficoMeses, type PontoMes } from "@/components/ui/GraficoMeses";
 import { DespesasEditor, type Despesa, type ServicoParaDespesa } from "./DespesasEditor";
 import { PERIODOS, chaveMes, comoPeriodo, janela, rotuloPeriodo } from "./periodo";
 import { Doc } from "@/components/icons";
