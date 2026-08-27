@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PropostaPmocForm, type ClienteOpcao } from "./PropostaPmocForm";
+import { PlanoBloqueado } from "@/components/ui/PlanoBloqueado";
 
 /* Proposta de PMOC pelo profissional.
  *
@@ -20,6 +21,25 @@ export default async function ProporPmocPage() {
 
   const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
   if (profile?.role !== "profissional") redirect("/painel/pmoc");
+
+  const { data: pmocLiberado } = await supabase.rpc("plano_permite", {
+    p_professional_id: user.id,
+    p_feature: "pmoc",
+  });
+  if (!pmocLiberado) {
+    return (
+      <main className="container-tight" style={{ padding: "40px 24px 80px" }}>
+        <Link href="/painel/pmoc" style={{ color: "var(--ink-faint)", fontSize: 13 }}>
+          ← PMOC
+        </Link>
+        <h1 style={{ margin: "20px 0 6px" }}>Propor um PMOC</h1>
+        <PlanoBloqueado
+          titulo="Propor PMOC é do plano Essencial"
+          descricao="Traga pra plataforma um contrato de manutenção que você já tem por fora — o sistema gera as visitas sozinho. Faça upgrade para liberar."
+        />
+      </main>
+    );
+  }
 
   const { data: jobs } = await supabase
     .from("jobs")

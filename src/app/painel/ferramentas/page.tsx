@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { wrap } from "../shared";
+import { Cabecalho, wrap } from "../shared";
 import { CalculadoraBtu } from "./CalculadoraBtu";
 import { FerramentasEditor, type Ferramenta } from "./FerramentasEditor";
+import { PlanoBloqueado } from "@/components/ui/PlanoBloqueado";
 
 /* Referências de bancada. Valores usuais de mercado para consulta rápida — não
    substituem o manual do fabricante nem a norma, e a tela diz isso. */
@@ -39,6 +40,22 @@ export default async function FerramentasPage() {
 
   const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
   if (profile?.role !== "profissional") redirect("/painel");
+
+  const { data: ferramentasLiberado } = await supabase.rpc("plano_permite", {
+    p_professional_id: user.id,
+    p_feature: "ferramentas",
+  });
+  if (!ferramentasLiberado) {
+    return (
+      <div style={wrap}>
+        <Cabecalho eyebrow="Bancada" titulo="Ferramentas" />
+        <PlanoBloqueado
+          titulo="Ferramentas é do plano Essencial"
+          descricao="Seu inventário de ferramentas com valor de compra puxando despesa automática, mais as referências técnicas de bancada. Faça upgrade para liberar."
+        />
+      </div>
+    );
+  }
 
   const { data: ferramentasData } = await supabase
     .from("professional_tools")

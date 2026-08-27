@@ -6,6 +6,7 @@ import { rotuloJob } from "@/app/solicitar/tipos";
 import { Cabecalho, dataCurta, mono, wrap } from "../shared";
 import { ConcluirFollowUpForm, CriarFollowUpForm } from "./FollowUpForms";
 import { featureHabilitada } from "@/lib/feature-flags";
+import { PlanoBloqueado } from "@/components/ui/PlanoBloqueado";
 
 type Etapa = "novo" | "visualizado" | "proposta" | "ganho" | "perdido";
 const ETAPA: Record<Etapa, { label: string; cor: string }> = {
@@ -25,6 +26,21 @@ export default async function OportunidadesPage() {
   if (!(await featureHabilitada(supabase, "ux_pipeline", user.id))) redirect("/painel");
   const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
   if (profile?.role !== "profissional") redirect("/painel");
+  const { data: oportunidadesLiberadas } = await supabase.rpc("plano_permite", {
+    p_professional_id: user.id,
+    p_feature: "oportunidades",
+  });
+  if (!oportunidadesLiberadas) {
+    return (
+      <div style={wrap}>
+        <Cabecalho eyebrow="Comercial" titulo="Oportunidades" />
+        <PlanoBloqueado
+          titulo="Oportunidades é do plano Profissional"
+          descricao="Veja cada pedido de orçamento organizado por etapa, com follow-up para não perder negociação em aberto. Faça upgrade para liberar."
+        />
+      </div>
+    );
+  }
   const { data: targets } = await supabase
     .from("quote_request_targets")
     .select(

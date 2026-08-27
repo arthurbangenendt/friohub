@@ -4,6 +4,7 @@ import { Cabecalho, wrap } from "../shared";
 import { salvarNota } from "./actions";
 import { featureHabilitada } from "@/lib/feature-flags";
 import { EmptyState } from "@/components/ui";
+import { PlanoBloqueado } from "@/components/ui/PlanoBloqueado";
 
 type EquipamentoCliente = { id: string; customer_id: string; brand: string | null; model: string | null; capacity_btu: number | null };
 export default async function ClientesPage() {
@@ -15,6 +16,21 @@ export default async function ClientesPage() {
   if (!(await featureHabilitada(supabase, "ux_portfolio", user.id))) redirect("/painel");
   const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
   if (profile?.role !== "profissional") redirect("/painel");
+  const { data: clientesLiberado } = await supabase.rpc("plano_permite", {
+    p_professional_id: user.id,
+    p_feature: "clientes",
+  });
+  if (!clientesLiberado) {
+    return (
+      <div style={wrap}>
+        <Cabecalho eyebrow="Relacionamento" titulo="Meus clientes" />
+        <PlanoBloqueado
+          titulo="Meus clientes é do plano Profissional"
+          descricao="Histórico de serviço, equipamento e anotações privadas de cada cliente que já te contratou, num só lugar. Faça upgrade para liberar."
+        />
+      </div>
+    );
+  }
   const [{ data: jobs }, { data: notes }] = await Promise.all([
     supabase
       .from("jobs")

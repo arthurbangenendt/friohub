@@ -8,6 +8,7 @@ import { featureHabilitada } from "@/lib/feature-flags";
 import { Campo } from "@/components/ui";
 import { TimelineContent } from "@/components/ui/timeline-animation";
 import { Search, Doc, Star, Check, Bolt, Tool } from "@/components/icons";
+import { PlanoBloqueado } from "@/components/ui/PlanoBloqueado";
 
 export default async function DesempenhoPage() {
   const supabase = await createClient();
@@ -18,6 +19,21 @@ export default async function DesempenhoPage() {
   if (!(await featureHabilitada(supabase, "ux_growth", user.id))) redirect("/painel");
   const { data: p } = await supabase.from("profiles").select("role,avatar_url").eq("id", user.id).single();
   if (p?.role !== "profissional") redirect("/painel");
+  const { data: desempenhoLiberado } = await supabase.rpc("plano_permite", {
+    p_professional_id: user.id,
+    p_feature: "desempenho",
+  });
+  if (!desempenhoLiberado) {
+    return (
+      <div style={wrap}>
+        <Cabecalho eyebrow="Gestão" titulo="Desempenho" />
+        <PlanoBloqueado
+          titulo="Desempenho é do plano Profissional"
+          descricao="Funil do mês, taxa de conversão e sugestões práticas pra fechar mais orçamento. Faça upgrade para liberar."
+        />
+      </div>
+    );
+  }
   const since = new Date();
   since.setDate(1);
   since.setHours(0, 0, 0, 0);

@@ -7,6 +7,7 @@ import { Cabecalho, dataCurta, mono, wrap } from "../shared";
 import { comoPapel } from "../navegacao";
 import { CancelarPmocForm, ConcluirVisitaForm, ResponderPmocForm, SolicitarPmocForm } from "./PmocClient";
 import { vincularEquipamentoPmoc } from "./actions";
+import { PlanoBloqueado } from "@/components/ui/PlanoBloqueado";
 
 type Visita = {
   id: string;
@@ -70,6 +71,11 @@ export default async function PmocPage() {
   });
   if (!pmocLiberado && papel !== "admin") redirect("/painel");
 
+  const { data: pmocPlanoLiberado } =
+    papel === "profissional"
+      ? await supabase.rpc("plano_permite", { p_professional_id: user.id, p_feature: "pmoc" })
+      : { data: null };
+
   const { data, error } = await supabase
     .from("pmoc_plans")
     .select(
@@ -99,7 +105,7 @@ export default async function PmocPage() {
             Abrir fila administrativa
           </Link>
         )}
-        {papel === "profissional" && (
+        {papel === "profissional" && pmocPlanoLiberado && (
           <Link href="/painel/pmoc/propor" className="btn btn-primary">
             Propor PMOC a um cliente
           </Link>
@@ -119,23 +125,32 @@ export default async function PmocPage() {
       <h2 style={{ margin: "34px 0 14px" }}>
         {papel === "profissional" ? "Planos atribuídos a você" : "Seus planos"}
       </h2>
-      {error && <p style={{ color: "var(--danger)" }}>Não foi possível carregar os planos.</p>}
-      {!error && planos.length === 0 && (
-        <div className="card" style={{ padding: 24, color: "var(--ink-faint)" }}>
-          Nenhum plano PMOC por aqui.
-        </div>
+      {papel === "profissional" && !pmocPlanoLiberado ? (
+        <PlanoBloqueado
+          titulo="PMOC é do plano Essencial"
+          descricao="Receba e acompanhe contratos de manutenção recorrente atribuídos a você, com visitas geradas automaticamente. Faça upgrade para liberar."
+        />
+      ) : (
+        <>
+          {error && <p style={{ color: "var(--danger)" }}>Não foi possível carregar os planos.</p>}
+          {!error && planos.length === 0 && (
+            <div className="card" style={{ padding: 24, color: "var(--ink-faint)" }}>
+              Nenhum plano PMOC por aqui.
+            </div>
+          )}
+          <div style={{ display: "grid", gap: 12 }}>
+            {planos.map((plano) => (
+              <PlanoCard
+                key={plano.id}
+                plano={plano}
+                isPro={papel === "profissional"}
+                equipamentos={equipamentos ?? []}
+                vinculados={(vinculos ?? []).filter((v) => v.plan_id === plano.id).map((v) => v.equipment_id)}
+              />
+            ))}
+          </div>
+        </>
       )}
-      <div style={{ display: "grid", gap: 12 }}>
-        {planos.map((plano) => (
-          <PlanoCard
-            key={plano.id}
-            plano={plano}
-            isPro={papel === "profissional"}
-            equipamentos={equipamentos ?? []}
-            vinculados={(vinculos ?? []).filter((v) => v.plan_id === plano.id).map((v) => v.equipment_id)}
-          />
-        ))}
-      </div>
     </div>
   );
 }
