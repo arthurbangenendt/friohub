@@ -146,3 +146,12 @@ export const Chat = (p: P) => (
     <path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9 9 0 0 1-3.6-.7L3 21l1.9-5A8.2 8.2 0 0 1 4 11.5 8.4 8.4 0 0 1 12.5 3 8.4 8.4 0 0 1 21 11.5Z" />
   </svg>
 );
+
+// Assistente de IA — estrela de quatro pontas (sparkle), diferente do balão
+// de Chat/Mensagens para não confundir os dois itens no menu.
+export const Sparkle = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3Z" />
+    <path d="M19 15.5l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7.7-2Z" />
+  </svg>
+);

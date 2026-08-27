@@ -53,6 +53,96 @@ export type Database = {
           },
         ]
       }
+      assistant_conversations: {
+        Row: {
+          created_at: string
+          id: string
+          professional_id: string
+          quote_request_id: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          professional_id: string
+          quote_request_id?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          professional_id?: string
+          quote_request_id?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assistant_conversations_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
+            referencedRelation: "diretorio_profissionais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assistant_conversations_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
+            referencedRelation: "professionals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assistant_conversations_quote_request_id_fkey"
+            columns: ["quote_request_id"]
+            isOneToOne: false
+            referencedRelation: "quote_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      assistant_messages: {
+        Row: {
+          completion_tokens: number | null
+          content: string
+          conversation_id: string
+          created_at: string
+          id: string
+          model: string | null
+          prompt_tokens: number | null
+          role: string
+        }
+        Insert: {
+          completion_tokens?: number | null
+          content: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          model?: string | null
+          prompt_tokens?: number | null
+          role: string
+        }
+        Update: {
+          completion_tokens?: number | null
+          content?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          model?: string | null
+          prompt_tokens?: number | null
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assistant_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "assistant_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chatwoot_events: {
         Row: {
           attempts: number
@@ -4764,6 +4854,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      consumir_limite_assistente: { Args: never; Returns: undefined }
       consumir_limite_mensagem: {
         Args: { p_user_id: string }
         Returns: undefined

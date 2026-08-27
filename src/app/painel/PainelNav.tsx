@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, Bolt, Wrench, User, Shield, Star, Tool, Droplet, Chat, Doc, MapPin, Building } from "@/components/icons";
+import { Bell, Bolt, Wrench, User, Shield, Star, Tool, Droplet, Chat, Doc, MapPin, Building, Sparkle } from "@/components/icons";
 import type { UxFeature } from "@/lib/feature-flags";
 
 export type ItemNav = { href: string; label: string; icone: keyof typeof ICONE; feature?: UxFeature };
@@ -14,6 +14,7 @@ const ICONE = {
   // Agenda é trabalho de rua: o alfinete de mapa é o que o técnico procura.
   agenda: MapPin,
   planos: Building,
+  assistente: Sparkle,
 };
 
 /* Único pedaço cliente do shell: só existe para marcar o link ativo, que

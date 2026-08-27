@@ -10,6 +10,7 @@ import { PropostaForm } from "./PropostaForm";
 import { Propostas, type PropostaView } from "./Propostas";
 import { CancelarPedido } from "./CancelarPedido";
 import { AbrirChatPedido } from "./AbrirChatPedido";
+import { PedirAnaliseIa } from "./PedirAnaliseIa";
 import { ComparisonLink } from "./ComparisonLink";
 import { featureHabilitada } from "@/lib/feature-flags";
 import { REGIAO_SLUG } from "@/lib/regiao";
@@ -307,8 +308,9 @@ export default async function PedidoPage({ params }: { params: Promise<{ id: str
         {souDestinatario && (
           <div className="card" style={{ padding: 22 }}>
             <SecTitle>{minhaProposta ? "Sua proposta" : "Responder com uma proposta"}</SecTitle>
-            <div style={{ marginBottom: 16 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
               <AbrirChatPedido pedidoId={pedido.id} professionalId={user.id} />
+              <PedirAnaliseIa pedidoId={pedido.id} />
             </div>
             {alvo?.recusado_em ? (
               <p style={{ color: "var(--ink-faint)", fontSize: 14.5, margin: 0 }}>

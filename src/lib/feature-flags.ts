@@ -11,7 +11,11 @@ export type UxFeature =
      mensagem e o que a tela de atendimento mostra. Não governa a entrada: se o
      Chatwoot já está entregando evento, espelhar é sempre certo — desligar a
      flag no meio de uma conversa não pode fazer mensagem sumir. */
-  | "chatwoot_messaging";
+  | "chatwoot_messaging"
+  /* Assistente de IA do profissional (20260828100000). Kill switch
+     independente do gate de plano: `plano_permite('assistente')` decide quem
+     PODE usar (só Master); esta flag decide se a feature está no ar agora. */
+  | "assistente_ia";
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 
 export async function featureHabilitada(client: SupabaseServerClient, flag: UxFeature, subjectId: string) {
