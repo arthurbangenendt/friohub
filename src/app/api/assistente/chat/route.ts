@@ -3,7 +3,7 @@ import OpenAI from "openai";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import { createClient } from "@/lib/supabase/server";
 import { featureHabilitada } from "@/lib/feature-flags";
-import { openai, MODELO_ASSISTENTE } from "@/lib/openai/client";
+import { getOpenAI, MODELO_ASSISTENTE } from "@/lib/openai/client";
 import { SYSTEM_PROMPT, formatarContextoOrcamento, type ContextoOrcamento } from "@/lib/assistente/prompt";
 import { rotuloJob } from "@/app/solicitar/tipos";
 import { one } from "@/lib/relacional";
@@ -132,6 +132,7 @@ export async function POST(request: NextRequest) {
     mensagensOpenAI.push({ role: m.role as "user" | "assistant", content: m.content });
   }
 
+  const openai = getOpenAI();
   let openAiStream: Awaited<ReturnType<typeof openai.chat.completions.create>>;
   try {
     openAiStream = await openai.chat.completions.create({
