@@ -13,7 +13,8 @@
  */
 
 import { servico, json } from "../_shared/supabase.ts";
-import { criarTransferencia, AsaasError } from "../_shared/asaas.ts";
+import { criarTransferencia, criarTransferenciaBancaria, AsaasError, type AsaasTransfer } from "../_shared/asaas.ts";
+import type { SupabaseClient } from "jsr:@supabase/supabase-js@2";
 
 const WORKER_KEY = Deno.env.get("REPASSES_WORKER_KEY") ?? "";
 
@@ -25,12 +26,26 @@ const TIPO_PIX: Record<string, "CPF" | "CNPJ" | "EMAIL" | "PHONE" | "EVP"> = {
   aleatoria: "EVP",
 };
 
+const TIPO_CONTA: Record<string, "CONTA_CORRENTE" | "CONTA_POUPANCA"> = {
+  conta_corrente: "CONTA_CORRENTE",
+  conta_poupanca: "CONTA_POUPANCA",
+};
+
 type RepasseFila = {
   id: string;
   job_id: string;
+  purchase_order_id: string | null;
   amount: number;
-  pix_key: string;
-  pix_key_type: string;
+  metodo: "pix" | "ted";
+  pix_key: string | null;
+  pix_key_type: string | null;
+  banco_codigo: string | null;
+  banco_agencia: string | null;
+  banco_conta: string | null;
+  banco_conta_digito: string | null;
+  banco_conta_tipo: string | null;
+  banco_titular_nome: string | null;
+  banco_titular_documento: string | null;
 };
 
 function comparacaoConstante(a: string, b: string): boolean {
@@ -38,6 +53,57 @@ function comparacaoConstante(a: string, b: string): boolean {
   let diferenca = 0;
   for (let i = 0; i < a.length; i++) diferenca |= a.charCodeAt(i) ^ b.charCodeAt(i);
   return diferenca === 0;
+}
+
+/* Retorna null quando a própria validação (antes de qualquer chamada ao
+ * Asaas) já marcou o repasse como falho — o chamador só precisa contar a
+ * falha e seguir pro próximo, sem cair no catch genérico. */
+async function criarTransferenciaPixOuFalha(
+  db: SupabaseClient, repasse: RepasseFila, descricao: string,
+): Promise<AsaasTransfer | null> {
+  const tipoChave = TIPO_PIX[repasse.pix_key_type ?? ""];
+  if (!tipoChave || !repasse.pix_key) {
+    await db.rpc("marcar_repasse_falho", {
+      p_transfer_id: repasse.id,
+      p_erro: `Tipo de chave PIX desconhecido ou ausente: ${repasse.pix_key_type}`,
+    });
+    return null;
+  }
+  return await criarTransferencia({
+    value: repasse.amount,
+    pixAddressKey: repasse.pix_key,
+    pixAddressKeyType: tipoChave,
+    description: descricao,
+    externalReference: repasse.id,
+  });
+}
+
+async function criarTransferenciaTedOuFalha(
+  db: SupabaseClient, repasse: RepasseFila, descricao: string,
+): Promise<AsaasTransfer | null> {
+  const tipoConta = TIPO_CONTA[repasse.banco_conta_tipo ?? ""];
+  if (
+    !tipoConta || !repasse.banco_codigo || !repasse.banco_agencia || !repasse.banco_conta
+    || !repasse.banco_conta_digito || !repasse.banco_titular_nome || !repasse.banco_titular_documento
+  ) {
+    await db.rpc("marcar_repasse_falho", {
+      p_transfer_id: repasse.id,
+      p_erro: "Dados bancários incompletos para transferência TED.",
+    });
+    return null;
+  }
+  return await criarTransferenciaBancaria({
+    value: repasse.amount,
+    bankCode: repasse.banco_codigo,
+    agency: repasse.banco_agencia,
+    account: repasse.banco_conta,
+    accountDigit: repasse.banco_conta_digito,
+    accountType: tipoConta,
+    ownerName: repasse.banco_titular_nome,
+    ownerCpfCnpj: repasse.banco_titular_documento,
+    description: descricao,
+    externalReference: repasse.id,
+  });
 }
 
 Deno.serve(async (req) => {
@@ -62,24 +128,19 @@ Deno.serve(async (req) => {
   let falhas = 0;
 
   for (const repasse of repasses) {
-    const tipoChave = TIPO_PIX[repasse.pix_key_type];
-    if (!tipoChave) {
-      await db.rpc("marcar_repasse_falho", {
-        p_transfer_id: repasse.id,
-        p_erro: `Tipo de chave PIX desconhecido: ${repasse.pix_key_type}`,
-      });
-      falhas++;
-      continue;
-    }
+    const descricao = repasse.purchase_order_id
+      ? `FrioHub — repasse da entrega ${repasse.purchase_order_id}`
+      : `FrioHub — repasse do serviço ${repasse.job_id}`;
 
     try {
-      const transferencia = await criarTransferencia({
-        value: repasse.amount,
-        pixAddressKey: repasse.pix_key,
-        pixAddressKeyType: tipoChave,
-        description: `FrioHub — repasse do serviço ${repasse.job_id}`,
-        externalReference: repasse.id,
-      });
+      const transferencia = repasse.metodo === "ted"
+        ? await criarTransferenciaTedOuFalha(db, repasse, descricao)
+        : await criarTransferenciaPixOuFalha(db, repasse, descricao);
+
+      if (!transferencia) {
+        falhas++;
+        continue;
+      }
 
       const { error: erroVincular } = await db.rpc("vincular_transferencia_gateway", {
         p_transfer_id: repasse.id,

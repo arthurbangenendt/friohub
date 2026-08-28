@@ -11,7 +11,7 @@ import { tentarNovamenteCobranca } from "./actions";
  * de verdade no Asaas). Sem isso o cliente ficava vendo "Aguardando
  * emissão" pra sempre, sem nenhuma ação disponível — achado testando o
  * fluxo real em produção. */
-export function RetentarPagamento({ jobId }: { jobId: string }) {
+export function RetentarPagamento({ jobId, orderId }: { jobId: string; orderId: string }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
@@ -21,7 +21,7 @@ export function RetentarPagamento({ jobId }: { jobId: string }) {
   function tentar() {
     setErro(null);
     start(async () => {
-      const r = await tentarNovamenteCobranca(jobId);
+      const r = await tentarNovamenteCobranca(jobId, orderId);
       if (r.ok) router.refresh();
       else setErro(r.error);
     });

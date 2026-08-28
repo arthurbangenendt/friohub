@@ -644,11 +644,21 @@ export type Database = {
       distributors: {
         Row: {
           ativo: boolean
+          banco_agencia: string | null
+          banco_codigo: string | null
+          banco_conta: string | null
+          banco_conta_digito: string | null
+          banco_conta_tipo: string | null
+          banco_titular_documento: string | null
+          banco_titular_nome: string | null
+          chave_pix: string | null
+          chave_pix_tipo: string | null
           cidade: string
           cnpj: string | null
           created_at: string
           estado: string
           id: string
+          metodo_repasse: string | null
           prazo_entrega_dias: number
           razao_social: string
           updated_at: string
@@ -657,11 +667,21 @@ export type Database = {
         }
         Insert: {
           ativo?: boolean
+          banco_agencia?: string | null
+          banco_codigo?: string | null
+          banco_conta?: string | null
+          banco_conta_digito?: string | null
+          banco_conta_tipo?: string | null
+          banco_titular_documento?: string | null
+          banco_titular_nome?: string | null
+          chave_pix?: string | null
+          chave_pix_tipo?: string | null
           cidade: string
           cnpj?: string | null
           created_at?: string
           estado?: string
           id: string
+          metodo_repasse?: string | null
           prazo_entrega_dias?: number
           razao_social: string
           updated_at?: string
@@ -670,11 +690,21 @@ export type Database = {
         }
         Update: {
           ativo?: boolean
+          banco_agencia?: string | null
+          banco_codigo?: string | null
+          banco_conta?: string | null
+          banco_conta_digito?: string | null
+          banco_conta_tipo?: string | null
+          banco_titular_documento?: string | null
+          banco_titular_nome?: string | null
+          chave_pix?: string | null
+          chave_pix_tipo?: string | null
           cidade?: string
           cnpj?: string | null
           created_at?: string
           estado?: string
           id?: string
+          metodo_repasse?: string | null
           prazo_entrega_dias?: number
           razao_social?: string
           updated_at?: string
@@ -1372,6 +1402,7 @@ export type Database = {
           job_id: string
           motivo: string
           nota_admin: string | null
+          purchase_order_id: string | null
           resolvido_em: string | null
           resolvido_por: string | null
           situacao_repasse: string | null
@@ -1388,6 +1419,7 @@ export type Database = {
           job_id: string
           motivo: string
           nota_admin?: string | null
+          purchase_order_id?: string | null
           resolvido_em?: string | null
           resolvido_por?: string | null
           situacao_repasse?: string | null
@@ -1404,6 +1436,7 @@ export type Database = {
           job_id?: string
           motivo?: string
           nota_admin?: string | null
+          purchase_order_id?: string | null
           resolvido_em?: string | null
           resolvido_por?: string | null
           situacao_repasse?: string | null
@@ -1434,6 +1467,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "pedidos_distribuidora"
             referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "job_disputes_purchase_order_id_fkey"
+            columns: ["purchase_order_id"]
+            isOneToOne: false
+            referencedRelation: "entregas_cliente"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_disputes_purchase_order_id_fkey"
+            columns: ["purchase_order_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos_distribuidora"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_disputes_purchase_order_id_fkey"
+            columns: ["purchase_order_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "job_disputes_resolvido_por_fkey"
@@ -2417,6 +2471,13 @@ export type Database = {
         Row: {
           allocation_id: string
           amount: number
+          banco_agencia: string | null
+          banco_codigo: string | null
+          banco_conta: string | null
+          banco_conta_digito: string | null
+          banco_conta_tipo: string | null
+          banco_titular_documento: string | null
+          banco_titular_nome: string | null
           beneficiary_id: string
           confirmed_at: string | null
           contestado_em: string | null
@@ -2429,9 +2490,11 @@ export type Database = {
           idempotency_key: string
           job_id: string
           last_error: string | null
+          metodo: string
           order_id: string
-          pix_key: string
-          pix_key_type: string
+          pix_key: string | null
+          pix_key_type: string | null
+          purchase_order_id: string | null
           requested_at: string
           scheduled_for: string
           status: string
@@ -2440,6 +2503,13 @@ export type Database = {
         Insert: {
           allocation_id: string
           amount: number
+          banco_agencia?: string | null
+          banco_codigo?: string | null
+          banco_conta?: string | null
+          banco_conta_digito?: string | null
+          banco_conta_tipo?: string | null
+          banco_titular_documento?: string | null
+          banco_titular_nome?: string | null
           beneficiary_id: string
           confirmed_at?: string | null
           contestado_em?: string | null
@@ -2452,9 +2522,11 @@ export type Database = {
           idempotency_key: string
           job_id: string
           last_error?: string | null
+          metodo?: string
           order_id: string
-          pix_key: string
-          pix_key_type: string
+          pix_key?: string | null
+          pix_key_type?: string | null
+          purchase_order_id?: string | null
           requested_at?: string
           scheduled_for: string
           status?: string
@@ -2463,6 +2535,13 @@ export type Database = {
         Update: {
           allocation_id?: string
           amount?: number
+          banco_agencia?: string | null
+          banco_codigo?: string | null
+          banco_conta?: string | null
+          banco_conta_digito?: string | null
+          banco_conta_tipo?: string | null
+          banco_titular_documento?: string | null
+          banco_titular_nome?: string | null
           beneficiary_id?: string
           confirmed_at?: string | null
           contestado_em?: string | null
@@ -2475,9 +2554,11 @@ export type Database = {
           idempotency_key?: string
           job_id?: string
           last_error?: string | null
+          metodo?: string
           order_id?: string
-          pix_key?: string
-          pix_key_type?: string
+          pix_key?: string | null
+          pix_key_type?: string | null
+          purchase_order_id?: string | null
           requested_at?: string
           scheduled_for?: string
           status?: string
@@ -2524,6 +2605,27 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders_cliente"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_transfers_purchase_order_id_fkey"
+            columns: ["purchase_order_id"]
+            isOneToOne: false
+            referencedRelation: "entregas_cliente"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_transfers_purchase_order_id_fkey"
+            columns: ["purchase_order_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos_distribuidora"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_transfers_purchase_order_id_fkey"
+            columns: ["purchase_order_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
             referencedColumns: ["id"]
           },
         ]
@@ -2903,6 +3005,7 @@ export type Database = {
           custo: number
           distributor_id: string | null
           estoque_disponivel: boolean
+          estoque_quantidade: number | null
           id: string
           image_url: string | null
           marca: string
@@ -2919,6 +3022,7 @@ export type Database = {
           custo: number
           distributor_id?: string | null
           estoque_disponivel?: boolean
+          estoque_quantidade?: number | null
           id?: string
           image_url?: string | null
           marca: string
@@ -2935,6 +3039,7 @@ export type Database = {
           custo?: number
           distributor_id?: string | null
           estoque_disponivel?: boolean
+          estoque_quantidade?: number | null
           id?: string
           image_url?: string | null
           marca?: string
@@ -4483,6 +4588,7 @@ export type Database = {
           custo: number | null
           distributor_id: string | null
           estoque_disponivel: boolean | null
+          estoque_quantidade: number | null
           id: string | null
           image_url: string | null
           marca: string | null
@@ -4498,6 +4604,7 @@ export type Database = {
           custo?: number | null
           distributor_id?: string | null
           estoque_disponivel?: boolean | null
+          estoque_quantidade?: number | null
           id?: string | null
           image_url?: string | null
           marca?: string | null
@@ -4513,6 +4620,7 @@ export type Database = {
           custo?: number | null
           distributor_id?: string | null
           estoque_disponivel?: boolean | null
+          estoque_quantidade?: number | null
           id?: string | null
           image_url?: string | null
           marca?: string | null
@@ -4859,8 +4967,21 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: undefined
       }
+      contestar_entrega_purchase_order: {
+        Args: { p_motivo: string; p_purchase_order_id: string }
+        Returns: string
+      }
       contestar_execucao_job: {
         Args: { p_job_id: string; p_motivo: string }
+        Returns: string
+      }
+      criar_compra_avulsa: {
+        Args: {
+          p_cep: string
+          p_cidade: string
+          p_endereco: string
+          p_itens: Json
+        }
         Returns: string
       }
       criar_follow_up: {
@@ -5004,10 +5125,19 @@ export type Database = {
         Args: { p_limit?: number }
         Returns: {
           amount: number
+          banco_agencia: string
+          banco_codigo: string
+          banco_conta: string
+          banco_conta_digito: string
+          banco_conta_tipo: string
+          banco_titular_documento: string
+          banco_titular_nome: string
           id: string
           job_id: string
+          metodo: string
           pix_key: string
           pix_key_type: string
+          purchase_order_id: string
         }[]
       }
       marcar_conversa_lida: {
@@ -5045,6 +5175,21 @@ export type Database = {
         Returns: {
           chave_pix: string
           chave_pix_tipo: string
+        }[]
+      }
+      minha_config_repasse_distribuidora: {
+        Args: never
+        Returns: {
+          banco_agencia: string
+          banco_codigo: string
+          banco_conta: string
+          banco_conta_digito: string
+          banco_conta_tipo: string
+          banco_titular_documento: string
+          banco_titular_nome: string
+          chave_pix: string
+          chave_pix_tipo: string
+          metodo_repasse: string
         }[]
       }
       moderar_review: {
@@ -5173,7 +5318,7 @@ export type Database = {
         Returns: string
       }
       preparar_cobranca_servico: {
-        Args: { p_cliente_id: string; p_job_id: string }
+        Args: { p_cliente_id: string; p_order_id: string }
         Returns: string
       }
       preparar_reembolso_disputa: {
@@ -5184,6 +5329,10 @@ export type Database = {
           p_valor_reembolso: number
         }
         Returns: Json
+      }
+      preparar_repasse_distribuidora: {
+        Args: { p_purchase_order_id: string }
+        Returns: undefined
       }
       preparar_repasse_profissional: {
         Args: { p_job_id: string }
@@ -5426,6 +5575,22 @@ export type Database = {
           p_prazo_entrega_dias: number
           p_razao_social: string
         }
+        Returns: undefined
+      }
+      salvar_repasse_bancario_distribuidora: {
+        Args: {
+          p_agencia: string
+          p_banco_codigo: string
+          p_conta: string
+          p_conta_digito: string
+          p_conta_tipo: string
+          p_titular_documento: string
+          p_titular_nome: string
+        }
+        Returns: undefined
+      }
+      salvar_repasse_pix_distribuidora: {
+        Args: { p_chave: string; p_tipo: string }
         Returns: undefined
       }
       solicitar_cancelamento_job_pago: {

@@ -5,6 +5,7 @@ import { Cabecalho, mono, wrap } from "../../shared";
 import { comoPapel } from "../../navegacao";
 import { MidiaEditor } from "../../MidiaEditor";
 import { PerfilDistribuidoraForm } from "./PerfilDistribuidoraForm";
+import { ConfigRepasseForm } from "./ConfigRepasseForm";
 import { STATUS_VERIFICACAO, resolverMapa } from "@/lib/status";
 
 const STATUS = resolverMapa(STATUS_VERIFICACAO);
@@ -31,6 +32,8 @@ export default async function PerfilDistribuidoraPage() {
     .from("distributor_areas")
     .select("uf")
     .eq("distributor_id", user.id);
+
+  const { data: repasse } = await supabase.rpc("minha_config_repasse_distribuidora").single();
 
   const st = STATUS[dist?.verification_status ?? "pendente"] ?? STATUS.pendente;
 
@@ -63,6 +66,31 @@ export default async function PerfilDistribuidoraPage() {
           ufs: (areas ?? []).map((a) => (a as { uf: string }).uf),
         }}
       />
+
+      <div className="card" style={{ padding: 26, marginTop: 16 }}>
+        <h2 style={{ fontSize: "1.1rem", fontWeight: 700, margin: "0 0 16px" }}>Como você recebe os repasses</h2>
+        {dist ? (
+          <ConfigRepasseForm
+            inicial={{
+              metodoRepasse: (repasse?.metodo_repasse as "pix" | "ted" | null) ?? null,
+              chavePix: repasse?.chave_pix ?? "",
+              chavePixTipo: repasse?.chave_pix_tipo ?? "",
+              bancoCodigo: repasse?.banco_codigo ?? "",
+              bancoAgencia: repasse?.banco_agencia ?? "",
+              bancoConta: repasse?.banco_conta ?? "",
+              bancoContaDigito: repasse?.banco_conta_digito ?? "",
+              bancoContaTipo: repasse?.banco_conta_tipo ?? "",
+              bancoTitularNome: repasse?.banco_titular_nome ?? "",
+              bancoTitularDocumento: repasse?.banco_titular_documento ?? "",
+            }}
+          />
+        ) : (
+          <p style={{ fontSize: 13.5, color: "var(--ink-faint)", margin: 0 }}>
+            Salve a razão social e o CNPJ acima primeiro — é isso que cria seu cadastro. Depois disso
+            esta seção libera pra você escolher Pix ou transferência bancária.
+          </p>
+        )}
+      </div>
     </div>
   );
 }

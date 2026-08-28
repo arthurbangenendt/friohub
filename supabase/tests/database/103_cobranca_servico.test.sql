@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
-select plan(8);
+select plan(10);
 
 select ok(
   not has_function_privilege('authenticated', 'public.preparar_cobranca_servico(uuid,uuid)', 'execute')
@@ -38,7 +38,7 @@ insert into public.orders (id, job_id, preco_servico, comissao_servico, total, p
 
 -- Dono de verdade consegue preparar a cobrança.
 select lives_ok(
-  $$select public.preparar_cobranca_servico('a1000000-0000-0000-0000-000000000001'::uuid, 'f0000000-0000-0000-0000-000000000001'::uuid)$$,
+  $$select public.preparar_cobranca_servico('a2000000-0000-0000-0000-000000000001'::uuid, 'f0000000-0000-0000-0000-000000000001'::uuid)$$,
   'cliente dono do job prepara a própria cobrança'
 );
 select is(
@@ -47,11 +47,31 @@ select is(
   'cobrança foi criada para a order certa'
 );
 
--- Outro cliente não pode cobrar o job de ninguém mais — nem pelo id certo.
+-- Outro cliente não pode cobrar a order de ninguém mais — nem pelo id certo.
 select throws_ok(
-  $$select public.preparar_cobranca_servico('a1000000-0000-0000-0000-000000000001'::uuid, 'f0000000-0000-0000-0000-000000000002'::uuid)$$,
+  $$select public.preparar_cobranca_servico('a2000000-0000-0000-0000-000000000001'::uuid, 'f0000000-0000-0000-0000-000000000002'::uuid)$$,
   'Serviço não encontrado para este cliente.',
-  'cliente que não é dono do job não consegue preparar cobrança dele'
+  'cliente que não é dono da order não consegue preparar cobrança dela'
+);
+
+-- ===========================================================================
+-- Regressão do bug corrigido em 20260828110000: um job com visita técnica +
+-- orçamento final ganha uma SEGUNDA order (origem='orcamento_final'). Antes,
+-- `preparar_cobranca_servico` buscava só por job_id — com duas orders no
+-- mesmo job, a linha escolhida não era determinística. Agora o order_id é
+-- explícito, então cada chamada tem que acertar a order certa.
+-- ===========================================================================
+insert into public.orders (id, job_id, origem, preco_servico, comissao_servico, total, payment_status) values
+('a2000000-0000-0000-0000-000000000002','a1000000-0000-0000-0000-000000000001','orcamento_final',500,35,500,'pendente');
+
+select lives_ok(
+  $$select public.preparar_cobranca_servico('a2000000-0000-0000-0000-000000000002'::uuid, 'f0000000-0000-0000-0000-000000000001'::uuid)$$,
+  'cliente prepara a cobrança da SEGUNDA order do mesmo job (orçamento final)'
+);
+select is(
+  (select amount from public.payment_charges where order_id = 'a2000000-0000-0000-0000-000000000002'),
+  500::numeric,
+  'a cobrança da order de orçamento final usa o valor certo (500), não o da order do aceite (300)'
 );
 
 -- CPF/CNPJ do cliente: mesma coleta única do lado do profissional.

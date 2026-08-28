@@ -1,13 +1,20 @@
-/* Cobra o cliente pelo serviço, logo depois que ele aceita uma proposta.
+/* Cobra o cliente por uma order de serviço específica — no aceite de uma
+ * proposta, na aprovação do orçamento final pós-visita, ou num retry manual.
  *
  * Autorização: JWT do cliente, mesmo padrão de `asaas-assinar`/`asaas-cancelar`
  * — este endpoint roda com service_role e a RLS não protege quem chama.
  *
- * Chamado por `aceitarProposta` (src/app/painel/orcamentos/actions.ts) como
- * best-effort, DEPOIS de `aceitar_quote` já ter criado job/order: se esta
- * função falhar, o aceite não é desfeito — job e order já são a fonte de
- * verdade, e a cobrança fica pendente para a rotina de reconciliação
+ * Chamado por `aceitarProposta` e `aprovarOrcamentoFinal`
+ * (src/app/painel/orcamentos/actions.ts, src/app/servico/[id]/actions.ts) como
+ * best-effort, DEPOIS que job/order já existem: se esta função falhar, o
+ * aceite/aprovação não é desfeito — job e order já são a fonte de verdade, e a
+ * cobrança fica pendente para a rotina de reconciliação
  * (`reconciliar_financeiro`) pegar depois.
+ *
+ * Recebe `order_id`, não `job_id`: um job pode ter até duas orders
+ * (`origem in ('aceite_quote', 'orcamento_final')`, ver
+ * 20260817130000_orcamento_final_pos_visita.sql) e cobrar por job_id era
+ * ambíguo — corrigido em 20260828110000_fix_cobranca_orcamento_final.sql.
  *
  * Atrás da feature flag `asaas_payments` (20260813184012_resilience_phase5.sql,
  * ligada em produção desde 20260819180000) — sem ela ligada para a região do
@@ -23,7 +30,7 @@
 import { servico, json } from "../_shared/supabase.ts";
 import { criarCustomer, criarCobrancaComRecuperacao, AsaasError } from "../_shared/asaas.ts";
 
-type Corpo = { job_id?: string };
+type Corpo = { order_id?: string };
 
 const REGIAO_SLUG = Deno.env.get("REGIAO_SLUG") ?? "sao-paulo-sp";
 
@@ -39,8 +46,8 @@ Deno.serve(async (req) => {
   } catch {
     return json({ error: "Dados inválidos." }, 400);
   }
-  const jobId = typeof corpo.job_id === "string" ? corpo.job_id : "";
-  if (!jobId) return json({ error: "Informe o serviço." }, 400);
+  const orderId = typeof corpo.order_id === "string" ? corpo.order_id : "";
+  if (!orderId) return json({ error: "Informe o serviço." }, 400);
 
   const db = servico();
 
@@ -59,7 +66,7 @@ Deno.serve(async (req) => {
 
   try {
     const { data: chargeId, error: erroCharge } = await db.rpc("preparar_cobranca_servico", {
-      p_job_id: jobId,
+      p_order_id: orderId,
       p_cliente_id: userId,
     });
     if (erroCharge || !chargeId) {
@@ -74,7 +81,7 @@ Deno.serve(async (req) => {
 
     const cpfCnpj = await db.rpc("obter_cpf_cnpj_cliente", { p_user_id: userId }).then((r) => r.data as string | null);
     if (!cpfCnpj) {
-      console.error(`cliente ${userId} sem cpf_cnpj — cobrança do job ${jobId} não pôde ser criada no Asaas`);
+      console.error(`cliente ${userId} sem cpf_cnpj — cobrança da order ${orderId} não pôde ser criada no Asaas`);
       return json({ error: "Cliente sem CPF/CNPJ cadastrado para a cobrança." }, 400);
     }
 
@@ -134,11 +141,11 @@ Deno.serve(async (req) => {
     return json({ ok: true, checkout_url: pagamento.invoiceUrl });
   } catch (erro) {
     if (erro instanceof AsaasError) {
-      console.error(`Asaas recusou cobrança do job ${jobId}: ${erro.status} ${erro.corpo}`);
+      console.error(`Asaas recusou cobrança da order ${orderId}: ${erro.status} ${erro.corpo}`);
       return json({ error: "O gateway de pagamento recusou a cobrança." }, 502);
     }
     const mensagem = erro instanceof Error ? erro.message : String(erro);
-    console.error(`falha ao cobrar serviço ${jobId}: ${mensagem}`);
+    console.error(`falha ao cobrar order ${orderId}: ${mensagem}`);
     return json({ error: "Não foi possível processar a cobrança agora." }, 500);
   }
 });

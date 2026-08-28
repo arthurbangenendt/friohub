@@ -157,10 +157,30 @@ export async function enviarOrcamentoFinal(input: {
 
 export async function aprovarOrcamentoFinal(input: { jobId: string; jobFinalQuoteId: string }) {
   const supabase = await createClient();
-  const { error } = await supabase.rpc("aprovar_orcamento_final", {
+  const { data, error } = await supabase.rpc("aprovar_orcamento_final", {
     p_job_final_quote_id: input.jobFinalQuoteId,
   });
   if (error) return { ok: false as const, error: error.message };
+
+  /* Best-effort, mesmo padrão de `aceitarProposta` (painel/orcamentos/actions.ts):
+     a RPC já criou a order 'orcamento_final' e retorna o id dela — sem este
+     disparo, o cliente ficava sem cobrança nenhuma até clicar "Tentar
+     novamente" por conta própria. */
+  const orderId = data as string;
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session && orderId) {
+    try {
+      const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/asaas-cobrar-servico`;
+      await fetch(url, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ order_id: orderId }),
+      });
+    } catch (erro) {
+      console.error(`falha ao acionar cobrança do orçamento final ${orderId}:`, erro);
+    }
+  }
+
   revalidatePath(`/servico/${input.jobId}`);
   revalidatePath("/painel");
   return { ok: true as const };
@@ -309,11 +329,15 @@ export async function avaliarCliente(input: { jobId: string; rating: number; tag
 // Pagamento — retry de cobrança que falhou (ou nunca foi tentada).
 // ---------------------------------------------------------------------------
 
-/* Chama a mesma Edge Function que `aceitarProposta` já aciona no aceite da
- * proposta (`painel/orcamentos/actions.ts`) — mas lá é best-effort e engole
- * o erro de propósito, pra não travar o aceite. Aqui o cliente clicou um
- * botão pedindo isso, então o erro precisa aparecer pra ele em vez de sumir. */
-export async function tentarNovamenteCobranca(jobId: string) {
+/* Chama a mesma Edge Function que `aceitarProposta`/`aprovarOrcamentoFinal` já
+ * acionam — mas lá é best-effort e engole o erro de propósito, pra não travar
+ * o aceite/aprovação. Aqui o cliente clicou um botão pedindo isso, então o
+ * erro precisa aparecer pra ele em vez de sumir.
+ *
+ * Recebe `orderId`, não `jobId`: um job pode ter até duas orders (aceite_quote
+ * + orcamento_final) e cada bloco de pagamento da tela (`Pagamento.tsx`) já
+ * sabe a sua — ver 20260828110000_fix_cobranca_orcamento_final.sql. */
+export async function tentarNovamenteCobranca(jobId: string, orderId: string) {
   const supabase = await createClient();
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) return { ok: false as const, error: "Não autenticado." };
@@ -324,7 +348,7 @@ export async function tentarNovamenteCobranca(jobId: string) {
     const res = await fetch(url, {
       method: "POST",
       headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ job_id: jobId }),
+      body: JSON.stringify({ order_id: orderId }),
     });
     corpo = await res.json();
     if (!res.ok) return { ok: false as const, error: corpo.error ?? "Não foi possível gerar a cobrança." };

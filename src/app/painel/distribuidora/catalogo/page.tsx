@@ -17,7 +17,7 @@ export default async function CatalogoPage() {
      distribuidora até o próprio custo. */
   const { data } = await supabase
     .from("meus_produtos")
-    .select("id, marca, modelo, btu, categoria, custo, preco_venda, preco_manual, image_url, ativo, estoque_disponivel")
+    .select("id, marca, modelo, btu, categoria, custo, preco_venda, preco_manual, image_url, ativo, estoque_disponivel, estoque_quantidade")
     .order("marca")
     .order("btu");
 

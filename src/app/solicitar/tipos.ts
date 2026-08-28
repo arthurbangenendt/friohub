@@ -11,7 +11,12 @@ export type JobType =
   | "remanejamento"
   | "limpeza"
   | "conserto"
-  | "outros";
+  | "outros"
+  /* Compra avulsa de equipamento/peça, sem pedido de orçamento nem
+     profissional envolvido — ver 20260828140000_compra_avulsa.sql. Não entra
+     em TIPOS_COM_CATALOGO porque não passa pelo wizard: nasce direto de
+     `criar_compra_avulsa`. */
+  | "compra_equipamento";
 
 // Tipos em que o cliente pode comprar o aparelho pela plataforma. Só nesses o
 // catálogo aparece e só neles pode nascer uma order com margem de produto.
@@ -31,6 +36,7 @@ export const JOB_LABEL: Record<JobType, string> = {
   limpeza: "Limpeza",
   conserto: "Conserto",
   outros: "Outro serviço",
+  compra_equipamento: "Compra de equipamento",
 };
 
 /* Especialidade avaliável correspondente ao serviço.
@@ -46,6 +52,8 @@ export const SPECIALTY_OF: Record<JobType, string | null> = {
   limpeza: "limpeza",
   conserto: "conserto",
   outros: null,
+  // Sem profissional, não há o que avaliar por especialidade.
+  compra_equipamento: null,
 };
 
 export function rotuloJob(t: string): string {

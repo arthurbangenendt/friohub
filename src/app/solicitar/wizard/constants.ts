@@ -21,6 +21,7 @@ export const SPECIALTY_OF: Record<JobType, string | null> = {
   instalacao_com_equipamento: "instalacao", troca_equipamento: "instalacao",
   manutencao: "manutencao", remanejamento: "remanejamento",
   limpeza: "limpeza", conserto: "conserto", outros: null,
+  compra_equipamento: null,
 };
 export const SPECIALTY_LABEL: Record<string, string> = {
   instalacao: "Instalação", manutencao: "Manutenção", remanejamento: "Remanejamento", limpeza: "Limpeza", conserto: "Conserto",

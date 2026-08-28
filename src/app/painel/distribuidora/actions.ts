@@ -67,6 +67,11 @@ export type ProdutoInput = {
   imageUrl?: string | null;
   ativo: boolean;
   estoqueDisponivel: boolean;
+  /* null = modo booleano legado (estoqueDisponivel manda). Número (>= 0) =
+     modo de quantidade controlada: o trigger `protege_produto` deriva
+     estoque_disponivel a partir dela, e `aceitar_quote` dá baixa aqui a cada
+     venda. Ver 20260828120000_estoque_quantidade.sql. */
+  estoqueQuantidade?: number | null;
 };
 
 /** Cria ou atualiza um produto do catálogo da distribuidora.
@@ -87,6 +92,10 @@ export async function salvarProduto(input: ProdutoInput) {
   if (!(input.custo > 0)) {
     return { ok: false as const, error: "Informe o custo do aparelho." };
   }
+  const estoqueQuantidade = input.estoqueQuantidade ?? null;
+  if (estoqueQuantidade !== null && (!Number.isInteger(estoqueQuantidade) || estoqueQuantidade < 0)) {
+    return { ok: false as const, error: "A quantidade em estoque precisa ser um número inteiro maior ou igual a zero." };
+  }
 
   const linha = {
     distributor_id: user.id,
@@ -98,6 +107,7 @@ export async function salvarProduto(input: ProdutoInput) {
     image_url: input.imageUrl?.trim() || null,
     ativo: input.ativo,
     estoque_disponivel: input.estoqueDisponivel,
+    estoque_quantidade: estoqueQuantidade,
   };
 
   const { error } = input.id
@@ -110,6 +120,9 @@ export async function salvarProduto(input: ProdutoInput) {
   return { ok: true as const };
 }
 
+/* Só se aplica a produto em modo booleano legado (estoque_quantidade null) —
+ * em modo de quantidade controlada, quem manda é o número, editado em
+ * `salvarProduto`. */
 export async function alternarEstoque(produtoId: string, disponivel: boolean) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -123,6 +136,54 @@ export async function alternarEstoque(produtoId: string, disponivel: boolean) {
 
   if (error) return { ok: false as const, error: error.message };
   revalidatePath("/painel/distribuidora/catalogo");
+  return { ok: true as const };
+}
+
+/** Cadastra/troca Pix como forma de repasse — limpa dados bancários se houver
+ *  (garantido pelo banco, `distributors_metodo_repasse_consistente`). Ver
+ *  20260828150000_repasse_distribuidora_pix_ted.sql. */
+export async function salvarRepassePix(chave: string, tipo: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false as const, error: "Não autenticado." };
+
+  const { error } = await supabase.rpc("salvar_repasse_pix_distribuidora", {
+    p_chave: chave,
+    p_tipo: tipo,
+  });
+  if (error) return { ok: false as const, error: error.message };
+
+  revalidatePath("/painel/distribuidora/perfil");
+  return { ok: true as const };
+}
+
+/** Cadastra/troca transferência bancária (TED) como forma de repasse — limpa
+ *  Pix se houver. */
+export async function salvarRepasseBancario(input: {
+  bancoCodigo: string;
+  agencia: string;
+  conta: string;
+  contaDigito: string;
+  contaTipo: string;
+  titularNome: string;
+  titularDocumento: string;
+}) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false as const, error: "Não autenticado." };
+
+  const { error } = await supabase.rpc("salvar_repasse_bancario_distribuidora", {
+    p_banco_codigo: input.bancoCodigo,
+    p_agencia: input.agencia,
+    p_conta: input.conta,
+    p_conta_digito: input.contaDigito,
+    p_conta_tipo: input.contaTipo,
+    p_titular_nome: input.titularNome,
+    p_titular_documento: input.titularDocumento,
+  });
+  if (error) return { ok: false as const, error: error.message };
+
+  revalidatePath("/painel/distribuidora/perfil");
   return { ok: true as const };
 }
 

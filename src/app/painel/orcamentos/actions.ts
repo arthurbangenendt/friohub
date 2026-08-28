@@ -253,9 +253,20 @@ export async function aceitarProposta(
   /* Best-effort: job e order já existem, são a fonte de verdade. Se a
      cobrança falhar (gateway fora do ar, flag desligada, cliente sem
      documento), o aceite não é desfeito — fica pendente para a reconciliação
-     resolver depois. Ver supabase/functions/asaas-cobrar-servico. */
+     resolver depois. Ver supabase/functions/asaas-cobrar-servico.
+     `aceitar_quote` cria só a order 'aceite_quote' — buscamos o id dela
+     explicitamente porque a Edge Function cobra por order_id, não job_id
+     (um job pode ganhar uma segunda order depois, no orçamento final pós-
+     visita — ver 20260828110000_fix_cobranca_orcamento_final.sql). */
+  const { data: order } = await supabase
+    .from("orders")
+    .select("id")
+    .eq("job_id", jobId)
+    .eq("origem", "aceite_quote")
+    .maybeSingle();
+
   const { data: { session } } = await supabase.auth.getSession();
-  if (session) {
+  if (session && order) {
     /* Aguardado de propósito: em ambiente serverless, uma promise disparada
        sem `await` pode ser encerrada junto com a function antes do fetch
        terminar. O erro é engolido — best-effort não pode virar falha do
@@ -265,7 +276,7 @@ export async function aceitarProposta(
       await fetch(url, {
         method: "POST",
         headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ job_id: jobId }),
+        body: JSON.stringify({ order_id: order.id }),
       });
     } catch (erro) {
       console.error(`falha ao acionar cobrança do serviço ${jobId}:`, erro);

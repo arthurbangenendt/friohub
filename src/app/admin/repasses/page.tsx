@@ -78,7 +78,7 @@ export default async function AdminRepassesPage() {
 
   const { data: transfersData } = await supabase
     .from("payment_transfers")
-    .select("id, job_id, beneficiary_id, amount, status, scheduled_for, last_error, contestado_em, requested_at")
+    .select("id, job_id, beneficiary_id, amount, status, metodo, scheduled_for, last_error, contestado_em, requested_at")
     .not("status", "in", "(confirmed,cancelled)")
     .order("requested_at", { ascending: true });
 
@@ -131,6 +131,7 @@ type TransferenciaRow = {
   beneficiary_id: string;
   amount: number;
   status: string;
+  metodo: string;
   scheduled_for: string;
   last_error: string | null;
   contestado_em: string | null;
@@ -154,7 +155,7 @@ function CardTransferencia({ t, beneficiarioNome }: { t: TransferenciaRow; benef
           )}
         </div>
         <div style={{ fontSize: 13, color: "var(--ink-faint)", marginTop: 4 }}>
-          Para {beneficiarioNome} · <Link href={`/servico/${t.job_id}`} style={{ color: "var(--cool)" }}>ver serviço →</Link>
+          Para {beneficiarioNome} · {t.metodo === "ted" ? "TED" : "Pix"} · <Link href={`/servico/${t.job_id}`} style={{ color: "var(--cool)" }}>ver serviço →</Link>
         </div>
         <div style={{ fontSize: 12.5, color: "var(--ink-faint)", marginTop: 3 }}>
           Solicitado em {new Date(t.requested_at).toLocaleString("pt-BR")}

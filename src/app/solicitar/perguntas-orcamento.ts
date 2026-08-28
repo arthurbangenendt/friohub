@@ -203,6 +203,10 @@ const PERGUNTAS: Record<JobType, Pergunta[]> = {
 
   // Balde genérico: o que existe de estruturado aqui é a descrição em texto e as fotos.
   outros: [],
+
+  // Compra avulsa nunca passa por proposta/aceite de profissional — não tem
+  // questionário técnico a perguntar.
+  compra_equipamento: [],
 };
 
 export function perguntasDe(t: JobType): Pergunta[] {

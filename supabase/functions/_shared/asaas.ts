@@ -83,6 +83,43 @@ export async function criarTransferencia(params: {
   }) as AsaasTransfer;
 }
 
+/* Transferência bancária (TED) — alternativa ao Pix pra quem não quer/pode
+ * usar chave Pix (ex.: distribuidora). Payload confirmado contra a
+ * documentação atual da Asaas (28/08/2026,
+ * docs.asaas.com/reference/transferir-para-conta-de-outra-instituicao-ou-chave-pix):
+ * `bank.code`, `ownerName`, `cpfCnpj`, `agency`, `account` e `accountDigit`
+ * são obrigatórios dentro de `bankAccount`; `bankAccountType` é opcional na
+ * Asaas mas sempre mandamos, porque coletamos isso no cadastro. NÃO
+ * confirmado em sandbox ainda — testar antes de considerar validado. */
+export async function criarTransferenciaBancaria(params: {
+  value: number;
+  bankCode: string;
+  agency: string;
+  account: string;
+  accountDigit: string;
+  accountType: "CONTA_CORRENTE" | "CONTA_POUPANCA";
+  ownerName: string;
+  ownerCpfCnpj: string;
+  description: string;
+  externalReference: string;
+}): Promise<AsaasTransfer> {
+  return await asaas("POST", "/transfers", {
+    value: params.value,
+    bankAccount: {
+      bank: { code: params.bankCode },
+      ownerName: params.ownerName,
+      cpfCnpj: params.ownerCpfCnpj,
+      agency: params.agency,
+      account: params.account,
+      accountDigit: params.accountDigit,
+      bankAccountType: params.accountType,
+    },
+    operationType: "TED",
+    description: params.description,
+    externalReference: params.externalReference,
+  }) as AsaasTransfer;
+}
+
 export async function criarCustomer(params: {
   externalReference: string;
   name: string;

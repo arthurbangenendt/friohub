@@ -16,6 +16,7 @@ export const NAV_POR_PAPEL: Record<Papel, ItemNav[]> = {
   cliente: [
     { href: "/painel", label: "Meus pedidos", icone: "servicos" },
     { href: "/painel/orcamentos", label: "Orçamentos", icone: "orcamentos" },
+    { href: "/painel/comprar", label: "Comprar", icone: "servicos" },
     { href: "/painel/pmoc", label: "PMOC", icone: "pmoc" },
     { href: "/painel/equipamentos", label: "Equipamentos", icone: "equipamentos", feature: "ux_portfolio" },
     { href: "/painel/mensagens", label: "Mensagens", icone: "mensagens" },
@@ -32,6 +33,7 @@ export const NAV_POR_PAPEL: Record<Papel, ItemNav[]> = {
     { href: "/painel/clientes", label: "Clientes", icone: "clientes", feature: "ux_portfolio" },
     { href: "/painel/desempenho", label: "Desempenho", icone: "desempenho", feature: "ux_growth" },
     { href: "/painel/orcamentos", label: "Orçamentos", icone: "orcamentos" },
+    { href: "/painel/comprar", label: "Comprar peças", icone: "servicos" },
     { href: "/painel/pmoc", label: "PMOC", icone: "pmoc" },
     { href: "/painel/mensagens", label: "Mensagens", icone: "mensagens" },
     { href: "/painel/financeiro", label: "Financeiro", icone: "financeiro" },

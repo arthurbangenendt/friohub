@@ -35,7 +35,7 @@ export async function Pagamento({ orderId, total, jobId }: { orderId: string; to
           Ainda não geramos a cobrança deste serviço pela plataforma — o
           valor acertado é <strong>{formatarBRL(total)}</strong>.
         </Alert>
-        <RetentarPagamento jobId={jobId} />
+        <RetentarPagamento jobId={jobId} orderId={orderId} />
       </div>
     );
   }
@@ -93,7 +93,7 @@ export async function Pagamento({ orderId, total, jobId }: { orderId: string; to
           <p style={{ margin: 0, fontSize: 13, color: "var(--ink-soft)" }}>
             Ainda não conseguimos gerar o link de pagamento.
           </p>
-          <RetentarPagamento jobId={jobId} />
+          <RetentarPagamento jobId={jobId} orderId={orderId} />
         </div>
       )}
 

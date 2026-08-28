@@ -249,7 +249,9 @@ export default async function ServicoPage({ params }: { params: Promise<{ id: st
       </div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap", marginBottom: 28 }}>
         <p style={{ color: "var(--ink-faint)", fontSize: 14, margin: 0 }}>
-          {isAdmin ? `${cliNome} · ${proNome}` : isPro ? `Cliente: ${cliNome}` : `Profissional: ${proNome}`}
+          {job.job_type === "compra_equipamento"
+            ? "Compra direto com a distribuidora"
+            : isAdmin ? `${cliNome} · ${proNome}` : isPro ? `Cliente: ${cliNome}` : `Profissional: ${proNome}`}
         </p>
         {/* Falar com a outra parte é a ação mais frequente nesta tela — antes não
             existia caminho nenhum, nem telefone nem chat. Admin fica de fora: ele
@@ -443,8 +445,13 @@ export default async function ServicoPage({ params }: { params: Promise<{ id: st
 
         {/* O rastreio vem ANTES do histórico: responde "onde estou e o que
             falta", que é a pergunta que o cliente faz primeiro. O histórico
-            continua logo abaixo, para quem quiser o detalhe cronológico. */}
-        {job.status !== "aberto" && job.status !== "aguardando_profissional" && (
+            continua logo abaixo, para quem quiser o detalhe cronológico.
+
+            Compra avulsa (sem profissional) fica de fora: os passos do
+            componente são os do ciclo aceito/em_execucao, que esse job_type
+            nunca passa por — o bloco "Aparelho" acima já cobre o
+            acompanhamento que importa (entrega da distribuidora). */}
+        {job.job_type !== "compra_equipamento" && job.status !== "aberto" && job.status !== "aguardando_profissional" && (
           <div className="card" style={{ padding: 22 }}>
             <SecTitle>Acompanhamento</SecTitle>
             <Rastreio
@@ -497,8 +504,10 @@ export default async function ServicoPage({ params }: { params: Promise<{ id: st
           </div>
         )}
 
-        {/* avaliação do cliente */}
-        {isCliente && job.status === "concluido" && !review && (
+        {/* avaliação do cliente — não se aplica à compra avulsa, sem
+            profissional pra avaliar (SPECIALTY_OF[compra_equipamento] é null,
+            avaliarJob recusaria o envio mesmo se o formulário aparecesse). */}
+        {isCliente && job.status === "concluido" && !review && job.job_type !== "compra_equipamento" && (
           <div className="card" style={{ padding: 22 }}>
             <SecTitle>Avalie o serviço</SecTitle>
             <p style={{ color: "var(--ink-soft)", fontSize: 14, marginBottom: 16 }}>Sua nota ajuda outros clientes e valoriza os bons profissionais.</p>
