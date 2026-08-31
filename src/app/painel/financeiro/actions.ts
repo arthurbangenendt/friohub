@@ -10,6 +10,9 @@ export async function registrarDespesa(input: { categoria: string; descricao: st
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false as const, error: "Não autenticado." };
 
+  const { data: permite } = await supabase.rpc("plano_permite", { p_professional_id: user.id, p_feature: "custos_obra" });
+  if (!permite) return { ok: false as const, error: "Controle de custos é exclusivo do seu plano." };
+
   if (!CATEGORIA_IDS.includes(input.categoria)) return { ok: false as const, error: "Categoria inválida." };
   if (!Number.isFinite(input.valor) || !(input.valor > 0) || input.valor > 99_999_999.99) {
     return { ok: false as const, error: "Informe um valor maior que zero." };

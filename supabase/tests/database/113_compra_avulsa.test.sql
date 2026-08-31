@@ -78,8 +78,8 @@ select is(
   (select o.origem from public.orders o
      join public.jobs j on j.id = o.job_id
     where j.cliente_id = 'c0000000-0000-0000-0000-000000000001' and j.job_type = 'compra_equipamento'),
-  'aceite_quote',
-  'order reaproveita origem=aceite_quote, mesmo caminho de cobrança de preparar_cobranca_servico'
+  'compra_avulsa',
+  'order de compra avulsa tem origem própria, não reaproveita aceite_quote'
 );
 select is(
   (select o.preco_servico from public.orders o

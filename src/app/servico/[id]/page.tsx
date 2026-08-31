@@ -44,7 +44,7 @@ type OrderView = {
   preco_servico: number;
   total: number;
   payment_status: string;
-  origem: "aceite_quote" | "orcamento_final";
+  origem: "aceite_quote" | "orcamento_final" | "compra_avulsa";
   comissao_servico?: number; // só existe para o profissional
 };
 
@@ -577,13 +577,15 @@ function Linha({ k, v }: { k: React.ReactNode; v: React.ReactNode }) {
   );
 }
 
-function rotuloOrigemOrder(origem: "aceite_quote" | "orcamento_final", isVisitaTecnica: boolean): string {
+function rotuloOrigemOrder(origem: "aceite_quote" | "orcamento_final" | "compra_avulsa", isVisitaTecnica: boolean): string {
   if (origem === "orcamento_final") return "Serviço (pós-visita)";
+  if (origem === "compra_avulsa") return "Compra de aparelho";
   return isVisitaTecnica ? "Visita técnica" : "Instalação";
 }
 
-function rotuloServicoOrder(origem: "aceite_quote" | "orcamento_final", isVisitaTecnica: boolean): string {
+function rotuloServicoOrder(origem: "aceite_quote" | "orcamento_final" | "compra_avulsa", isVisitaTecnica: boolean): string {
   if (origem === "orcamento_final") return "Serviço (pós-visita)";
+  if (origem === "compra_avulsa") return "Compra de aparelho";
   return isVisitaTecnica ? "Visita técnica" : "Mão de obra (instalação)";
 }
 

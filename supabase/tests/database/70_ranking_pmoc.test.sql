@@ -87,10 +87,10 @@ update public.profiles set role = 'profissional', nome = 'Pro Novo Cinco Estrela
 update public.profiles set role = 'admin', nome = 'Admin PMOC'
  where id = '70000000-0000-0000-0000-000000000004';
 
-insert into public.professionals (id, tipo, cidade, estado)
+insert into public.professionals (id, tipo, cidade, estado, subscription_plan_id)
 values
-  ('70000000-0000-0000-0000-000000000002', 'empresa', 'São Paulo', 'SP'),
-  ('70000000-0000-0000-0000-000000000003', 'autonomo', 'São Paulo', 'SP');
+  ('70000000-0000-0000-0000-000000000002', 'empresa', 'São Paulo', 'SP', (select id from public.subscription_plans where slug = 'master')),
+  ('70000000-0000-0000-0000-000000000003', 'autonomo', 'São Paulo', 'SP', (select id from public.subscription_plans where slug = 'master'));
 insert into public.professional_skills (
   professional_id, specialty, years_experience, rating_avg, rating_count, jobs_completed
 ) values

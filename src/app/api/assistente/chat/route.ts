@@ -140,6 +140,7 @@ export async function POST(request: NextRequest) {
       messages: mensagensOpenAI,
       stream: true,
       stream_options: { include_usage: true },
+      max_completion_tokens: 1200,
     });
   } catch (e) {
     console.error("assistente/chat: falha ao chamar a OpenAI", e);

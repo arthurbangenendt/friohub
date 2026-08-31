@@ -21,9 +21,9 @@ update public.profiles set role='profissional' where id in (
   '93000000-0000-0000-0000-000000000001',
   '93000000-0000-0000-0000-000000000002'
 );
-insert into public.professionals(id,tipo,cidade,estado) values
-('93000000-0000-0000-0000-000000000001','autonomo','São Paulo','SP'),
-('93000000-0000-0000-0000-000000000002','autonomo','Campinas','SP');
+insert into public.professionals(id,tipo,cidade,estado,subscription_plan_id) values
+('93000000-0000-0000-0000-000000000001','autonomo','São Paulo','SP',(select id from public.subscription_plans where slug = 'master')),
+('93000000-0000-0000-0000-000000000002','autonomo','Campinas','SP',(select id from public.subscription_plans where slug = 'master'));
 
 set local role authenticated;
 select set_config('request.jwt.claim.sub','93000000-0000-0000-0000-000000000001',true);

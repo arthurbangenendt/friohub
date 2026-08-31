@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
-select plan(24);
+select plan(25);
 
 select ok(
   not has_function_privilege('authenticated', 'public.preparar_repasse_distribuidora(uuid)', 'execute'),
@@ -181,6 +181,19 @@ select is(
 select ok(
   (select scheduled_for from public.payment_transfers where beneficiary_id = 'f1000000-0000-0000-0000-000000000002') > now(),
   'repasse da distribuidora também respeita a janela de contenção — não dispara na hora'
+);
+
+-- Reprocessar a mesma transição não duplica (idempotência por allocation_id)
+-- — mesmo teste já existente pro lado do profissional (102_repasse_
+-- automatico.test.sql). `avancar_purchase_order` não libera o caminho de
+-- volta 'entregue' -> 'enviado', então o update é cru na tabela, ignorando a
+-- RPC, só pra forçar o trigger a rodar de novo.
+update public.purchase_orders set status = 'enviado' where id = (select po_pix from rd_ids);
+update public.purchase_orders set status = 'entregue' where id = (select po_pix from rd_ids);
+select is(
+  (select count(*)::integer from public.payment_transfers where purchase_order_id = (select po_pix from rd_ids)),
+  1,
+  'reentregar a mesma purchase_order não duplica o repasse'
 );
 
 -- ===========================================================================

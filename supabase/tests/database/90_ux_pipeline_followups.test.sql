@@ -22,9 +22,9 @@ values
  ('90000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000000','authenticated','authenticated','intruso-follow@teste.local','',now(),now());
 update public.profiles set role = 'cliente' where id = '90000000-0000-0000-0000-000000000001';
 update public.profiles set role = 'profissional' where id in ('90000000-0000-0000-0000-000000000002','90000000-0000-0000-0000-000000000003');
-insert into public.professionals (id, tipo, cidade, estado) values
- ('90000000-0000-0000-0000-000000000002','autonomo','São Paulo','SP'),
- ('90000000-0000-0000-0000-000000000003','autonomo','São Paulo','SP');
+insert into public.professionals (id, tipo, cidade, estado, subscription_plan_id) values
+ ('90000000-0000-0000-0000-000000000002','autonomo','São Paulo','SP',(select id from public.subscription_plans where slug = 'master')),
+ ('90000000-0000-0000-0000-000000000003','autonomo','São Paulo','SP',(select id from public.subscription_plans where slug = 'master'));
 insert into public.quote_requests (id, cliente_id, job_type, cep, cidade, quantidade, detalhes)
 values ('90000000-0000-0000-0000-000000000010','90000000-0000-0000-0000-000000000001','manutencao','01001000','São Paulo',1,'{}');
 insert into public.quote_request_targets (quote_request_id, professional_id)

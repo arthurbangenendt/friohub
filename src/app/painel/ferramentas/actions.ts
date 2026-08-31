@@ -33,6 +33,11 @@ export async function registrarFerramenta(input: NovaFerramenta) {
     return { ok: false as const, error: "Apenas profissionais podem cadastrar ferramentas." };
   }
 
+  const { data: permite } = await supabase.rpc("plano_permite", { p_professional_id: user.id, p_feature: "ferramentas" });
+  if (!permite) {
+    return { ok: false as const, error: "Controle de ferramentas é exclusivo do seu plano." };
+  }
+
   const nome = input.nome.trim();
   const marca = input.marca.trim();
   const modelo = input.modelo.trim();

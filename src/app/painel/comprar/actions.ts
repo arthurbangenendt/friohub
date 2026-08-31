@@ -37,7 +37,7 @@ export async function criarCompraAvulsa(input: {
     .from("orders")
     .select("id")
     .eq("job_id", jobId)
-    .eq("origem", "aceite_quote")
+    .eq("origem", "compra_avulsa")
     .maybeSingle();
 
   const { data: { session } } = await supabase.auth.getSession();
