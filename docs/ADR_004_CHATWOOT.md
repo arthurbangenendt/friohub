@@ -121,6 +121,44 @@ Segredos no Vault, nunca em migration. O recorte da fila fica em
 `reservar_notificacoes_whatsapp()`, no banco, e não dentro da function — é lá que dá para revisar e
 testar, que foi a lição escrita no cabeçalho de `src/lib/notificacoes-canal.ts`.
 
+## Addendum — worker de sync de PII e widget do site (31/08/2026)
+
+Duas peças que ficaram só no schema/documentadas em comentário ganharam código:
+
+- **`chatwoot-pii-sync`** (migration `20260831100000`): worker acordado por
+  `pg_cron` a cada 5 minutos, que lê `conversas_pendentes_sync_pii()` (nova
+  função — conversa com `chatwoot_conversation_id`, `handoff_liberado()` e pelo
+  menos um participante com `chatwoot_identities.pii_synced_at is null`),
+  chama `pii_liberado_para_chatwoot()` por conversa e faz `PUT /contacts/{id}`
+  com telefone/e-mail antes de `marcar_pii_sincronizado_chatwoot()`. Até aqui
+  essas duas RPCs (de 15/08) não tinham consumidor — handoff liberado e duplo
+  consentimento não bastavam para o contato do Chatwoot receber o telefone.
+  Configuração manual (uma vez, como o `chatwoot_dispatch_url`):
+  ```
+  select vault.create_secret(
+    'https://<ref>.supabase.co/functions/v1/chatwoot-pii-sync',
+    'chatwoot_pii_sync_url', 'URL da Edge Function de sync de PII');
+  ```
+  Reutiliza o secret `chatwoot_worker_key` já existente. Ganhou health check
+  próprio (`chatwoot_pii_sync` em `avaliar_saude_sistema()`) e cobertura pgTAP
+  em `92_chatwoot.test.sql`.
+
+- **Widget do site** (`src/components/ChatwootWidget.tsx`, montado em
+  `src/app/layout.tsx`): sobe em toda página pública quando
+  `NEXT_PUBLIC_CHATWOOT_BASE_URL`/`NEXT_PUBLIC_CHATWOOT_WEBSITE_TOKEN` existem;
+  some em `/painel/**` e `/admin/**` (o painel já tem o chat próprio). Roda em
+  modo **anônimo/não-verificado** — não implementa `identifier_hash`
+  (`_shared/assinatura.ts` já tem a função pronta, mas sem caller). Fica
+  independente da flag `chatwoot_messaging`: o comentário original da migration
+  `20260815095000` previa "widget subir identificado" como algo que a flag
+  governaria, mas como o `identifier_hash` não foi implementado nesta rodada,
+  essa parte do contrato original não está coberta. **Endurecer o widget**
+  (`identifier_hash` + `--endurecer-widget` do `chatwoot-setup.mjs`) continua
+  pendente como trabalho futuro — sem ele, um visitante poderia teoricamente se
+  passar por outro contato existente no widget, mas o risco só é real depois
+  que o widget também tiver `setUser()` identificando um usuário logado, o que
+  não é o caso hoje.
+
 ## Limites conhecidos
 
 - **Uma conversa por par cliente↔profissional.** `conversations` tem `unique (cliente_id,

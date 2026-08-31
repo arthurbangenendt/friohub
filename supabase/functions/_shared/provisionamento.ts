@@ -17,13 +17,13 @@
 import type { SupabaseClient } from "jsr:@supabase/supabase-js@2";
 import { chatwoot, plataforma, MARKETPLACE_INBOX_ID } from "./chatwoot.ts";
 
-type Identidade = {
+export type Identidade = {
   profile_id: string;
   chatwoot_contact_id: number | null;
   chatwoot_user_id: number | null;
 };
 
-async function identidade(db: SupabaseClient, profileId: string): Promise<Identidade | null> {
+export async function identidade(db: SupabaseClient, profileId: string): Promise<Identidade | null> {
   const { data } = await db
     .from("chatwoot_identities")
     .select("profile_id, chatwoot_contact_id, chatwoot_user_id")

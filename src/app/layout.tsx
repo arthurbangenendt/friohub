@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { REGIAO_LABEL } from "@/lib/regiao";
 import "./globals.css";
 import { AnalyticsConsent } from "@/components/AnalyticsConsent";
+import { ChatwootWidget } from "@/components/ChatwootWidget";
 import { ToastProvider } from "@/components/ui";
 
 const geistSans = Geist({
@@ -39,6 +40,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <a href="#conteudo" className="skip-link">Pular para o conteúdo</a>
         <ToastProvider>{children}</ToastProvider>
         <AnalyticsConsent />
+        <ChatwootWidget />
       </body>
     </html>
   );

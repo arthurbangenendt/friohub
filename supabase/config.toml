@@ -392,8 +392,8 @@ deno_version = 2
 [functions.chatwoot-webhook]
 verify_jwt = false
 
-# As três abaixo mantêm a verificação padrão: outbound recebe o JWT do usuário,
-# dispatch e provision são chamadas com a chave de serviço.
+# As quatro abaixo mantêm a verificação padrão: outbound recebe o JWT do
+# usuário, dispatch, provision e pii-sync são chamadas com a chave de serviço.
 [functions.chatwoot-outbound]
 verify_jwt = true
 
@@ -401,6 +401,9 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.chatwoot-provision]
+verify_jwt = true
+
+[functions.chatwoot-pii-sync]
 verify_jwt = true
 
 # O Asaas não manda JWT do Supabase no webhook — autenticação é o header

@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
-select plan(40);
+select plan(44);
 
 -- ---------------------------------------------------------------------------
 -- Fixture
@@ -206,6 +206,34 @@ select is(
   (select count(*)::integer from public.pii_liberado_para_chatwoot('92000000-0000-0000-0000-0000000000a1')),
   0,
   'consentimento sem handoff continua não entregando telefone'
+);
+
+-- ===========================================================================
+-- Worker de sync de PII — conversas candidatas
+-- ===========================================================================
+select has_function('public','conversas_pendentes_sync_pii','recorte de candidatas a sync de PII é RPC');
+
+select public.vincular_conversa_chatwoot('92000000-0000-0000-0000-0000000000a2', 7003, 22);
+select public.registrar_identidade_chatwoot('92000000-0000-0000-0000-000000000002', 9002, null);
+select public.registrar_identidade_chatwoot('92000000-0000-0000-0000-000000000009', 9009, 8009);
+
+select ok(
+  '92000000-0000-0000-0000-0000000000a2' in (select * from public.conversas_pendentes_sync_pii(100)),
+  'conversa com handoff liberado e PII pendente entra na lista de candidatas'
+);
+
+select public.marcar_pii_sincronizado_chatwoot(array['92000000-0000-0000-0000-000000000002']::uuid[]);
+
+select ok(
+  '92000000-0000-0000-0000-0000000000a2' in (select * from public.conversas_pendentes_sync_pii(100)),
+  'sincronizar só um dos dois participantes ainda mantém a conversa candidata'
+);
+
+select public.marcar_pii_sincronizado_chatwoot(array['92000000-0000-0000-0000-000000000009']::uuid[]);
+
+select ok(
+  '92000000-0000-0000-0000-0000000000a2' not in (select * from public.conversas_pendentes_sync_pii(100)),
+  'sincronizar os dois participantes remove a conversa das candidatas'
 );
 
 -- ===========================================================================
