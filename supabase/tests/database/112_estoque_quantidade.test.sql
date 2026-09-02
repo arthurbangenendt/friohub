@@ -27,6 +27,12 @@ values ('e0000000-0000-0000-0000-000000000002','instalacao');
 insert into public.professional_service_radius(professional_id,latitude,longitude,radius_km,location_label)
 values ('e0000000-0000-0000-0000-000000000002',-23.550000,-46.633000,50,'Base Centro');
 
+-- Verificado só DEPOIS de skills/raio: os dois disparam
+-- `trg_skills_revalidacao`/`trg_areas_revalidacao`, que rebaixam de volta pra
+-- 'em_analise' quando o dado relacionado muda depois da aprovação.
+update public.professionals set verification_status = 'verificado'
+ where id = 'e0000000-0000-0000-0000-000000000002';
+
 insert into public.distributors(id,razao_social,cidade,estado,prazo_entrega_dias,verification_status,ativo)
 values ('e0000000-0000-0000-0000-000000000003','Dist Estoque LTDA','São Paulo','SP',5,'verificado',true);
 

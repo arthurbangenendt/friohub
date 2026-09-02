@@ -15,7 +15,8 @@ export type EventoNotificacao =
   | "quote_cancelled" | "quote_declined" | "new_message" | "job_updated"
   | "appointment_proposed" | "appointment_confirmed" | "appointment_cancelled"
   | "appointment_reminder" | "pmoc_offered" | "pmoc_activated" | "pmoc_visit_due"
-  | "purchase_order_created" | "purchase_order_updated";
+  | "purchase_order_created" | "purchase_order_updated"
+  | "payment_received" | "subscription_overdue" | "pix_key_changed";
 
 export type CategoriaNotificacao =
   | "quote_requests" | "quotes" | "messages" | "reminders" | "job_updates" | "purchase_orders";
@@ -84,6 +85,7 @@ function destino(n: NotificacaoBruta): string | null {
     case "appointment":   return jobDoPayload ? `/servico/${jobDoPayload}` : null;
     case "pmoc_plan":
     case "pmoc_visit":    return "/painel/pmoc";
+    case "professional":  return "/painel/perfil";
     /* Mesmo aggregate_type, destinos diferentes: quem cria o repasse
        (distribuidora) precisa da lista de pedidos; quem acompanha a entrega
        (cliente/profissional) precisa da linha do tempo do job específico. */
@@ -173,6 +175,17 @@ function conteudo(n: NotificacaoBruta): Pick<NotificacaoView, "titulo" | "detalh
       const r = (status && rotulo[status]) || { t: "Atualização no pedido do aparelho", tom: "andamento" as const };
       return { titulo: r.t, detalhe: dist ? `Distribuidora: ${dist}` : null, tom: r.tom };
     }
+
+    case "payment_received": {
+      const valor = p?.amount;
+      return { titulo: "Pagamento do serviço confirmado", detalhe: typeof valor === "number" || typeof valor === "string" ? `Valor: ${valor}` : null, tom: "sucesso" };
+    }
+
+    case "subscription_overdue":
+      return { titulo: "Sua assinatura está com pagamento em atraso", detalhe: "Regularize para não perder os benefícios do seu plano.", tom: "erro" };
+
+    case "pix_key_changed":
+      return { titulo: "Sua chave PIX de recebimento foi alterada", detalhe: "Se não foi você, entre em contato com o suporte agora.", tom: "erro" };
 
     default:
       /* Evento novo no banco que a interface ainda não conhece. Mostrar a chave
