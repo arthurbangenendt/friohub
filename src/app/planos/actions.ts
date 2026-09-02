@@ -112,11 +112,13 @@ export async function trocarPlano(slug: string): Promise<ResultadoTroca> {
 
 /* Assinatura de planos — registro de intenção.
  *
- * [RISCO 1] Não existe gateway de pagamento no sistema. `city_billing_config`
- * mantém a cobrança desligada na cidade piloto de propósito (entrada grátis no
- * cold start). Enquanto isso, o botão de assinar registra QUEM quer QUAL plano
- * — que é o dado necessário para decidir se vale construir a cobrança — e não
- * finge que houve pagamento. Ver 20260813190000_planos_assinatura.sql. */
+ * Usado só onde `city_billing_config.cobranca_ativa` continua desligado
+ * (cold start de uma cidade nova). Onde a cobrança já está ligada — hoje São
+ * Paulo, ver 20260818145000_ligar_cobranca_sao_paulo_sandbox.sql —, o botão
+ * de assinar chama `iniciarAssinatura` acima, que cobra de verdade via
+ * Asaas. Aqui o objetivo é só saber QUEM quer QUAL plano antes de a cobrança
+ * existir naquela cidade — e não finge que houve pagamento. Ver
+ * 20260813190000_planos_assinatura.sql. */
 
 export type Ciclo = "mensal" | "anual";
 

@@ -104,11 +104,11 @@ export default async function AdminFinanceiroPage() {
 
       {!erro && (postings ?? []).length === 0 && (
         <Alert tipo="aviso" titulo="Nenhum lançamento no ledger">
-          Nenhuma cobrança foi criada até agora. As RPCs financeiras são
-          exclusivas de <code>service_role</code> e o gateway não está conectado
-          — a flag <code>asaas_payments</code> segue desligada. A rotina de
-          conciliação continua rodando e reportando zero divergências, que é o
-          resultado correto para uma base sem movimento.
+          Nenhuma cobrança foi criada até agora nesta base. As RPCs financeiras são exclusivas de{" "}
+          <code>service_role</code>; se a flag <code>asaas_payments</code> estiver ligada para a
+          região e ainda assim não houver lançamento, vale checar se o gateway está de fato
+          recebendo eventos. A rotina de conciliação continua rodando e reportando zero
+          divergências, que é o resultado correto para uma base sem movimento.
         </Alert>
       )}
 

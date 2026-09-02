@@ -18,6 +18,56 @@ O objetivo não é apenas entregar mais funcionalidades. A prioridade é garanti
 reputação, pedidos, pagamentos, dados pessoais e estados operacionais permaneçam corretos mesmo
 quando alguém usa a API diretamente, repete uma requisição ou tenta explorar o sistema.
 
+## Auditoria de 02/09/2026 — o que avançou e o que falta antes de produção real
+
+> As seções abaixo (avaliação inicial, bloqueadores P0, fases) datam de 13-14/08/2026 e não foram
+> reescritas — ficam como registro histórico do diagnóstico original. Esta seção traz o estado
+> real verificado no código em 02/09/2026, 53 commits depois. Leia esta seção primeiro.
+
+**O que já avançou e este documento ainda descrevia como pendente:**
+- Gateway Asaas está integrado e ativo: cobrança de serviço (`asaas-cobrar-servico`), assinatura
+  (`asaas-assinar`/`asaas-trocar-plano`/`asaas-renovar-assinaturas`), repasse a profissional e
+  distribuidora (`asaas-processar-repasses`), disputa/estorno (`asaas-resolver-disputa`) — todos
+  com idempotência, inbox de webhook e reconciliação horária.
+- `city_billing_config.cobranca_ativa = true` para São Paulo desde
+  `20260818145000_ligar_cobranca_sao_paulo_sandbox.sql` — assinatura e cobrança de serviço já são
+  fato, não só intenção, nessa cidade.
+- Aceite de proposta idempotente e com lock (`FOR UPDATE`) — o P0.3 abaixo está resolvido.
+- Repasse à distribuidora sem update direto (P0.2 resolvido), com janela de contenção e
+  contestação de entrega pelo cliente.
+- Fotos de orçamento em bucket privado com signed URL (P0.5 resolvido).
+- Distribuidora, admin e PMOC estão funcionais ponta a ponta — nenhuma tela é shell vazio.
+
+**O que a auditoria de 02/09 encontrou e corrigiu nesta sessão** (ver
+`supabase/migrations/20260902100000_kyc_gate_pedido_repasse_pix.sql` e
+`20260902110000_ligar_chatwoot_messaging_global.sql`):
+- `criar_pedido_orcamento` e `preparar_repasse_profissional` não checavam
+  `verification_status = 'verificado'` do profissional — só a busca fazia isso, não o banco. Um ID
+  passado direto à RPC podia receber pedido e repasse sem ter passado por aprovação de admin.
+  Corrigido.
+- Troca de chave PIX (`salvar_chave_pix`) não avisava o dono da conta. Agora dispara notificação
+  in-app obrigatória (`pix_key_changed`) a cada troca real.
+- Bug de cálculo no comparador de propostas (`/painel/orcamentos/[id]/comparar`): o total ignorava
+  o valor do aparelho, podendo inverter o ranking de "mais barato". Corrigido.
+- `chatwoot_messaging` (WhatsApp via Chatwoot) ligada a 100%, sem restrição de região.
+
+**O que continua pendente e precisa de decisão ou infraestrutura fora do código:**
+1. **Confirmar se `ASAAS_ENV`/`ASAAS_API_KEY` (secrets do Supabase) são sandbox ou produção** —
+   não verificável por código; decide se `cobranca_ativa=true` em SP já é dinheiro real.
+2. Disputa com repasse já enviado ao profissional exige contato manual fora do sistema — sem
+   charge-back automatizado. Depende de política comercial.
+3. `CHATWOOT_WHATSAPP_INBOX_ID` precisa estar configurado nos secrets de `chatwoot-dispatch` e o
+   número de WhatsApp conectado no Chatwoot self-hosted, para a flag ligada nesta sessão ter efeito
+   de verdade.
+4. CAPTCHA desligado (`supabase/config.toml`) — depende de domínio/credencial Turnstile/hCaptcha.
+5. Monitor externo de erro (tipo Sentry) inexistente — decisão de ferramenta/custo.
+6. PMOC sem cobrança recorrente automatizada nem emissão de documento técnico formal — decisão
+   jurídica/regulatória.
+7. E-mail de notificação nunca implementado — decisão de provedor.
+8. KYC/KYB formal (documento + aprovação manual do admin) existe, mas sem re-verificação quando
+   dados de identidade mudam — risco residual menor, já que o gap de dinheiro sem verificação foi
+   fechado no item acima.
+
 ## Status de execução
 
 Atualizado em 14/08/2026.

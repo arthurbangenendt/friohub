@@ -5,18 +5,24 @@ comparam propostas e podem comprar equipamentos de distribuidoras em dropship.
 
 **Stack:** Next.js 16 (App Router) · React 19 · Supabase (Postgres, Auth, Storage e Realtime) · Vercel
 
-> O sistema está em hardening. Comissão e margem são calculadas, mas ainda não existe gateway de
-> pagamento. Não usar para movimentar dinheiro real antes de concluir os bloqueadores P0 descritos
+> O gateway Asaas está integrado e ativo (cobrança de serviço, assinatura, repasse a profissional
+> e distribuidora, disputa/estorno) — hoje ligado para São Paulo. **Antes de tratar isso como
+> dinheiro real, confirme nos secrets do Supabase se `ASAAS_ENV`/`ASAAS_API_KEY` apontam para
+> sandbox ou produção** — isso não é verificável só lendo o repositório. Bloqueadores restantes
+> (KYC/KYB, política de disputa com repasse já enviado, CAPTCHA, monitor externo de erro) estão
 > em [`docs/ROADMAP_10_DE_10.md`](docs/ROADMAP_10_DE_10.md).
 
 ---
 
-## Modelo de receita planejado
+## Modelo de receita
 
-1. **Margem do equipamento** — calculada no banco; cobrança pendente.
-2. **Comissão do serviço** — calculada no banco; cobrança pendente.
-3. **Assinatura do profissional** — schema inicial existente; produto e cobrança pendentes.
-4. **Destaque patrocinado** — elegibilidade modelada; compra e cobrança pendentes.
+1. **Margem do equipamento** — calculada no banco e cobrada via compra avulsa/aceite de proposta.
+2. **Comissão do serviço** — calculada no banco; cobrada via Asaas (`asaas-cobrar-servico`).
+3. **Assinatura do profissional** — três planos (Essencial/Profissional/Master); cobrança real
+   ligada em São Paulo (`city_billing_config.cobranca_ativa`), registro de intenção nas demais
+   cidades.
+4. **Destaque patrocinado** — elegibilidade e rótulo modelados; compra ainda não ligada
+   (`sponsored_placements` em 0% de rollout).
 
 As primeiras decisões de risco estão registradas nas migrations versionadas em
 `supabase/migrations/`:

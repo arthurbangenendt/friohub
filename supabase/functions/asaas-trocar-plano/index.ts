@@ -122,6 +122,6 @@ Deno.serve(async (req) => {
   return json({
     ok: true,
     tipo: "downgrade",
-    aviso: "Downgrade agendado. Ainda não existe um processo automático que aplique isso sozinho no vencimento — nossa equipe aplica manualmente até esse worker existir.",
+    aviso: "Downgrade agendado para o próximo vencimento — você continua no plano atual até lá.",
   });
 });

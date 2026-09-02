@@ -5,13 +5,14 @@ import { formatarBRL } from "@/lib/pricing";
 
 /* Demanda por plano — visão da operação.
  *
- * Enquanto não existe gateway, ASSINATURA não é um fato do sistema: o que
- * existe é INTENÇÃO (`plan_interest`), registrada quando o parceiro escolhe um
- * plano em /planos. Esta tela chama as coisas pelo nome. Mostrar "12 assinantes"
- * quando ninguém pagou nada seria enganar a própria operação — e é justamente
- * este número que decide se vale construir a cobrança.
+ * `city_billing_config.cobranca_ativa` liga cidade por cidade — hoje já vale
+ * para São Paulo (20260818145000_ligar_cobranca_sao_paulo_sandbox.sql), então
+ * ASSINATURA já é um fato do sistema ali, não só intenção. Onde a cobrança
+ * ainda está desligada (cold start de uma cidade nova), o que existe é
+ * INTENÇÃO (`plan_interest`), registrada quando o parceiro escolhe um plano
+ * em /planos. Esta tela mostra os dois números, sem confundir um com o outro.
  *
- * A leitura depende da policy `plan_interest_admin_read`
+ * A leitura de `plan_interest` depende da policy `plan_interest_admin_read`
  * (20260813200000_plan_interest_admin.sql). Sem ela o admin enxerga zero. */
 
 export const metadata = { title: "Assinaturas — Administração" };
@@ -96,21 +97,32 @@ export default async function AssinaturasPage() {
   const ranking = [...porPlano.values()].sort((a, b) => b.receita - a.receita);
   const anuais = escolhas.filter((i) => i.ciclo === "anual").length;
 
-  /* Assinatura de verdade, se um dia houver. Hoje todo mundo está em 'gratis'
-     porque a cobrança está desligada — o bloco só aparece quando deixar de ser
-     verdade, em vez de mostrar uma fileira de zeros. */
+  /* Assinatura de verdade — conta quem já saiu de 'gratis' porque a cobrança
+     está ligada na própria cidade. O bloco só aparece quando esse número for
+     maior que zero, em vez de mostrar uma fileira de zeros nas cidades onde a
+     cobrança ainda não foi ligada. */
   const { count: pagantes } = await supabase
     .from("professionals")
     .select("id", { count: "exact", head: true })
     .in("subscription_status", ["ativa", "trial", "inadimplente"]);
 
+  const { data: cidadesCobranca } = await supabase
+    .from("city_billing_config")
+    .select("cidade")
+    .eq("cobranca_ativa", true);
+  const cobrancaLigadaEm = (cidadesCobranca ?? []).map((c) => c.cidade);
+
   return (
     <main className="container-tight" style={{ padding: "40px 24px 80px" }}>
       <h1 style={{ margin: "0 0 6px" }}>Assinaturas</h1>
       <p style={{ color: "var(--ink-soft)", marginBottom: 26, lineHeight: 1.6 }}>
-        A cobrança ainda não está ligada, então ninguém paga nada. O que esta tela mostra é a{" "}
-        <strong>intenção registrada</strong> — quem escolheu qual plano em /planos. É o número que
-        decide se vale construir o gateway.
+        {cobrancaLigadaEm.length > 0
+          ? <>A cobrança já está ligada em <strong>{cobrancaLigadaEm.join(", ")}</strong> — veja assinantes reais
+              abaixo. O restante da tela é a <strong>intenção registrada</strong> em /planos, incluindo cidades
+              onde a cobrança ainda não foi ligada.</>
+          : <>A cobrança ainda não está ligada em nenhuma cidade, então ninguém paga nada. O que esta tela
+              mostra é a <strong>intenção registrada</strong> — quem escolheu qual plano em /planos. É o número
+              que decide se vale ligar a cobrança.</>}
       </p>
 
       {interesses.length === 0 ? (
@@ -216,10 +228,10 @@ export default async function AssinaturasPage() {
 
       {(pagantes ?? 0) > 0 && (
         <div className="card" style={{ padding: 20, marginTop: 26, borderLeft: "4px solid var(--good)" }}>
-          <strong>{pagantes} com assinatura ativa</strong>
+          <strong>{pagantes} com assinatura ativa (cobrança real)</strong>
           <div style={{ color: "var(--ink-soft)", fontSize: 13.5, marginTop: 4 }}>
-            `professionals.subscription_status` saiu de &lsquo;gratis&rsquo;. A partir daqui, esta
-            tela precisa separar cobrança real de intenção.
+            Profissionais com `professionals.subscription_status` em ativa, trial ou inadimplente —
+            dinheiro de verdade passando pelo Asaas, não intenção. Ver <Link href="/admin/financeiro" style={{ color: "var(--cool)" }}>/admin/financeiro</Link> para o ledger completo.
           </div>
         </div>
       )}
