@@ -11,6 +11,7 @@ type Proposta = {
   id: string; professional_id: string; tipo: string; valor_mao_obra: number; valor_materiais: number; valor_visita: number;
   visita_abatida: boolean; inclui: string | null; nao_inclui: string | null; prazo_execucao: string | null;
   garantia_dias: number; validade_ate: string; observacoes: string | null; status: string;
+  valor_equipamento: number; produto_escolhido: unknown;
   profissional: unknown;
 };
 
@@ -18,9 +19,11 @@ export default async function CompararPropostasPage({ params }: { params: Promis
   const { id } = await params; const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser(); if (!user) redirect("/login");
   if (!await featureHabilitada(supabase, "ux_pipeline", user.id)) redirect(`/painel/orcamentos/${id}`);
-  const { data: pedido } = await supabase.from("quote_requests").select("id, cliente_id, job_type, status").eq("id", id).maybeSingle();
+  const { data: pedido } = await supabase.from("quote_requests").select("id, cliente_id, job_type, status, produto:products(preco_venda)").eq("id", id).maybeSingle();
   if (!pedido || pedido.cliente_id !== user.id) redirect(`/painel/orcamentos/${id}`);
-  const { data } = await supabase.from("quotes").select(`id, professional_id, tipo, valor_mao_obra, valor_materiais, valor_visita, visita_abatida, inclui, nao_inclui, prazo_execucao, garantia_dias, validade_ate, observacoes, status, profissional:professionals(profiles(nome), professional_skills(rating_avg, rating_count, jobs_completed))`).eq("quote_request_id", id).in("status", ["enviada", "aceita"]).order("created_at");
+  const produto = one(pedido.produto) as { preco_venda: number } | null;
+  const produtoPreco = Number(produto?.preco_venda ?? 0);
+  const { data } = await supabase.from("quotes").select(`id, professional_id, tipo, valor_mao_obra, valor_materiais, valor_visita, visita_abatida, inclui, nao_inclui, prazo_execucao, garantia_dias, validade_ate, observacoes, status, valor_equipamento, produto_escolhido:products(marca, modelo), profissional:professionals(profiles(nome), professional_skills(rating_avg, rating_count, jobs_completed))`).eq("quote_request_id", id).in("status", ["enviada", "aceita"]).order("created_at");
   const propostas = (data ?? []) as unknown as Proposta[];
   return <div style={{ ...wrap, maxWidth: 1100 }}>
     <Link href={`/painel/orcamentos/${id}`} style={{ fontFamily: mono, fontSize: 13, color: "var(--ink-faint)" }}>← Voltar ao pedido</Link>
@@ -29,7 +32,8 @@ export default async function CompararPropostasPage({ params }: { params: Promis
     {propostas.length < 2 && <div className="card" style={{ padding: 24 }}>O comparador fica mais útil quando há pelo menos duas propostas. Você pode revisar a proposta disponível no pedido.</div>}
     {propostas.length >= 2 && <div style={{ overflowX: "auto", paddingBottom: 8 }}><div style={{ display: "grid", gridTemplateColumns: `150px repeat(${propostas.length}, minmax(230px, 1fr))`, minWidth: 150 + propostas.length * 230, border: "1px solid var(--line)", borderRadius: 14, overflow: "hidden" }}>
       <Celula cabecalho>Critério</Celula>{propostas.map((p) => { const info = infoPro(p); return <Celula cabecalho key={p.id}><strong>{info.nome}</strong><span style={{ display: "flex", gap: 5, alignItems: "center", marginTop: 6, color: "var(--warm)" }}><Star size={14} filled /> {info.nota ?? "nova"}</span></Celula>; })}
-      <Celula>Total</Celula>{propostas.map((p) => <Celula key={`${p.id}-total`} destaque><strong>{formatarBRL(total(p))}</strong><small>{p.tipo === "visita_tecnica" ? "visita técnica" : "preço fechado"}</small></Celula>)}
+      <Celula>Total</Celula>{propostas.map((p) => <Celula key={`${p.id}-total`} destaque><strong>{formatarBRL(total(p, produtoPreco))}</strong><small>{p.tipo === "visita_tecnica" ? "visita técnica" : "preço fechado"}</small></Celula>)}
+      <Celula>Aparelho</Celula>{propostas.map((p) => { const info = aparelho(p, produtoPreco); return <Celula key={`${p.id}-aparelho`}>{info ? `${formatarBRL(info.preco)}${info.rotulo ? ` (${info.rotulo})` : ""}${p.tipo === "visita_tecnica" ? " — à parte" : ""}` : "Incluído no serviço"}</Celula>; })}
       <Celula>Inclui</Celula>{propostas.map((p) => <Celula key={`${p.id}-inclui`}>{p.inclui || "Não detalhado"}</Celula>)}
       <Celula>Não inclui</Celula>{propostas.map((p) => <Celula key={`${p.id}-fora`}>{p.nao_inclui || "Não informado"}</Celula>)}
       <Celula>Garantia</Celula>{propostas.map((p) => <Celula key={`${p.id}-garantia`}>{p.garantia_dias > 0 ? `${p.garantia_dias} dias` : "Não informada"}</Celula>)}
@@ -42,7 +46,23 @@ export default async function CompararPropostasPage({ params }: { params: Promis
   </div>;
 }
 
-function total(p: Proposta) { return Number(p.valor_mao_obra) + Number(p.valor_materiais) + (p.tipo === "visita_tecnica" ? Number(p.valor_visita) : 0); }
+/* Mesmo cálculo de Propostas.tsx: em visita técnica o total exibido é só o
+   que é cobrado agora (a visita); o aparelho é compra à parte, mostrado na
+   linha própria. `valor_equipamento` só existe quando o cliente não sabia o
+   aparelho — nesse caso `produtoPreco` (catálogo) é sempre 0. */
+function total(p: Proposta, produtoPreco: number) {
+  const servico = p.tipo === "visita_tecnica" ? Number(p.valor_visita) : Number(p.valor_mao_obra) + Number(p.valor_materiais);
+  const precoAparelho = produtoPreco > 0 ? produtoPreco : Number(p.valor_equipamento);
+  return p.tipo === "visita_tecnica" ? servico : servico + precoAparelho;
+}
+function aparelho(p: Proposta, produtoPreco: number) {
+  if (produtoPreco > 0) return { preco: produtoPreco, rotulo: null };
+  if (Number(p.valor_equipamento) > 0) {
+    const escolhido = one(p.produto_escolhido) as { marca: string; modelo: string } | null;
+    return { preco: Number(p.valor_equipamento), rotulo: escolhido ? `${escolhido.marca} ${escolhido.modelo}` : null };
+  }
+  return null;
+}
 function infoPro(p: Proposta) {
   const pro = one(p.profissional as { profiles: unknown; professional_skills: unknown } | null);
   const perfil = one(pro?.profiles) as { nome: string } | null;
