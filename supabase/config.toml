@@ -449,6 +449,18 @@ verify_jwt = true
 [functions.admin-suspender-usuario]
 verify_jwt = true
 
+# O ERP da distribuidora não tem sessão de usuário Supabase — autenticação é
+# a API key própria (Bearer fh_live_...), validada via validar_chave_api em
+# index.ts (mesmo raciocínio do asaas-webhook).
+[functions.product-import-ingest]
+verify_jwt = false
+
+# Acordado pelo pg_cron via pg_net (20260903140000) — não manda JWT do
+# Supabase, só o token guardado em vault.product_import_worker_key, conferido
+# em index.ts (mesmo raciocínio do asaas-renovar-assinaturas).
+[functions.product-import-processor]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

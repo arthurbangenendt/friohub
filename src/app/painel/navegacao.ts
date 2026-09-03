@@ -48,6 +48,8 @@ export const NAV_POR_PAPEL: Record<Papel, ItemNav[]> = {
     { href: "/painel/distribuidora", label: "Visão geral", icone: "visao" },
     { href: "/painel/distribuidora/pedidos", label: "Pedidos", icone: "orcamentos" },
     { href: "/painel/distribuidora/catalogo", label: "Catálogo", icone: "servicos" },
+    { href: "/painel/distribuidora/importacoes", label: "Importações", icone: "importacoes" },
+    { href: "/painel/distribuidora/integracoes", label: "Integrações", icone: "integracoes" },
     { href: "/painel/notificacoes", label: "Notificações", icone: "notificacoes" },
     { href: "/painel/distribuidora/perfil", label: "Meu perfil", icone: "perfil" },
   ],

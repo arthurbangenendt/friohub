@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, Bolt, Wrench, User, Shield, Star, Tool, Droplet, Chat, Doc, MapPin, Building, Sparkle } from "@/components/icons";
+import { Bell, Bolt, Wrench, User, Shield, Star, Tool, Droplet, Chat, Doc, MapPin, Building, Sparkle, Move } from "@/components/icons";
 import type { UxFeature } from "@/lib/feature-flags";
 
 export type ItemNav = { href: string; label: string; icone: keyof typeof ICONE; feature?: UxFeature };
@@ -15,6 +15,9 @@ const ICONE = {
   agenda: MapPin,
   planos: Building,
   assistente: Sparkle,
+  // Setas em quatro pontas: sincronização de dados com um sistema externo.
+  integracoes: Move,
+  importacoes: Doc,
 };
 
 /* Único pedaço cliente do shell: só existe para marcar o link ativo, que

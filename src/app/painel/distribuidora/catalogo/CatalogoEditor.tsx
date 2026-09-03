@@ -7,6 +7,7 @@ import { formatarBRL } from "@/lib/pricing";
 import { formatarBtu } from "@/lib/btu";
 import { alternarEstoque, salvarProduto } from "../actions";
 import { Campo, CampoSelecao } from "@/components/ui";
+import { CATEGORIAS, CAT_LABEL } from "@/lib/produtos";
 
 const MAX_MB_IMAGEM = 8;
 const FORMATOS_IMAGEM: Record<string, string> = {
@@ -30,11 +31,6 @@ export type ProdutoLinha = {
   /* null = modo booleano legado (o botão "Em estoque"/"Sem estoque" manda).
      Número = quantidade controlada: cada venda dá baixa automática aqui. */
   estoque_quantidade: number | null;
-};
-
-const CATEGORIAS = ["split", "inverter", "multi_split", "piso_teto", "janela"];
-const CAT_LABEL: Record<string, string> = {
-  split: "Split", inverter: "Inverter", multi_split: "Multi-split", piso_teto: "Piso-teto", janela: "Janela",
 };
 
 /* Catálogo da distribuidora.

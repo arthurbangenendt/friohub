@@ -122,6 +122,17 @@ export const STATUS_PAGAMENTO: Record<string, Estado> = {
   falhou: { label: "Falhou", tom: "erro" },
 };
 
+/** `product_import_batches.status` — o sync em massa de catálogo via API. */
+export const STATUS_LOTE_IMPORTACAO: Record<string, Estado> = {
+  staged: { label: "Recebido, na fila", tom: "espera" },
+  validating: { label: "Validando", tom: "espera" },
+  ready_for_review: { label: "Pronto para revisão", tom: "andamento" },
+  applying: { label: "Aplicando", tom: "andamento" },
+  applied: { label: "Aplicado", tom: "sucesso" },
+  rejected: { label: "Rejeitado", tom: "neutro" },
+  expired: { label: "Expirado sem revisão", tom: "erro" },
+};
+
 /* Status vindo do banco é texto livre do ponto de vista do front. Um valor
    desconhecido não pode derrubar a tela nem sumir: cai em neutro exibindo a
    própria chave, que é informação suficiente para alguém investigar. */

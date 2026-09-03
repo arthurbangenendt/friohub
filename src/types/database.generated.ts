@@ -7,6 +7,11 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.5"
+  }
   public: {
     Tables: {
       admin_audit_log: {
@@ -569,6 +574,47 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      distributor_api_keys: {
+        Row: {
+          criado_em: string
+          distributor_id: string
+          id: string
+          key_hash: string
+          key_prefix: string
+          last_used_at: string | null
+          nome: string
+          revogado_em: string | null
+        }
+        Insert: {
+          criado_em?: string
+          distributor_id: string
+          id?: string
+          key_hash: string
+          key_prefix: string
+          last_used_at?: string | null
+          nome: string
+          revogado_em?: string | null
+        }
+        Update: {
+          criado_em?: string
+          distributor_id?: string
+          id?: string
+          key_hash?: string
+          key_prefix?: string
+          last_used_at?: string | null
+          nome?: string
+          revogado_em?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "distributor_api_keys_distributor_id_fkey"
+            columns: ["distributor_id"]
+            isOneToOne: false
+            referencedRelation: "distributors"
             referencedColumns: ["id"]
           },
         ]
@@ -2996,6 +3042,146 @@ export type Database = {
           },
         ]
       }
+      product_import_batches: {
+        Row: {
+          api_key_id: string | null
+          confirmado_em: string | null
+          confirmado_por: string | null
+          criado_em: string
+          distributor_id: string
+          error_items: number
+          expira_em: string
+          id: string
+          idempotency_key: string | null
+          status: string
+          total_items: number
+          valid_items: number
+          validado_em: string | null
+        }
+        Insert: {
+          api_key_id?: string | null
+          confirmado_em?: string | null
+          confirmado_por?: string | null
+          criado_em?: string
+          distributor_id: string
+          error_items?: number
+          expira_em?: string
+          id?: string
+          idempotency_key?: string | null
+          status?: string
+          total_items?: number
+          valid_items?: number
+          validado_em?: string | null
+        }
+        Update: {
+          api_key_id?: string | null
+          confirmado_em?: string | null
+          confirmado_por?: string | null
+          criado_em?: string
+          distributor_id?: string
+          error_items?: number
+          expira_em?: string
+          id?: string
+          idempotency_key?: string | null
+          status?: string
+          total_items?: number
+          valid_items?: number
+          validado_em?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_import_batches_api_key_id_fkey"
+            columns: ["api_key_id"]
+            isOneToOne: false
+            referencedRelation: "distributor_api_keys"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_import_batches_confirmado_por_fkey"
+            columns: ["confirmado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_import_batches_distributor_id_fkey"
+            columns: ["distributor_id"]
+            isOneToOne: false
+            referencedRelation: "distributors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_import_items: {
+        Row: {
+          action: string | null
+          batch_id: string
+          claimed_at: string | null
+          errors: Json
+          id: string
+          image_final_url: string | null
+          image_status: string
+          image_url_original: string | null
+          line_number: number
+          matched_product_id: string | null
+          raw: Json
+          sku_distribuidor: string
+          status: string
+        }
+        Insert: {
+          action?: string | null
+          batch_id: string
+          claimed_at?: string | null
+          errors?: Json
+          id?: string
+          image_final_url?: string | null
+          image_status?: string
+          image_url_original?: string | null
+          line_number: number
+          matched_product_id?: string | null
+          raw: Json
+          sku_distribuidor: string
+          status?: string
+        }
+        Update: {
+          action?: string | null
+          batch_id?: string
+          claimed_at?: string | null
+          errors?: Json
+          id?: string
+          image_final_url?: string | null
+          image_status?: string
+          image_url_original?: string | null
+          line_number?: number
+          matched_product_id?: string | null
+          raw?: Json
+          sku_distribuidor?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_import_items_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "product_import_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_import_items_matched_product_id_fkey"
+            columns: ["matched_product_id"]
+            isOneToOne: false
+            referencedRelation: "meus_produtos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_import_items_matched_product_id_fkey"
+            columns: ["matched_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           ativo: boolean
@@ -3012,6 +3198,7 @@ export type Database = {
           modelo: string
           preco_manual: boolean
           preco_venda: number
+          sku_distribuidor: string | null
           supplier: string | null
         }
         Insert: {
@@ -3029,6 +3216,7 @@ export type Database = {
           modelo: string
           preco_manual?: boolean
           preco_venda?: number
+          sku_distribuidor?: string | null
           supplier?: string | null
         }
         Update: {
@@ -3046,6 +3234,7 @@ export type Database = {
           modelo?: string
           preco_manual?: boolean
           preco_venda?: number
+          sku_distribuidor?: string | null
           supplier?: string | null
         }
         Relationships: [
@@ -4595,6 +4784,7 @@ export type Database = {
           modelo: string | null
           preco_manual: boolean | null
           preco_venda: number | null
+          sku_distribuidor: string | null
         }
         Insert: {
           ativo?: boolean | null
@@ -4611,6 +4801,7 @@ export type Database = {
           modelo?: string | null
           preco_manual?: boolean | null
           preco_venda?: number | null
+          sku_distribuidor?: string | null
         }
         Update: {
           ativo?: boolean | null
@@ -4627,6 +4818,7 @@ export type Database = {
           modelo?: string | null
           preco_manual?: boolean | null
           preco_venda?: number | null
+          sku_distribuidor?: string | null
         }
         Relationships: [
           {
@@ -4774,6 +4966,13 @@ export type Database = {
         Returns: undefined
       }
       aplicar_ciclo_assinaturas_vencidas: { Args: never; Returns: undefined }
+      aplicar_lote_importacao: {
+        Args: { p_batch_id: string }
+        Returns: {
+          aplicados: number
+          ignorados: number
+        }[]
+      }
       aplicar_reembolso_proporcional: {
         Args: {
           p_charge_id: string
@@ -4898,6 +5097,16 @@ export type Database = {
           total_count: number
         }[]
       }
+      calcular_btu_recomendado: {
+        Args: {
+          p_andar_ou_telhado: boolean
+          p_area_m2: number
+          p_eletronicos: number
+          p_insolacao_alta: boolean
+          p_num_pessoas: number
+        }
+        Returns: number
+      }
       cancelar_agendamento: {
         Args: { p_appointment_id: string; p_reason: string }
         Returns: undefined
@@ -4975,6 +5184,17 @@ export type Database = {
         Args: { p_job_id: string; p_motivo: string }
         Returns: string
       }
+      conversas_pendentes_sync_pii: {
+        Args: { p_limit?: number }
+        Returns: string[]
+      }
+      criar_chave_api_distribuidora: {
+        Args: { p_nome: string }
+        Returns: {
+          chave: string
+          id: string
+        }[]
+      }
       criar_compra_avulsa: {
         Args: {
           p_cep: string
@@ -5037,6 +5257,8 @@ export type Database = {
       destravar_notificacoes_presas: { Args: never; Returns: number }
       disparar_processador_repasses: { Args: never; Returns: undefined }
       disparar_worker_chatwoot: { Args: never; Returns: undefined }
+      disparar_worker_chatwoot_pii: { Args: never; Returns: undefined }
+      disparar_worker_importacao_produtos: { Args: never; Returns: undefined }
       disparar_worker_renovacao_assinaturas: { Args: never; Returns: undefined }
       distancia_coordenadas_km: {
         Args: {
@@ -5049,6 +5271,10 @@ export type Database = {
       }
       distribuidora_ativa: {
         Args: { p_distributor_id: string }
+        Returns: boolean
+      }
+      dono_do_lote_importacao: {
+        Args: { p_batch_id: string }
         Returns: boolean
       }
       dono_do_pedido: { Args: { p_quote_request_id: string }; Returns: boolean }
@@ -5085,6 +5311,7 @@ export type Database = {
         }
         Returns: string
       }
+      expirar_lotes_importacao_pendentes: { Args: never; Returns: undefined }
       feature_enabled: {
         Args: {
           p_flag_key: string
@@ -5093,6 +5320,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      fechar_validacao_lote: {
+        Args: { p_batch_id: string }
+        Returns: undefined
+      }
       finalizar_execucao_servico: {
         Args: { p_job_id: string }
         Returns: string
@@ -5100,6 +5331,14 @@ export type Database = {
       handoff_liberado: {
         Args: { p_conversation_id: string }
         Returns: boolean
+      }
+      ingerir_lote_produtos: {
+        Args: {
+          p_distributor_id: string
+          p_idempotency_key: string
+          p_itens: Json
+        }
+        Returns: string
       }
       is_featured_eligible: {
         Args: {
@@ -5473,6 +5712,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      registrar_imagem_importada: {
+        Args: { p_erro: string; p_item_id: string; p_url: string }
+        Returns: undefined
+      }
       registrar_interesse_plano: {
         Args: { p_ciclo: string; p_slug: string }
         Returns: string
@@ -5501,6 +5744,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      rejeitar_lote_importacao: {
+        Args: { p_batch_id: string }
+        Returns: undefined
+      }
       reputacao_distribuidora: {
         Args: { p_distributor_id: string }
         Returns: {
@@ -5509,6 +5756,30 @@ export type Database = {
           total_entregues: number
           verificada: boolean
         }[]
+      }
+      reservar_itens_para_validar: {
+        Args: { p_limit?: number }
+        Returns: {
+          action: string | null
+          batch_id: string
+          claimed_at: string | null
+          errors: Json
+          id: string
+          image_final_url: string | null
+          image_status: string
+          image_url_original: string | null
+          line_number: number
+          matched_product_id: string | null
+          raw: Json
+          sku_distribuidor: string
+          status: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "product_import_items"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       reservar_notificacoes_whatsapp: {
         Args: { p_limite?: number }
@@ -5550,6 +5821,10 @@ export type Database = {
           telefone: string
           whatsapp_url: string
         }[]
+      }
+      revogar_chave_api_distribuidora: {
+        Args: { p_id: string }
+        Returns: undefined
       }
       salvar_chave_pix: {
         Args: { p_chave: string; p_tipo: string }
@@ -5613,6 +5888,28 @@ export type Database = {
         }
         Returns: string
       }
+      validar_campos_produto: {
+        Args: {
+          p_btu: number
+          p_categoria: string
+          p_custo: number
+          p_estoque_quantidade: number
+          p_marca: string
+          p_modelo: string
+        }
+        Returns: string[]
+      }
+      validar_chave_api: {
+        Args: { p_chave: string }
+        Returns: {
+          api_key_id: string
+          distributor_id: string
+        }[]
+      }
+      validar_item_importacao: {
+        Args: { p_item_id: string }
+        Returns: undefined
+      }
       vincular_cobranca_gateway: {
         Args: {
           p_charge_id: string
@@ -5660,12 +5957,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -5689,11 +5986,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -5714,11 +6011,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -5739,11 +6036,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -5756,11 +6053,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -5774,4 +6071,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-
