@@ -102,6 +102,11 @@ export default async function DistribuidoraPage() {
           desc={semEstoque ? `${semEstoque} sem estoque, fora da busca.` : "Preço, estoque e novos modelos."}
           destaque={(semEstoque ?? 0) > 0}
         />
+        <Atalho
+          href="/painel/distribuidora/financeiro"
+          titulo="Financeiro"
+          desc="Faturado, despesas e o que sobrou em cada pedido."
+        />
       </div>
     </div>
   );

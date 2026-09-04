@@ -6,6 +6,9 @@
  *
  * O corte é por mês civil, não por "últimos 30 dias": conciliação de faturamento
  * é feita em mês fechado, e uma janela deslizante não bate com nenhum extrato.
+ *
+ * Compartilhado entre painel/financeiro (técnico), painel/distribuidora/financeiro
+ * e as telas financeiras do admin — todas precisam da mesma janela de mês civil.
  */
 
 export type PeriodoId = "mes" | "mes_passado" | "trimestre" | "semestre" | "ano";

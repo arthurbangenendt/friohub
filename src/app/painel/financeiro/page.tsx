@@ -5,7 +5,7 @@ import { formatarBRL, TAXA_COMISSAO } from "@/lib/pricing";
 import { Kpi, FECHADOS, wrap } from "../shared";
 import { GraficoMeses, type PontoMes } from "@/components/ui/GraficoMeses";
 import { DespesasEditor, type Despesa, type ServicoParaDespesa } from "./DespesasEditor";
-import { PERIODOS, chaveMes, comoPeriodo, janela, rotuloPeriodo } from "./periodo";
+import { PERIODOS, chaveMes, comoPeriodo, janela, rotuloPeriodo } from "@/lib/periodo";
 import { Doc } from "@/components/icons";
 import { Repasses } from "./Repasses";
 import { rotuloJob } from "../../solicitar/tipos";

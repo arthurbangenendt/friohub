@@ -1,6 +1,6 @@
 import { type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { comoPeriodo, janela, rotuloPeriodo } from "../periodo";
+import { comoPeriodo, janela, rotuloPeriodo } from "@/lib/periodo";
 
 /* Exportação do financeiro em CSV.
  *

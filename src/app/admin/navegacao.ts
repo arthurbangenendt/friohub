@@ -41,6 +41,8 @@ export const GRUPOS_ADMIN: GrupoNavAdmin[] = [
     titulo: "Financeiro",
     itens: [
       { href: "/admin/financeiro", label: "Ledger" },
+      { href: "/admin/financeiro/tecnicos", label: "Ganhos — técnicos" },
+      { href: "/admin/financeiro/distribuidoras", label: "Ganhos — distribuidoras" },
       { href: "/admin/assinaturas", label: "Assinaturas" },
     ],
   },

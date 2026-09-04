@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AdminActions } from "../AdminActions";
@@ -76,6 +77,9 @@ function CardDist({ d }: {
         <div style={{ fontSize: 13, color: "var(--ink-faint)", marginTop: 4 }}>
           {d.cidade} — {d.estado} · entrega em {d.prazo_entrega_dias} dia(s)
           {d.cnpj ? ` · CNPJ ${d.cnpj}` : " · sem CNPJ informado"}
+        </div>
+        <div style={{ display: "flex", gap: 14, marginTop: 6 }}>
+          <Link href={`/admin/distribuidoras/${d.id}/financeiro`} style={{ fontSize: 12.5, color: "var(--cool-deep)", fontWeight: 600 }}>Ver financeiro →</Link>
         </div>
       </div>
       <AdminActions id={d.id} status={d.verification_status} tipo="distribuidora" />

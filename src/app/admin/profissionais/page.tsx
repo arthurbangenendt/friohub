@@ -107,6 +107,7 @@ function Card({ p }: { p: { id: string; nome: string; tipo: string; bio: string 
         {p.bio && <p style={{ fontSize: 13.5, color: "var(--ink-soft)", marginTop: 6 }}>{p.bio}</p>}
         <div style={{ display: "flex", gap: 14, marginTop: 6 }}>
           <Link href={`/profissional/${p.id}`} target="_blank" style={{ fontSize: 12.5, color: "var(--cool-deep)", fontWeight: 600 }}>Ver perfil →</Link>
+          <Link href={`/admin/profissionais/${p.id}/financeiro`} style={{ fontSize: 12.5, color: "var(--cool-deep)", fontWeight: 600 }}>Ver financeiro →</Link>
           {p.documentoUrl ? (
             <a href={p.documentoUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12.5, color: "var(--cool-deep)", fontWeight: 600 }}>Ver documento →</a>
           ) : (
