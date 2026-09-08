@@ -5,7 +5,11 @@ import { formatarBRL } from "@/lib/pricing";
 import { formatarBtu } from "@/lib/btu";
 import { one } from "@/lib/relacional";
 import { GraficoMeses, type PontoMes } from "@/components/ui/GraficoMeses";
+import { WeeklyExpenseCard } from "@/components/ui/card-20";
+import { resumirCategorias } from "@/lib/resumo-despesas";
+import { CATEGORIAS_DESPESA_DIST } from "@/app/painel/distribuidora/financeiro/categorias";
 import { PERIODOS, chaveMes, comoPeriodo, janela, rotuloPeriodo, type PeriodoId } from "@/lib/periodo";
+import { STATUS_REPASSE, resolver } from "@/lib/status";
 
 /* Financeiro de UMA distribuidora, visto pelo admin. Faturamento e despesa
    real, não a coluna de custo — `job_itens.custo_snapshot` nunca tem grant
@@ -17,6 +21,7 @@ import { PERIODOS, chaveMes, comoPeriodo, janela, rotuloPeriodo, type PeriodoId 
    purchase_orders desde 20260817122000). */
 
 const PAGINA_TAM = 20;
+const CATEGORIA_LABEL = Object.fromEntries(CATEGORIAS_DESPESA_DIST.map((c) => [c.id, c.label]));
 
 type ItemJob = { produto_id: string | null; quantidade: number; ambiente: string; produto: { marca: string; modelo: string; btu: number } | null };
 type PoRow = { id: string; status: string; custo_snapshot: number; created_at: string; job_id: string };
@@ -99,9 +104,16 @@ export default async function FinanceiroDistribuidoraAdminPage({ params, searchP
   const totalDespesas = despesas.reduce((s, d) => s + d.valor, 0);
   const resultado = faturado - totalDespesas;
 
-  const totalPaginas = Math.max(1, Math.ceil(entregues.length / PAGINA_TAM));
+  const resumoDespesas = resumirCategorias(
+    despesas.map((d) => ({ ...d, vinculoId: d.purchase_order_id })),
+    CATEGORIA_LABEL,
+  );
+
+  // Extrato agora cobre TODOS os pedidos do período, não só os entregues —
+  // com etiqueta de status (a_repassar/confirmado/faturado/enviado/...).
+  const totalPaginas = Math.max(1, Math.ceil(pedidos.length / PAGINA_TAM));
   const paginaAtual = Math.min(pagina, totalPaginas);
-  const extrato = entregues.slice((paginaAtual - 1) * PAGINA_TAM, paginaAtual * PAGINA_TAM);
+  const extrato = pedidos.slice((paginaAtual - 1) * PAGINA_TAM, paginaAtual * PAGINA_TAM);
 
   const linkPeriodo = (p: PeriodoId) => `/admin/distribuidoras/${id}/financeiro?p=${p}`;
 
@@ -144,25 +156,65 @@ export default async function FinanceiroDistribuidoraAdminPage({ params, searchP
       </section>
 
       <section style={{ marginTop: 22 }}>
-        <h2 style={{ fontSize: "1.05rem", fontWeight: 700, marginBottom: 4 }}>Extrato por pedido</h2>
+        <h2 style={{ fontSize: "1.05rem", fontWeight: 700, marginBottom: 4 }}>Despesas</h2>
         <p style={{ fontSize: 13, color: "var(--ink-soft)", marginBottom: 14 }}>
-          {entregues.length} pedido(s) entregue(s) no período · página {paginaAtual} de {totalPaginas}
+          {despesas.length} lançamento(s) no período.
         </p>
-        <div style={{ display: "grid", gap: 8 }}>
-          {extrato.map((pedido) => {
-            const custo = despesas.filter((d) => d.purchase_order_id === pedido.id).reduce((sum, d) => sum + d.valor, 0);
-            const receita = Number(pedido.custo_snapshot);
-            return (
-              <div key={pedido.id} style={{ display: "flex", justifyContent: "space-between", gap: 12, borderBottom: "1px solid var(--line-soft)", padding: "8px 0" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(240px, 320px) 1fr", gap: 16, alignItems: "start" }}>
+          <WeeklyExpenseCard title="Por categoria" dateRange={rotuloPeriodo(periodo)} data={resumoDespesas} />
+          <div style={{ display: "grid", gap: 6, maxHeight: 380, overflowY: "auto", paddingRight: 4 }}>
+            {despesas.map((d) => (
+              <div key={d.id} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "9px 12px", borderRadius: 10, background: "var(--surface)", border: "1px solid var(--line)" }}>
                 <span>
-                  {rotuloItens(itensPorJob.get(pedido.job_id) ?? [])}
-                  <span style={{ color: "var(--ink-faint)" }}> · {new Date(pedido.created_at).toLocaleDateString("pt-BR")} · #{pedido.id.slice(0, 8)}</span>
+                  <strong style={{ fontSize: 13.5 }}>{CATEGORIA_LABEL[d.categoria] ?? d.categoria}</strong>
+                  {d.descricao && <span style={{ color: "var(--ink-soft)" }}> — {d.descricao}</span>}
+                  <span style={{ display: "block", fontSize: 12, color: "var(--ink-faint)" }}>
+                    {new Date(`${d.data}T12:00:00`).toLocaleDateString("pt-BR")}
+                    {d.purchase_order_id && <> · vinculada a <Link href={`/admin/distribuidoras/${id}/financeiro/pedidos/${d.purchase_order_id}?p=${periodo}`} style={{ color: "var(--cool-deep)" }}>#{d.purchase_order_id.slice(0, 8)}</Link></>}
+                  </span>
                 </span>
-                <strong>{formatarBRL(receita - custo)}</strong>
+                <strong style={{ whiteSpace: "nowrap" }}>{formatarBRL(d.valor)}</strong>
               </div>
-            );
-          })}
-          {!extrato.length && <span style={{ color: "var(--ink-soft)" }}>Nenhum pedido entregue neste período.</span>}
+            ))}
+            {!despesas.length && <span style={{ color: "var(--ink-soft)" }}>Nenhuma despesa lançada neste período.</span>}
+          </div>
+        </div>
+      </section>
+
+      <section style={{ marginTop: 22 }}>
+        <h2 style={{ fontSize: "1.05rem", fontWeight: 700, marginBottom: 4 }}>Todos os pedidos</h2>
+        <p style={{ fontSize: 13, color: "var(--ink-soft)", marginBottom: 14 }}>
+          {pedidos.length} pedido(s) no período · página {paginaAtual} de {totalPaginas}
+        </p>
+        <div style={{ overflowX: "auto" }}>
+          <div style={{ minWidth: 560 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "90px 1fr 110px 100px 100px 100px", gap: 10, padding: "0 12px 8px", fontSize: 11, color: "var(--ink-faint)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              <span>Data</span><span>Aparelho</span><span>Status</span><span>Faturado</span><span>Despesas</span><span>Líquido</span>
+            </div>
+            <div style={{ display: "grid", gap: 6 }}>
+              {extrato.map((pedido) => {
+                const custo = despesas.filter((d) => d.purchase_order_id === pedido.id).reduce((sum, d) => sum + d.valor, 0);
+                const receita = Number(pedido.custo_snapshot);
+                const st = resolver(STATUS_REPASSE, pedido.status);
+                return (
+                  <Link
+                    key={pedido.id}
+                    href={`/admin/distribuidoras/${id}/financeiro/pedidos/${pedido.id}?p=${periodo}`}
+                    className="card"
+                    style={{ display: "grid", gridTemplateColumns: "90px 1fr 110px 100px 100px 100px", gap: 10, padding: "10px 12px", alignItems: "center", fontSize: 13 }}
+                  >
+                    <span style={{ color: "var(--ink-faint)" }}>{new Date(pedido.created_at).toLocaleDateString("pt-BR")}</span>
+                    <span>{rotuloItens(itensPorJob.get(pedido.job_id) ?? [])} <span style={{ color: "var(--ink-faint)" }}>#{pedido.id.slice(0, 8)}</span></span>
+                    <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 100, background: st.bg, color: st.cor, justifySelf: "start" }}>{st.label}</span>
+                    <span>{formatarBRL(receita)}</span>
+                    <span>{formatarBRL(custo)}</span>
+                    <strong>{formatarBRL(receita - custo)}</strong>
+                  </Link>
+                );
+              })}
+              {!extrato.length && <span style={{ color: "var(--ink-soft)" }}>Nenhum pedido neste período.</span>}
+            </div>
+          </div>
         </div>
         {totalPaginas > 1 && (
           <div style={{ display: "flex", gap: 8, marginTop: 16 }}>

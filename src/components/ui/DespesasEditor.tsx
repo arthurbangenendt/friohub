@@ -3,8 +3,9 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { WeeklyExpenseCard, type ExpenseItem } from "@/components/ui/card-20";
+import { WeeklyExpenseCard } from "@/components/ui/card-20";
 import { formatarBRL } from "@/lib/pricing";
+import { resumirCategorias } from "@/lib/resumo-despesas";
 
 export type Despesa = {
   id: string;
@@ -19,7 +20,6 @@ export type ItemParaVinculo = { id: string; label: string };
 
 type Resultado = { ok: true } | { ok: false; error: string };
 
-const CORES = ["var(--chart-1)", "var(--chart-2)", "var(--good)", "var(--warning)"];
 const inputClass = "h-11 w-full rounded-xl border border-[var(--line)] bg-[var(--bg)] px-3.5 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--cool)] focus:ring-2 focus:ring-[var(--cool-wash)]";
 const labelClass = "flex flex-col gap-1.5 text-xs font-bold text-[var(--ink-soft)]";
 
@@ -33,20 +33,6 @@ function moedaParaNumero(valor: string) {
   const limpo = valor.trim().replace(/\s/g, "");
   const normalizado = limpo.includes(",") ? limpo.replace(/\./g, "").replace(",", ".") : limpo;
   return Number(normalizado);
-}
-
-function resumirCategorias(lista: Despesa[], label: Record<string, string>): ExpenseItem[] {
-  const totais = new Map<string, number>();
-  for (const item of lista) totais.set(item.categoria, (totais.get(item.categoria) ?? 0) + item.valor);
-  const ordenadas = [...totais.entries()].sort((a, b) => b[1] - a[1]);
-  const principais: ExpenseItem[] = ordenadas.slice(0, 3).map(([categoria, amount], index) => ({
-    category: label[categoria] ?? categoria,
-    amount,
-    color: CORES[index],
-  }));
-  const restante = ordenadas.slice(3).reduce((soma, [, valor]) => soma + valor, 0);
-  if (restante > 0) principais.push({ category: "Outras", amount: restante, color: CORES[3] });
-  return principais;
 }
 
 /* Editor de despesas genérico — usado pelo técnico (vincula a um serviço) e
