@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { criarConversa, apagarConversa, listarMensagens, type Conversa, type MensagemAssistente } from "./actions";
+import { PEDIDO_ANALISE_INICIAL } from "@/lib/assistente/prompt";
 
 /* Modelada em `painel/mensagens/[id]/Thread.tsx`: mesmas bolhas
    (var(--cool) para o usuário, var(--surface-2) para a IA), inline style +
@@ -55,7 +56,10 @@ export function AssistenteChat({
   }
 
   // Chegada via "Pedir análise da IA" num orçamento: abre direto no modo
-  // triagem, uma única vez por visita à página.
+  // triagem, uma única vez por visita à página. Se a conversa é nova (ainda
+  // não existe uma triagem pra este pedido), dispara sozinha o pedido de
+  // análise — o técnico não precisa digitar nada, a IA já responde. Se a
+  // conversa já existe, só reabre o histórico (não pede a análise de novo).
   useEffect(() => {
     if (!orcamentoParaAbrir || abriuOrcamento.current) return;
     abriuOrcamento.current = true;
@@ -64,7 +68,8 @@ export function AssistenteChat({
       if (existente) {
         await selecionarConversa(existente.id);
       } else {
-        await novaConversa(orcamentoParaAbrir);
+        const novoId = await novaConversa(orcamentoParaAbrir);
+        if (novoId) await enviar({ conversationIdForcado: novoId, mensagemForcada: PEDIDO_ANALISE_INICIAL });
       }
       router.replace("/painel/assistente");
     });
@@ -75,13 +80,13 @@ export function AssistenteChat({
     fimRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [mensagens.length]);
 
-  async function enviar() {
-    const corpo = texto.trim();
+  async function enviar(forcado?: { conversationIdForcado: string; mensagemForcada: string }) {
+    const corpo = forcado?.mensagemForcada ?? texto.trim();
     if (!corpo || enviando) return;
     setErro(null);
-    setTexto("");
+    if (!forcado) setTexto("");
 
-    let idAtual = conversaId;
+    let idAtual = forcado?.conversationIdForcado ?? conversaId;
     if (!idAtual) {
       idAtual = (await novaConversa()) ?? null;
       if (!idAtual) return;
@@ -269,7 +274,7 @@ export function AssistenteChat({
           />
           <button
             className="btn btn-primary"
-            onClick={enviar}
+            onClick={() => enviar()}
             disabled={enviando || !texto.trim()}
             style={{ height: 44, padding: "0 20px", borderRadius: 22 }}
           >

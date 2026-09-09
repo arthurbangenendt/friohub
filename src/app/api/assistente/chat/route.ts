@@ -4,7 +4,13 @@ import type { ChatCompletionMessageParam } from "openai/resources/chat/completio
 import { createClient } from "@/lib/supabase/server";
 import { featureHabilitada } from "@/lib/feature-flags";
 import { getOpenAI, MODELO_ASSISTENTE } from "@/lib/openai/client";
-import { SYSTEM_PROMPT, formatarContextoOrcamento, type ContextoOrcamento } from "@/lib/assistente/prompt";
+import {
+  SYSTEM_PROMPT,
+  formatarContextoOrcamento,
+  gerarRespostaSimulada,
+  PEDIDO_ANALISE_INICIAL,
+  type ContextoOrcamento,
+} from "@/lib/assistente/prompt";
 import { rotuloJob } from "@/app/solicitar/tipos";
 import { one } from "@/lib/relacional";
 
@@ -20,26 +26,50 @@ async function buscarContextoOrcamento(
   supabase: Awaited<ReturnType<typeof createClient>>,
   quoteRequestId: string,
   professionalId: string,
-): Promise<string | null> {
+): Promise<ContextoOrcamento | null> {
   const { data: pedido } = await supabase
     .from("quote_requests")
-    .select(`job_type, urgencia, descricao, btu_recomendado,
+    .select(`job_type, urgencia, descricao, btu_recomendado, cidade, bairro,
              produto:products ( marca, modelo ),
              itens:quote_request_itens ( ambiente, area_m2 )`)
     .eq("id", quoteRequestId)
     .maybeSingle();
   if (!pedido) return null;
 
-  const { data: minhaProposta } = await supabase
-    .from("quotes")
-    .select("valor_mao_obra, valor_materiais, status")
-    .eq("quote_request_id", quoteRequestId)
-    .eq("professional_id", professionalId)
-    .maybeSingle();
+  const [{ data: minhaProposta }, { data: raioProfissional }, { data: profissional }, { data: ferramentas }] =
+    await Promise.all([
+      supabase
+        .from("quotes")
+        .select("valor_mao_obra, valor_materiais, status")
+        .eq("quote_request_id", quoteRequestId)
+        .eq("professional_id", professionalId)
+        .maybeSingle(),
+      supabase
+        .from("professional_service_radius")
+        .select("location_label, radius_km")
+        .eq("professional_id", professionalId)
+        .maybeSingle(),
+      supabase
+        .from("professionals")
+        .select("cidade, estado")
+        .eq("id", professionalId)
+        .maybeSingle(),
+      supabase
+        .from("professional_tools")
+        .select("name, category")
+        .eq("professional_id", professionalId)
+        .limit(40),
+    ]);
 
   const produto = one(pedido.produto) as { marca: string; modelo: string } | null;
   const itens = (pedido.itens ?? []) as { ambiente: string; area_m2: number | null }[];
   const primeiroItem = itens[0];
+
+  const areaAtuacaoProfissional = raioProfissional
+    ? { label: raioProfissional.location_label, raioKm: raioProfissional.radius_km }
+    : profissional
+      ? { label: `${profissional.cidade}, ${profissional.estado}`, raioKm: null }
+      : null;
 
   const ctx: ContextoOrcamento = {
     tipoServico: rotuloJob(pedido.job_type),
@@ -52,8 +82,12 @@ async function buscarContextoOrcamento(
     minhaPropostaResumo: minhaProposta
       ? `mão de obra R$ ${minhaProposta.valor_mao_obra}, materiais R$ ${minhaProposta.valor_materiais} (${minhaProposta.status})`
       : null,
+    cidadePedido: pedido.cidade,
+    bairroPedido: pedido.bairro,
+    areaAtuacaoProfissional,
+    ferramentasProfissional: ferramentas ?? [],
   };
-  return formatarContextoOrcamento(ctx);
+  return ctx;
 }
 
 export async function POST(request: NextRequest) {
@@ -123,34 +157,55 @@ export async function POST(request: NextRequest) {
 
   const mensagensOpenAI: ChatCompletionMessageParam[] = [{ role: "system", content: SYSTEM_PROMPT }];
 
+  let contexto: ContextoOrcamento | null = null;
   if (conversa.quote_request_id) {
-    const contexto = await buscarContextoOrcamento(supabase, conversa.quote_request_id, user.id);
-    if (contexto) mensagensOpenAI.push({ role: "system", content: contexto });
+    contexto = await buscarContextoOrcamento(supabase, conversa.quote_request_id, user.id);
+    if (contexto) {
+      mensagensOpenAI.push({
+        role: "system",
+        content: formatarContextoOrcamento(contexto, mensagem === PEDIDO_ANALISE_INICIAL),
+      });
+    }
   }
 
   for (const m of (historico ?? []).reverse()) {
     mensagensOpenAI.push({ role: m.role as "user" | "assistant", content: m.content });
   }
 
-  const openai = getOpenAI();
-  let openAiStream: Awaited<ReturnType<typeof openai.chat.completions.create>>;
-  try {
-    openAiStream = await openai.chat.completions.create({
-      model: MODELO_ASSISTENTE,
-      messages: mensagensOpenAI,
-      stream: true,
-      stream_options: { include_usage: true },
-      max_completion_tokens: 1200,
-    });
-  } catch (e) {
-    console.error("assistente/chat: falha ao chamar a OpenAI", e);
-    if (e instanceof OpenAI.RateLimitError) {
-      return NextResponse.json({ error: "O assistente está sobrecarregado agora. Tente novamente em instantes." }, { status: 429 });
+  // Modo de teste local sem custo: exige a flag explícita, nunca cai nela só
+  // porque a OPENAI_API_KEY está vazia — assim, se a chave sumir/expirar em
+  // produção por acidente, o assistente falha alto (ver catch abaixo) em vez
+  // de responder com uma análise fake sem avisar ninguém.
+  const modoSimuladoPedido = process.env.ASSISTENTE_IA_MOCK === "true";
+  if (modoSimuladoPedido && process.env.NODE_ENV === "production") {
+    console.error("assistente/chat: ASSISTENTE_IA_MOCK=true ignorado em produção — chamando a OpenAI normalmente.");
+  }
+  const usarMock = modoSimuladoPedido && process.env.NODE_ENV !== "production";
+  if (usarMock) {
+    console.warn("assistente/chat: respondendo em MODO SIMULADO (ASSISTENTE_IA_MOCK=true) — não é a IA de verdade.");
+  }
+
+  let openAiStream: Awaited<ReturnType<ReturnType<typeof getOpenAI>["chat"]["completions"]["create"]>> | null = null;
+  if (!usarMock) {
+    const openai = getOpenAI();
+    try {
+      openAiStream = await openai.chat.completions.create({
+        model: MODELO_ASSISTENTE,
+        messages: mensagensOpenAI,
+        stream: true,
+        stream_options: { include_usage: true },
+        max_completion_tokens: 1200,
+      });
+    } catch (e) {
+      console.error("assistente/chat: falha ao chamar a OpenAI", e);
+      if (e instanceof OpenAI.RateLimitError) {
+        return NextResponse.json({ error: "O assistente está sobrecarregado agora. Tente novamente em instantes." }, { status: 429 });
+      }
+      if (e instanceof OpenAI.AuthenticationError || e instanceof OpenAI.PermissionDeniedError) {
+        return NextResponse.json({ error: "Assistente mal configurado. Avise o suporte." }, { status: 500 });
+      }
+      return NextResponse.json({ error: "Não foi possível falar com o assistente agora." }, { status: 502 });
     }
-    if (e instanceof OpenAI.AuthenticationError || e instanceof OpenAI.PermissionDeniedError) {
-      return NextResponse.json({ error: "Assistente mal configurado. Avise o suporte." }, { status: 500 });
-    }
-    return NextResponse.json({ error: "Não foi possível falar com o assistente agora." }, { status: 502 });
   }
 
   const encoder = new TextEncoder();
@@ -161,15 +216,25 @@ export async function POST(request: NextRequest) {
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
-        for await (const chunk of openAiStream as AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>) {
-          const delta = chunk.choices[0]?.delta?.content;
-          if (delta) {
+        if (usarMock) {
+          const textoSimulado = gerarRespostaSimulada(contexto);
+          const passo = 40;
+          for (let i = 0; i < textoSimulado.length; i += passo) {
+            const delta = textoSimulado.slice(i, i + passo);
             acumulado += delta;
             controller.enqueue(encoder.encode(delta));
           }
-          if (chunk.usage) {
-            promptTokens = chunk.usage.prompt_tokens;
-            completionTokens = chunk.usage.completion_tokens;
+        } else {
+          for await (const chunk of openAiStream as AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>) {
+            const delta = chunk.choices[0]?.delta?.content;
+            if (delta) {
+              acumulado += delta;
+              controller.enqueue(encoder.encode(delta));
+            }
+            if (chunk.usage) {
+              promptTokens = chunk.usage.prompt_tokens;
+              completionTokens = chunk.usage.completion_tokens;
+            }
           }
         }
       } catch (e) {
@@ -188,7 +253,7 @@ export async function POST(request: NextRequest) {
             conversation_id: conversationId,
             role: "assistant",
             content: conteudoParaSalvar,
-            model: MODELO_ASSISTENTE,
+            model: usarMock ? "mock" : MODELO_ASSISTENTE,
             prompt_tokens: promptTokens,
             completion_tokens: completionTokens,
           });
