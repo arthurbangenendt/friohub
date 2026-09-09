@@ -4,6 +4,7 @@ import { REGIAO_LABEL } from "@/lib/regiao";
 import "./globals.css";
 import { AnalyticsConsent } from "@/components/AnalyticsConsent";
 import { ChatwootWidget } from "@/components/ChatwootWidget";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { ToastProvider } from "@/components/ui";
 
 const geistSans = Geist({
@@ -29,7 +30,20 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="pt-BR"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
+      <head>
+        {/* Lê a preferência salva e escreve data-theme no <html> antes do
+            primeiro paint — sem isso, quem escolheu modo escuro veria um
+            flash de tela clara a cada carregamento. Roda de forma síncrona
+            durante o parsing do HTML, antes até da hidratação do React (ver
+            node_modules/next/dist/docs/01-app/02-guides/preventing-flash-before-hydration.md). */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem("friohub-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;}catch(e){}})();`,
+          }}
+        />
+      </head>
       {/* Extensões de navegador (ColorZilla, gerenciadores de senha) injetam
           atributos no body antes da hidratação e disparam mismatch. O className
           aqui é literal fixo, então suprimir o aviso deste elemento — e só dele,
@@ -41,6 +55,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <ToastProvider>{children}</ToastProvider>
         <AnalyticsConsent />
         <ChatwootWidget />
+        <ThemeToggle />
       </body>
     </html>
   );
