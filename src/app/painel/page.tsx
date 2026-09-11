@@ -5,6 +5,7 @@ import { PainelCliente } from "./PainelCliente";
 import type { Filtro, JobRow, OrderRow } from "./shared";
 import type { AcaoCentral, ProximoAtendimento, ResumoCentral } from "./CentralAcoes";
 import { rotuloJob } from "@/app/solicitar/tipos";
+import { comoPapel } from "./navegacao";
 
 type AlvoOrcamento = {
   quote_request_id: string;
@@ -56,8 +57,15 @@ export default async function PainelPage(props: PageProps<"/painel">) {
   if (!user) redirect("/login");
 
   const { data: profile } = await supabase.from("profiles").select("nome, role").eq("id", user.id).single();
+  const papel = comoPapel(profile?.role);
+  /* Admin e distribuidora têm painel próprio (`/admin`, `/painel/distribuidora`);
+     nenhum dos dois aparece no nav como "Meus pedidos", então cair aqui sem
+     redirecionar mostrava a tela de cliente com dado que não é dela — pro
+     admin, pedidos da plataforma inteira sem filtro por cliente_id. */
+  if (papel === "admin") redirect("/admin");
+  if (papel === "distribuidora") redirect("/painel/distribuidora");
   const nome = profile?.nome ?? user.email ?? "você";
-  const isPro = profile?.role === "profissional";
+  const isPro = papel === "profissional";
 
   const { data: jobsData } = await supabase
     .from("jobs")
