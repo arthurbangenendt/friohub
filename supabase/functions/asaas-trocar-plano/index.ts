@@ -12,6 +12,7 @@
  * deixa isso explícito para a tela não prometer o que o backend não garante.
  */
 
+import "../_shared/sentry.ts";
 import { servico, json } from "../_shared/supabase.ts";
 import { criarCobrancaComRecuperacao, AsaasError } from "../_shared/asaas.ts";
 

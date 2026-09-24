@@ -11,6 +11,7 @@
  * denuncia. O único caso de não-200 é assinatura inválida.
  */
 
+import "../_shared/sentry.ts";
 import { servico, json } from "../_shared/supabase.ts";
 import { verificarAssinatura } from "../_shared/assinatura.ts";
 import {

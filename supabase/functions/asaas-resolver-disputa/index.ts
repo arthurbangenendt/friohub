@@ -12,6 +12,7 @@
  * (defesa em profundidade, já que a RPC só é executável por `service_role`).
  */
 
+import "../_shared/sentry.ts";
 import { servico, json } from "../_shared/supabase.ts";
 import { estornarCobranca, AsaasError } from "../_shared/asaas.ts";
 

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect } from "react";
+import * as Sentry from "@sentry/nextjs";
 
 /* Rede de segurança para tudo que está fora de `/painel` — home, wizard de
    solicitação, perfil público, páginas do serviço. Mesma regra de lá: a
@@ -9,6 +10,7 @@ import { useEffect } from "react";
 export default function ErroGlobal({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
     console.error("[app]", error);
+    Sentry.captureException(error);
   }, [error]);
 
   return (

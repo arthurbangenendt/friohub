@@ -10,6 +10,7 @@
  * corpo — este endpoint roda com service_role e a RLS não protege quem chama.
  */
 
+import "../_shared/sentry.ts";
 import { servico, json } from "../_shared/supabase.ts";
 import { chatwoot } from "../_shared/chatwoot.ts";
 import { garantirConversa, type ConversaLocal } from "../_shared/provisionamento.ts";

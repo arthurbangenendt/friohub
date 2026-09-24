@@ -11,6 +11,7 @@
  * revisar e testar.
  */
 
+import "../_shared/sentry.ts";
 import { servico, json } from "../_shared/supabase.ts";
 import { chatwoot } from "../_shared/chatwoot.ts";
 import { identidade } from "../_shared/provisionamento.ts";

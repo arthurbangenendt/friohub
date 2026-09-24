@@ -13,6 +13,7 @@
  * comparação em tempo constante mesmo sendo uma string simples.
  */
 
+import "../_shared/sentry.ts";
 import { servico, json } from "../_shared/supabase.ts";
 
 const TOKEN_ESPERADO = Deno.env.get("ASAAS_WEBHOOK_TOKEN") ?? "";

@@ -27,6 +27,7 @@
  * feito antes dessa coleta existir) recebe erro explícito abaixo.
  */
 
+import "../_shared/sentry.ts";
 import { servico, json } from "../_shared/supabase.ts";
 import { criarCustomer, criarCobrancaComRecuperacao, AsaasError } from "../_shared/asaas.ts";
 

@@ -21,6 +21,7 @@
  * à OUTRA — aquilo exige handoff e duplo consentimento, isto não.
  */
 
+import "../_shared/sentry.ts";
 import { servico, json } from "../_shared/supabase.ts";
 import { chatwoot } from "../_shared/chatwoot.ts";
 import { paraView, type NotificacaoBruta } from "../../../src/lib/notificacoes.ts";

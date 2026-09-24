@@ -12,6 +12,7 @@
  * Só service_role chama — não há caminho a partir de sessão de usuário.
  */
 
+import "../_shared/sentry.ts";
 import { servico, json } from "../_shared/supabase.ts";
 import { garantirContato, garantirUsuario } from "../_shared/provisionamento.ts";
 

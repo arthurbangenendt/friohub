@@ -18,6 +18,7 @@
  * agendado ainda não construído (ver comentário na migration 20260818140000).
  */
 
+import "../_shared/sentry.ts";
 import { servico, json } from "../_shared/supabase.ts";
 import { criarCustomer, criarCobrancaComRecuperacao, cancelarCobranca, AsaasError } from "../_shared/asaas.ts";
 

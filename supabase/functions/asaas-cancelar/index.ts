@@ -15,6 +15,7 @@
  * pode ficar preso esperando o gateway confirmar.
  */
 
+import "../_shared/sentry.ts";
 import { servico, json } from "../_shared/supabase.ts";
 import { cancelarCobranca, AsaasError } from "../_shared/asaas.ts";
 

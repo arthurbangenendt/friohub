@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import * as Sentry from "@sentry/nextjs";
 
 /* Rede de segurança para erro que escapa do próprio `layout.tsx` raiz — algo
  * fora de qualquer segmento de rota, então `error.tsx` (que só cobre os
@@ -19,6 +20,7 @@ import { useEffect } from "react";
 export default function ErroGlobalRaiz({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
     console.error("[app] erro na raiz", error);
+    Sentry.captureException(error);
   }, [error]);
 
   return (

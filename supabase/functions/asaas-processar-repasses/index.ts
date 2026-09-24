@@ -12,6 +12,7 @@
  * o dinheiro já saiu de verdade.
  */
 
+import "../_shared/sentry.ts";
 import { servico, json } from "../_shared/supabase.ts";
 import { criarTransferencia, criarTransferenciaBancaria, AsaasError, type AsaasTransfer } from "../_shared/asaas.ts";
 import type { SupabaseClient } from "jsr:@supabase/supabase-js@2";

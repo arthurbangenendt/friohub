@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect } from "react";
+import * as Sentry from "@sentry/nextjs";
 import { Alert } from "@/components/ui";
 
 /* Antes não existia nenhum `error.tsx` no projeto: qualquer erro não tratado
@@ -15,6 +16,7 @@ import { Alert } from "@/components/ui";
 export default function ErroPainel({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
     console.error("[painel]", error);
+    Sentry.captureException(error);
   }, [error]);
 
   return (

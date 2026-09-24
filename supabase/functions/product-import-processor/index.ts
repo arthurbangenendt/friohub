@@ -12,6 +12,7 @@
  * normalmente (decisão registrada no plano — foto é sempre best-effort).
  */
 
+import "../_shared/sentry.ts";
 import { servico, json } from "../_shared/supabase.ts";
 
 const WORKER_KEY = Deno.env.get("PRODUCT_IMPORT_WORKER_KEY") ?? "";

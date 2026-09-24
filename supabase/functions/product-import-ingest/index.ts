@@ -13,6 +13,7 @@
  * ERP poder consultar sem precisar abrir o painel.
  */
 
+import "../_shared/sentry.ts";
 import { servico, json } from "../_shared/supabase.ts";
 
 const LIMITE_ITENS = 2000;

@@ -11,6 +11,7 @@
  * asaas-resolver-disputa) — só `service_role` alcança `auth.admin.*`.
  */
 
+import "../_shared/sentry.ts";
 import { servico, json } from "../_shared/supabase.ts";
 
 type Corpo = { user_id?: string; acao?: "suspender" | "reativar"; motivo?: string };
